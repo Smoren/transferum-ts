@@ -421,8 +421,8 @@ describe('IntervalTicker handles object value in callback test', () => {
 
 describe('IntervalTicker with zero interval starts setInterval immediately test', () => {
   it('', () => {
-    const setIntervalSpy = jest.spyOn(global, 'setInterval').mockReturnValue(123 as any);
-    const clearIntervalSpy = jest.spyOn(global, 'clearInterval').mockImplementation(() => {});
+    const setIntervalSpy = jest.spyOn(globalThis, 'setInterval').mockReturnValue(123 as any);
+    const clearIntervalSpy = jest.spyOn(globalThis, 'clearInterval').mockImplementation(() => {});
 
     const callback = jest.fn();
     const ticker = new IntervalTicker({ callback, interval: 0 });
@@ -430,6 +430,34 @@ describe('IntervalTicker with zero interval starts setInterval immediately test'
     ticker.start();
 
     expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 0);
+    expect(ticker.active).toBe(true);
+
+    ticker.stop();
+
+    expect(clearIntervalSpy).toHaveBeenCalledWith(123);
+    expect(ticker.active).toBe(false);
+
+    setIntervalSpy.mockRestore();
+    clearIntervalSpy.mockRestore();
+  });
+});
+
+describe('IntervalTicker with zero interval executes callback via setInterval test', () => {
+  it('', () => {
+    const callback = jest.fn();
+    // @ts-ignore
+    const setIntervalSpy = jest.spyOn(globalThis, 'setInterval').mockImplementation((fn: (...args: any[]) => void) => {
+      fn();
+      return 123 as any;
+    });
+    const clearIntervalSpy = jest.spyOn(globalThis, 'clearInterval').mockImplementation(() => {});
+
+    const ticker = new IntervalTicker({ callback, interval: 0 });
+
+    ticker.start();
+
+    expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 0);
+    expect(callback).toHaveBeenCalledTimes(1);
     expect(ticker.active).toBe(true);
 
     ticker.stop();

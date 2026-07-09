@@ -546,6 +546,46 @@ describe(
 );
 
 // ═══════════════════════════════════════════════════════════════
+// PollingProxyTransfer Gate with ticker set
+// ═══════════════════════════════════════════════════════════════
+
+describe(
+  'PollingProxyTransfer toggle with ticker set calls ticker toggle test',
+  () => {
+    it('', () => {
+      jest.useFakeTimers();
+      const customTicker = {
+        start: jest.fn(),
+        stop: jest.fn(),
+        restart: jest.fn(),
+        toggle: jest.fn().mockReturnValue(false),
+        updateInterval: jest.fn(),
+        active: false,
+        interval: 100,
+      };
+      const tickerFactory = jest.fn(() => customTicker) as TickerFactory;
+
+      const transfer = new PollingProxyTransfer<number>({
+        interval: 100,
+        activated: true,
+        tickerFactory,
+      });
+
+      transfer.setFetcher(() => 42);
+
+      const result = transfer.toggle();
+
+      expect(customTicker.toggle).toHaveBeenCalledTimes(1);
+      expect(result).toBe(false);
+      expect(transfer.active).toBe(false);
+
+      transfer.destroy();
+      jest.useRealTimers();
+    });
+  },
+);
+
+// ═══════════════════════════════════════════════════════════════
 // PollingProxyTransfer onStateChange()
 // ═══════════════════════════════════════════════════════════════
 

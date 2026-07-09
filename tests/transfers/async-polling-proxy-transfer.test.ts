@@ -515,3 +515,78 @@ describe(
   },
 );
 
+// ═══════════════════════════════════════════════════════════════
+// AsyncPollingProxyTransfer Gate with ticker set
+// ═══════════════════════════════════════════════════════════════
+
+describe(
+  'AsyncPollingProxyTransfer deactivate with ticker set calls ticker stop test',
+  () => {
+    it('', () => {
+      jest.useFakeTimers();
+      const customTicker = {
+        start: jest.fn(),
+        stop: jest.fn(),
+        restart: jest.fn(),
+        toggle: jest.fn().mockReturnValue(true),
+        updateInterval: jest.fn(),
+        active: true,
+        interval: 100,
+      };
+      const tickerFactory = jest.fn(() => customTicker) as TickerFactory;
+
+      const transfer = new AsyncPollingProxyTransfer<number>({
+        interval: 100,
+        activated: true,
+        tickerFactory,
+      });
+
+      transfer.setAsyncFetcher(async () => 42);
+
+      transfer.deactivate();
+
+      expect(customTicker.stop).toHaveBeenCalledTimes(1);
+      expect(transfer.active).toBe(false);
+
+      transfer.destroy();
+      jest.useRealTimers();
+    });
+  },
+);
+
+describe(
+  'AsyncPollingProxyTransfer toggle with ticker set calls ticker toggle test',
+  () => {
+    it('', () => {
+      jest.useFakeTimers();
+      const customTicker = {
+        start: jest.fn(),
+        stop: jest.fn(),
+        restart: jest.fn(),
+        toggle: jest.fn().mockReturnValue(false),
+        updateInterval: jest.fn(),
+        active: false,
+        interval: 100,
+      };
+      const tickerFactory = jest.fn(() => customTicker) as TickerFactory;
+
+      const transfer = new AsyncPollingProxyTransfer<number>({
+        interval: 100,
+        activated: true,
+        tickerFactory,
+      });
+
+      transfer.setAsyncFetcher(async () => 42);
+
+      const result = transfer.toggle();
+
+      expect(customTicker.toggle).toHaveBeenCalledTimes(1);
+      expect(result).toBe(false);
+      expect(transfer.active).toBe(false);
+
+      transfer.destroy();
+      jest.useRealTimers();
+    });
+  },
+);
+
