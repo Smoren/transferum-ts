@@ -139,7 +139,9 @@ export type CompositeInputTransfer<
   TTriggerable extends TriggerableInterface | undefined,
   TAsyncTriggerable extends AsyncTriggerableInterface | undefined,
   TGate extends GateInterface | undefined,
-> = BaseTransferInterface & DisposableInterface & InputTransfer<TStart> & TTransfer
+> = BaseTransferInterface & DisposableInterface
+  & InputTransfer<TStart>
+  & Omit<TTransfer, keyof SubscribableInterface<any> | keyof PullableInterface<any>>
   & (TTriggerable extends TriggerableInterface ? TriggerableInterface : {})
   & (TAsyncTriggerable extends AsyncTriggerableInterface ? AsyncTriggerableInterface : {})
   & (TGate extends GateInterface ? GateInterface : {});
@@ -151,7 +153,9 @@ export type CompositeOutputTransfer<
   TTriggerable extends TriggerableInterface | undefined,
   TAsyncTriggerable extends AsyncTriggerableInterface | undefined,
   TGate extends GateInterface | undefined,
-> = BaseTransferInterface & DisposableInterface & OutputTransfer<TFinish> & TTransfer
+> = BaseTransferInterface & DisposableInterface
+  & OutputTransfer<TFinish>
+  & Omit<TTransfer, keyof PushableInterface<any> | keyof AsyncPushableInterface<any>>
   & (TTriggerable extends TriggerableInterface ? TriggerableInterface : {})
   & (TAsyncTriggerable extends AsyncTriggerableInterface ? AsyncTriggerableInterface : {})
   & (TGate extends GateInterface ? GateInterface : {});
@@ -160,12 +164,17 @@ export type CompositeOutputTransfer<
 export type CompositeDuplexTransfer<
   TStart,
   TFinish,
-  TInputTransfer extends InputTransfer<TStart>,
-  TOutputTransfer extends OutputTransfer<TFinish>,
+  TStartTransfer extends InputTransfer<TStart>,
+  TFinishTransfer extends OutputTransfer<TFinish>,
   TTriggerable extends TriggerableInterface | undefined,
   TAsyncTriggerable extends AsyncTriggerableInterface | undefined,
   TGate extends GateInterface | undefined,
-> = BaseTransferInterface & DisposableInterface & TInputTransfer & TOutputTransfer & { isDuplex: true }
+> = BaseTransferInterface & DisposableInterface
+  & InputTransfer<TStart>
+  & OutputTransfer<TFinish>
+  & Omit<TStartTransfer, keyof SubscribableInterface<any> | keyof PullableInterface<any>>
+  & Omit<TFinishTransfer, keyof PushableInterface<any> | keyof AsyncPushableInterface<any>>
+  & { isDuplex: true }
   & (TTriggerable extends TriggerableInterface ? TriggerableInterface : {})
   & (TAsyncTriggerable extends AsyncTriggerableInterface ? AsyncTriggerableInterface : {})
   & (TGate extends GateInterface ? GateInterface : {});

@@ -918,10 +918,14 @@ export class AsyncDuplexPipelineBuilder<
     this._ownedResources = ownedResources;
   }
 
-  public static start<TCurrent, TStartTransfer extends DuplexTransfer<any, TCurrent>>(
-    startTransfer: TStartTransfer,
-  ): AsyncDuplexPipelineBuilderInterface<TCurrent, TStartTransfer> {
-    return new AsyncDuplexPipelineBuilder<TCurrent, TStartTransfer>(startTransfer, startTransfer, []);
+  public static start<TStart extends InputTransfer<any>>(
+    startTransfer: TStart,
+  ): AsyncDuplexPipelineBuilderInterface<InputTransferDataType<TStart>, TStart> {
+    return new AsyncDuplexPipelineBuilder<InputTransferDataType<TStart>, TStart>(
+      startTransfer,
+      startTransfer as any, // Приведение к any безопасно, так как на старте это дуплекс-точка
+      []
+    );
   }
 
   public to<TNext>(
