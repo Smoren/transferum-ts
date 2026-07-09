@@ -1,6 +1,5 @@
 import {
   RAFTicker,
-  LatestStorage,
   OutputPipelineBuilder,
   AsyncInputPipelineBuilder,
   AsyncDuplexPipelineBuilder,
@@ -21,6 +20,7 @@ import {
   createIdlePollingTransfer,
   createSplitTransfer,
   createWriteTransfer,
+  createLatestStorage,
 } from '../../src';
 import { describe, expect, it, jest } from '@jest/globals';
 import {
@@ -282,7 +282,7 @@ describe('README Use Cases: Async data pipeline with storage', () => {
 describe('README Use Cases: Broadcast to multiple consumers', () => {
   it('broadcasts to multiple targets via SplitTransfer', () => {
     const source = createPushStoredChannelTransfer<Telemetry>();
-    const telemetryStorage = new LatestStorage<Telemetry>();
+    const telemetryStorage = createLatestStorage<Telemetry>();
 
     const logged: Telemetry[] = [];
     const charted: Telemetry[] = [];

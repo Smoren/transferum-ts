@@ -29,9 +29,9 @@ import {
   createAsyncConditionTransfer,
   createAsyncMapOperator,
   createAsyncStoredChannelTransfer,
-  UniversalCompositeTransfer,
-  LatestStorage,
   linkTransfers,
+  createLatestStorage,
+  UniversalCompositeTransfer,
 } from '../../src';
 import { describe, expect, it } from '@jest/globals';
 // @ts-ignore
@@ -287,7 +287,7 @@ describe('README Transfers: PollingProxyTransfer', () => {
 
 describe('README Transfers: PollingFlowTransfer', () => {
   it('polls from storage', async () => {
-    const storage = new LatestStorage<number>(0);
+    const storage = createLatestStorage<number>(0);
     const polling = createPollingFlowTransfer<number>({
       flow: storage,
       interval: 30,
@@ -402,7 +402,7 @@ describe('README Transfers: SinkTransfer', () => {
 
 describe('README Transfers: WriteTransfer', () => {
   it('writes to storage', () => {
-    const storage = new LatestStorage<number>();
+    const storage = createLatestStorage<number>();
     const writer = createWriteTransfer<number>({ flow: storage });
 
     writer.push(42);
@@ -414,7 +414,7 @@ describe('README Transfers: WriteTransfer', () => {
 
 describe('README Transfers: ReadTransfer', () => {
   it('reads from storage', () => {
-    const storage = new LatestStorage<number>();
+    const storage = createLatestStorage<number>();
     storage.write(42);
     const reader = createReadTransfer<number>({ flow: storage });
 

@@ -12,14 +12,14 @@ import {
   createPollingSourceTransfer,
   createMergeTransfer,
   createConditionTransfer,
-  DuplexPipelineBuilder,
   createSinkTransfer,
-  RAFTicker,
   createPushChannelTransfer,
   createSplitTransfer,
   OutputPipelineBuilder,
+  DuplexPipelineBuilder,
+  RAFTicker,
 } from '../../src';
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 import {
   wait,
   type InputEvent,

@@ -143,10 +143,10 @@ Transferum solves these by providing **composable, type-safe building blocks** w
 #### Real-time UI updates from API polling
 
 ```typescript
-import { PollingSourceTransfer, OutputPipelineBuilder, ConvertTransfer, MapOperator, PushStoredChannelTransfer } from 'transferum';
+import { OutputPipelineBuilder, createPollingSourceTransfer, createConvertTransfer, createMapOperator, createPushStoredChannelTransfer } from 'transferum';
 
 // Poll an API every 5 seconds, transform the response, update subscribers
-const polling = new PollingSourceTransfer<ServerState>({
+const polling = createPollingSourceTransfer<ServerState>({
   fetcher: () => fetch('/api/state').then(r => r.json()),
   interval: 5000,
   activated: true,
@@ -154,10 +154,10 @@ const polling = new PollingSourceTransfer<ServerState>({
 
 const pipeline = OutputPipelineBuilder
   .start(polling)
-  .to(new ConvertTransfer<ServerState, ViewModel>({
-    operator: new MapOperator((state) => toViewModel(state)),
+  .to(createConvertTransfer<ServerState, ViewModel>({
+    operator: createMapOperator((state) => toViewModel(state)),
   }))
-  .finish(new PushStoredChannelTransfer<ViewModel>());
+  .finish(createPushStoredChannelTransfer<ViewModel>());
 
 pipeline.subscribe((vm) => renderUI(vm));
 ```
@@ -165,20 +165,20 @@ pipeline.subscribe((vm) => renderUI(vm));
 #### Debounced user input with async validation
 
 ```typescript
-import { DebounceTransfer, AsyncInputPipelineBuilder, AsyncConditionTransfer, AsyncConvertTransfer, AsyncMapOperator, AsyncSinkTransfer } from 'transferum';
+import { AsyncInputPipelineBuilder, createDebounceTransfer, createAsyncConditionTransfer, createAsyncConvertTransfer, createAsyncSinkTransfer, createAsyncMapOperator } from 'transferum';
 
 // Debounce input → validate → transform → send to async sink
-const input = new DebounceTransfer<string>({ delay: 300 });
+const input = createDebounceTransfer<string>({ delay: 300 });
 
 const pipeline = AsyncInputPipelineBuilder
   .start(input)
-  .to(new AsyncConditionTransfer<string>({
+  .to(createAsyncConditionTransfer<string>({
     shouldAccept: async (s) => s.length > 0,
   }))
-  .to(new AsyncConvertTransfer<string, ValidationResult>({
-    operator: new AsyncMapOperator(async (s) => await validate(s)),
+  .to(createAsyncConvertTransfer<string, ValidationResult>({
+    operator: createAsyncMapOperator(async (s) => await validate(s)),
   }))
-  .finish(new AsyncSinkTransfer<ValidationResult>({
+  .finish(createAsyncSinkTransfer<ValidationResult>({
     callback: async (result) => await saveResult(result),
   }), { owned: true, linkOnError: (e) => console.error(e) });
 
@@ -188,13 +188,13 @@ input.push('user@example.com'); // debounced → validated → saved
 #### Merging multiple data sources into a single view
 
 ```typescript
-import { PollingSourceTransfer, PushStoredChannelTransfer, MergeTransfer } from 'transferum';
+import { createPollingSourceTransfer, createPushStoredChannelTransfer, createMergeTransfer } from 'transferum';
 
 // Merge multiple sensor streams into one (all sources must have the same type)
-const tempSensor = new PollingSourceTransfer<SensorData>({ fetcher: () => ({ temperature: 25, humidity: 50 }), interval: 1000, activated: true });
-const humiditySensor = new PollingSourceTransfer<SensorData>({ fetcher: () => ({ temperature: 26, humidity: 55 }), interval: 1000, activated: true });
+const tempSensor = createPollingSourceTransfer<SensorData>({ fetcher: () => ({ temperature: 25, humidity: 50 }), interval: 1000, activated: true });
+const humiditySensor = createPollingSourceTransfer<SensorData>({ fetcher: () => ({ temperature: 26, humidity: 55 }), interval: 1000, activated: true });
 
-const merge = new MergeTransfer<SensorData>({
+const merge = createMergeTransfer<SensorData>({
   sources: [tempSensor, humiditySensor],
 });
 
@@ -204,13 +204,13 @@ merge.subscribe((data) => updateDashboard(data)); // receives data from both sen
 #### Conditional routing with bridges
 
 ```typescript
-import { BridgeSelector, createPassBridge } from 'transferum';
+import { createBridgeSelector, createPassBridge } from 'transferum';
 
 // Route data to different processing pipelines based on a selector
 const fastBridge = createPassBridge({ source, target: fastPipeline, activated: false });
 const slowBridge = createPassBridge({ source, target: slowPipeline, activated: false });
 
-const router = new BridgeSelector({
+const router = createBridgeSelector({
   bridges: { fast: fastBridge, slow: slowBridge },
   initialKey: 'fast',
   activated: true,
@@ -223,10 +223,10 @@ router.select('slow');
 #### Idle fallback polling
 
 ```typescript
-import { IdlePollingTransfer } from 'transferum';
+import { createIdlePollingTransfer } from 'transferum';
 
 // When user stops interacting, fall back to polling for fresh data
-const channel = new IdlePollingTransfer<FeedItem>({
+const channel = createIdlePollingTransfer<FeedItem>({
   fetcher: () => fetchLatestFeed(),
   timeout: 10000,   // 10 s of inactivity → start polling
   interval: 2000,   // poll every 2 s
@@ -240,14 +240,14 @@ channel.subscribe((item) => appendToFeed(item));
 #### Game loop / animation frame data processing
 
 ```typescript
-import { RAFTicker, PollingSourceTransfer } from 'transferum';
+import { createPollingSourceTransfer, RAFTicker } from 'transferum';
 
 // Use RAFTicker for frame-aligned data processing
 const ticker = new RAFTicker({ callback: () => processFrame(), interval: 16 });
 ticker.start();
 
 // Or pass tickerFactory to a polling transfer for frame-aligned polling
-const framePolling = new PollingSourceTransfer<GameState>({
+const framePolling = createPollingSourceTransfer<GameState>({
   fetcher: () => getCurrentGameState(),
   interval: 16,
   activated: true,
@@ -258,17 +258,17 @@ const framePolling = new PollingSourceTransfer<GameState>({
 #### Async data pipeline with storage
 
 ```typescript
-import { PushStoredChannelTransfer, AsyncDuplexPipelineBuilder, AsyncConvertTransfer, AsyncMapOperator } from 'transferum';
+import { AsyncDuplexPipelineBuilder, createPushStoredChannelTransfer, createAsyncConvertTransfer, createAsyncMapOperator } from 'transferum';
 
 // Push data → async transform → notify subscribers
-const source = new PushStoredChannelTransfer<RawData>();
+const source = createPushStoredChannelTransfer<RawData>();
 
 const pipeline = AsyncDuplexPipelineBuilder
   .start(source)
-  .to(new AsyncConvertTransfer<RawData, ProcessedData>({
-    operator: new AsyncMapOperator(async (raw) => await process(raw)),
+  .to(createAsyncConvertTransfer<RawData, ProcessedData>({
+    operator: createAsyncMapOperator(async (raw) => await process(raw)),
   }))
-  .finish(new PushStoredChannelTransfer<ProcessedData>());
+  .finish(createPushStoredChannelTransfer<ProcessedData>());
 
 pipeline.subscribe((data) => console.log(data));
 source.push(rawData); // → async transformation → processed data
@@ -277,16 +277,16 @@ source.push(rawData); // → async transformation → processed data
 #### Broadcast to multiple consumers
 
 ```typescript
-import { PushStoredChannelTransfer, SplitTransfer, SinkTransfer, WriteTransfer, linkTransfers } from 'transferum';
+import { createPushStoredChannelTransfer, createSplitTransfer, createSinkTransfer, createWriteTransfer, linkTransfers } from 'transferum';
 
 // One source → multiple independent consumers
-const source = new PushStoredChannelTransfer<Telemetry>();
+const source = createPushStoredChannelTransfer<Telemetry>();
 
-const split = new SplitTransfer<Telemetry>({
+const split = createSplitTransfer<Telemetry>({
   targets: [
-    new SinkTransfer({ callback: (t) => logTelemetry(t) }),
-    new SinkTransfer({ callback: (t) => updateChart(t) }),
-    new WriteTransfer({ flow: telemetryStorage }),
+    createSinkTransfer({ callback: (t) => logTelemetry(t) }),
+    createSinkTransfer({ callback: (t) => updateChart(t) }),
+    createWriteTransfer({ flow: telemetryStorage }),
   ],
 });
 
@@ -307,14 +307,14 @@ Transferum is designed for building complex, predictable data processing systems
 Collect events from keyboard, mouse, and gamepad → filter (e.g., `DebounceTransfer` to prevent spam) → transform into game commands → route to appropriate systems.
 
 ```typescript
-import { DebounceTransfer, ConvertTransfer, MapOperator, BridgeSelector, createPassBridge } from 'transferum';
+import { createDebounceTransfer, createConvertTransfer, createMapOperator, createBridgeSelector, createPassBridge } from 'transferum';
 
-const inputChannel = new DebounceTransfer<InputEvent>({ delay: 50 });
-const commandConverter = new ConvertTransfer<InputEvent, GameCommand>({
-  operator: new MapOperator((e) => eventToCommand(e)),
+const inputChannel = createDebounceTransfer<InputEvent>({ delay: 50 });
+const commandConverter = createConvertTransfer<InputEvent, GameCommand>({
+  operator: createMapOperator((e) => eventToCommand(e)),
 });
 
-const router = new BridgeSelector({
+const router = createBridgeSelector({
   bridges: {
     walk: createPassBridge({ source: commandConverter, target: walkSystem, activated: false }),
     run: createPassBridge({ source: commandConverter, target: runSystem, activated: false }),
@@ -335,16 +335,16 @@ router.select('run');
 Manage game object state, synchronize animations, calculate physics. Use `ThrottleTransfer` to limit UI update frequency, `GateTransfer` to activate/deactivate game mechanics.
 
 ```typescript
-import { PushStoredChannelTransfer, ThrottleTransfer, GateTransfer, linkTransfers } from 'transferum';
+import { createPushStoredChannelTransfer, createThrottleTransfer, createGateTransfer, linkTransfers } from 'transferum';
 
-const gameState = new PushStoredChannelTransfer<GameState>({ initialValue: initialState });
-const uiUpdate = new ThrottleTransfer<GameState>({ interval: 100 }); // 10 FPS UI updates
+const gameState = createPushStoredChannelTransfer<GameState>({ initialValue: initialState });
+const uiUpdate = createThrottleTransfer<GameState>({ interval: 100 }); // 10 FPS UI updates
 
 linkTransfers(gameState, uiUpdate);
 uiUpdate.subscribe((state) => renderHUD(state));
 
 // Pause game mechanics
-const physicsGate = new GateTransfer<PhysicsEvent>({ activated: true });
+const physicsGate = createGateTransfer<PhysicsEvent>({ activated: true });
 physicsGate.deactivate(); // pause physics
 ```
 
@@ -353,9 +353,9 @@ physicsGate.deactivate(); // pause physics
 Use `BridgeMultiSelector` to activate multiple effects simultaneously on events (explosion, hit).
 
 ```typescript
-import { BridgeMultiSelector, createPassBridge } from 'transferum';
+import { createBridgeMultiSelector, createPassBridge } from 'transferum';
 
-const effects = new BridgeMultiSelector({
+const effects = createBridgeMultiSelector({
   bridges: {
     explosion: createPassBridge({ source: trigger, target: particleSystem, activated: false }),
     sound: createPassBridge({ source: trigger, target: audioSystem, activated: false }),
@@ -381,30 +381,30 @@ effects.check('shake');
 Read data from multiple sensors (temperature, humidity, motion) via `PollingSourceTransfer` → filter (`ConditionTransfer`) → aggregate → send to cloud or local storage.
 
 ```typescript
-import { PollingSourceTransfer, MergeTransfer, OutputPipelineBuilder, ConditionTransfer, AsyncWriteTransfer } from 'transferum';
+import { OutputPipelineBuilder, createPollingSourceTransfer, createMergeTransfer, createConditionTransfer, createAsyncWriteTransfer } from 'transferum';
 
-const tempSensor = new PollingSourceTransfer<number>({
+const tempSensor = createPollingSourceTransfer<number>({
   fetcher: () => readTemperatureSensor(),
   interval: 1000,
   activated: true,
 });
 
-const humiditySensor = new PollingSourceTransfer<number>({
+const humiditySensor = createPollingSourceTransfer<number>({
   fetcher: () => readHumiditySensor(),
   interval: 1000,
   activated: true,
 });
 
-const aggregator = new MergeTransfer<SensorData>({
+const aggregator = createMergeTransfer<SensorData>({
   sources: [tempSensor, humiditySensor],
 });
 
 const pipeline = OutputPipelineBuilder
   .start(aggregator)
-  .to(new ConditionTransfer<SensorData>({
+  .to(createConditionTransfer<SensorData>({
     shouldAccept: (d) => d.temperature > 0 && d.humidity >= 0,
   }))
-  .finish(new AsyncWriteTransfer<SensorData>({ flow: cloudStorage }));
+  .finish(createAsyncWriteTransfer<SensorData>({ flow: cloudStorage }));
 ```
 
 **Device Control**
@@ -412,9 +412,9 @@ const pipeline = OutputPipelineBuilder
 Process commands from users or external systems → route to specific actuators (`BridgeSelector`) → receive feedback.
 
 ```typescript
-import { BridgeSelector, createPassBridge } from 'transferum';
+import { createBridgeSelector, createPassBridge } from 'transferum';
 
-const commandRouter = new BridgeSelector({
+const commandRouter = createBridgeSelector({
   bridges: {
     light: createPassBridge({ source: commandChannel, target: lightController, activated: false }),
     thermostat: createPassBridge({ source: commandChannel, target: thermostatController, activated: false }),
@@ -433,15 +433,15 @@ commandRouter.select('thermostat'); // switch to thermostat control
 Use `IntervalTicker` for periodic device status polling, `DebounceTransfer` for stable-change notifications (e.g., temperature stays above threshold for N seconds).
 
 ```typescript
-import { DebounceTransfer, PollingSourceTransfer } from 'transferum';
+import { createDebounceTransfer, createPollingSourceTransfer } from 'transferum';
 
-const alertChannel = new DebounceTransfer<Alert>({ delay: 5000 }); // 5s stable alert
+const alertChannel = createDebounceTransfer<Alert>({ delay: 5000 }); // 5s stable alert
 
 alertChannel.subscribe((alert) => {
   sendNotification(alert);
 });
 
-const tempMonitor = new PollingSourceTransfer<number>({
+const tempMonitor = createPollingSourceTransfer<number>({
   fetcher: () => readTemperature(),
   interval: 1000,
   activated: true,
@@ -463,19 +463,26 @@ tempMonitor.subscribe((temp) => {
 Process user input in form fields → validate (`GuardOperator`) → transform (`MapOperator`) → `DebounceTransfer` for autosave or live search.
 
 ```typescript
-import { DebounceTransfer, AsyncDuplexPipelineBuilder, AsyncConditionTransfer, AsyncConvertTransfer, AsyncMapOperator, PushStoredChannelTransfer } from 'transferum';
+import {
+  AsyncDuplexPipelineBuilder,
+  createDebounceTransfer,
+  createAsyncConditionTransfer,
+  createAsyncConvertTransfer,
+  createPushStoredChannelTransfer,
+  createAsyncMapOperator,
+} from 'transferum';
 
-const searchInput = new DebounceTransfer<string>({ delay: 300 });
+const searchInput = createDebounceTransfer<string>({ delay: 300 });
 
 const pipeline = AsyncDuplexPipelineBuilder
   .start(searchInput)
-  .to(new AsyncConditionTransfer<string>({
+  .to(createAsyncConditionTransfer<string>({
     shouldAccept: async (s) => s.length >= 3,
   }))
-  .to(new AsyncConvertTransfer<string, SearchResult[]>({
-    operator: new AsyncMapOperator(async (query) => await searchAPI(query)),
+  .to(createAsyncConvertTransfer<string, SearchResult[]>({
+    operator: createAsyncMapOperator(async (query) => await searchAPI(query)),
   }))
-  .finish(new PushStoredChannelTransfer<SearchResult[]>());
+  .finish(createPushStoredChannelTransfer<SearchResult[]>());
 
 pipeline.subscribe((results) => renderSuggestions(results));
 searchInput.push('user query');
@@ -486,9 +493,9 @@ searchInput.push('user query');
 Use `PushStoredChannelTransfer` to store component state that other UI parts can subscribe to. `GateTransfer` to control element visibility or activity.
 
 ```typescript
-import { PushStoredChannelTransfer, GateTransfer } from 'transferum';
+import { createPushStoredChannelTransfer, createGateTransfer } from 'transferum';
 
-const componentState = new PushStoredChannelTransfer<ComponentState>({
+const componentState = createPushStoredChannelTransfer<ComponentState>({
   initialValue: { loading: false, data: null },
 });
 
@@ -497,7 +504,7 @@ componentState.subscribe((state) => renderContent(state));
 componentState.subscribe((state) => updateBreadcrumb(state));
 
 // Conditional rendering
-const visibilityGate = new GateTransfer<UIEvent>({ activated: true });
+const visibilityGate = createGateTransfer<UIEvent>({ activated: true });
 visibilityGate.deactivate(); // hide element
 ```
 
@@ -506,7 +513,7 @@ visibilityGate.deactivate(); // hide element
 Use `RAFTicker` for smooth animations, `ThrottleTransfer` to limit redraw frequency on intensive events (e.g., `mousemove`).
 
 ```typescript
-import { RAFTicker, ThrottleTransfer } from 'transferum';
+import { createThrottleTransfer, RAFTicker } from 'transferum';
 
 const frameTicker = new RAFTicker({
   callback: () => updateAnimation(),
@@ -514,7 +521,7 @@ const frameTicker = new RAFTicker({
 });
 frameTicker.start();
 
-const mouseMove = new ThrottleTransfer<MouseEvent>({ interval: 50 });
+const mouseMove = createThrottleTransfer<MouseEvent>({ interval: 50 });
 mouseMove.subscribe((e) => updateCursorPosition(e));
 ```
 
@@ -527,11 +534,11 @@ mouseMove.subscribe((e) => updateCursorPosition(e));
 Collect metrics from various sources (server logs, client events) → filter → transform → send to multiple monitoring systems (`BridgeMultiSelector` for Prometheus, ELK, Sentry simultaneously).
 
 ```typescript
-import { PushStoredChannelTransfer, BridgeMultiSelector, createPassBridge } from 'transferum';
+import { createPushStoredChannelTransfer, createBridgeMultiSelector, createPassBridge } from 'transferum';
 
-const metricsChannel = new PushStoredChannelTransfer<Metric>();
+const metricsChannel = createPushStoredChannelTransfer<Metric>();
 
-const destinations = new BridgeMultiSelector({
+const destinations = createBridgeMultiSelector({
   bridges: {
     prometheus: createPassBridge({ source: metricsChannel, target: prometheusWriter, activated: true }),
     elk: createPassBridge({ source: metricsChannel, target: elkWriter, activated: true }),
@@ -550,17 +557,17 @@ metricsChannel.push({ name: 'request_latency', value: 150 });
 Use `SplitTransfer` to separate log streams by severity level, `ConditionTransfer` for anomaly detection.
 
 ```typescript
-import { SplitTransfer, ConditionTransfer } from 'transferum';
+import { createSplitTransfer, createConditionTransfer } from 'transferum';
 
-const logSplit = new SplitTransfer<LogEntry>({
+const logSplit = createSplitTransfer<LogEntry>({
   targets: [
-    new ConditionTransfer({ shouldEmit: (l) => l.level === 'ERROR' }),
-    new ConditionTransfer({ shouldEmit: (l) => l.level === 'WARN' }),
-    new ConditionTransfer({ shouldEmit: (l) => l.level === 'INFO' }),
+    createConditionTransfer({ shouldEmit: (l) => l.level === 'ERROR' }),
+    createConditionTransfer({ shouldEmit: (l) => l.level === 'WARN' }),
+    createConditionTransfer({ shouldEmit: (l) => l.level === 'INFO' }),
   ],
 });
 
-const anomalyDetector = new ConditionTransfer<LogEntry>({
+const anomalyDetector = createConditionTransfer<LogEntry>({
   shouldAccept: (l) => detectAnomaly(l),
 });
 
@@ -578,22 +585,29 @@ anomalyDetector.subscribe((anomalousLog) => {
 Receive streaming quotes → calculate indicators (`MapOperator`) → filter by conditions (`ConditionTransfer`) → execute trading strategies.
 
 ```typescript
-import { PushStoredChannelTransfer, DuplexPipelineBuilder, ConvertTransfer, MapOperator, ConditionTransfer, AsyncSinkTransfer } from 'transferum';
+import {
+  DuplexPipelineBuilder,
+  createPushStoredChannelTransfer,
+  createConvertTransfer,
+  createConditionTransfer,
+  createAsyncSinkTransfer,
+  createMapOperator,
+} from 'transferum';
 
-const quoteStream = new PushStoredChannelTransfer<Quote[]>({ initialValue: [] });
+const quoteStream = createPushStoredChannelTransfer<Quote[]>({ initialValue: [] });
 
 const indicatorPipeline = DuplexPipelineBuilder
   .start(quoteStream)
-  .to(new ConvertTransfer<Quote[], TechnicalIndicator>({
-    operator: new MapOperator((quotes) => ({
+  .to(createConvertTransfer<Quote[], TechnicalIndicator>({
+    operator: createMapOperator((quotes) => ({
       value: quotes.reduce((sum, q) => sum + q.price, 0),
       threshold: 100,
     })),
   }))
-  .to(new ConditionTransfer<TechnicalIndicator>({
+  .to(createConditionTransfer<TechnicalIndicator>({
     shouldAccept: (ind) => ind.value > ind.threshold,
   }))
-  .finish(new AsyncSinkTransfer<TradingSignal>({
+  .finish(createAsyncSinkTransfer<TradingSignal>({
     callback: async (signal) => await executeTrade(signal),
   }));
 
@@ -605,9 +619,9 @@ quoteStream.push([{ symbol: 'AAPL', price: 150, timestamp: Date.now() }]);
 Use `BridgeSelector` to switch between different strategies or data sources.
 
 ```typescript
-import { BridgeSelector, createPassBridge } from 'transferum';
+import { createBridgeSelector, createPassBridge } from 'transferum';
 
-const strategyRouter = new BridgeSelector({
+const strategyRouter = createBridgeSelector({
   bridges: {
     conservative: createPassBridge({ source: marketData, target: conservativeStrategy, activated: false }),
     aggressive: createPassBridge({ source: marketData, target: aggressiveStrategy, activated: false }),
@@ -676,17 +690,24 @@ fromEvent(searchInput, 'input')
 
 ```typescript
 // Transferum
-import { DebounceTransfer, AsyncInputPipelineBuilder, AsyncConditionTransfer, AsyncConvertTransfer, AsyncSinkTransfer, AsyncMapOperator } from 'transferum';
+import {
+  AsyncInputPipelineBuilder,
+  createDebounceTransfer,
+  createAsyncConditionTransfer,
+  createAsyncConvertTransfer,
+  createAsyncSinkTransfer,
+  createAsyncMapOperator,
+} from 'transferum';
 
-const input = new DebounceTransfer<string>({ delay: 300 });
+const input = createDebounceTransfer<string>({ delay: 300 });
 
 const pipeline = AsyncInputPipelineBuilder
   .start(input)
-  .to(new AsyncConditionTransfer<string>({ shouldAccept: q => q.length >= 3 }))
-  .to(new AsyncConvertTransfer<string, SearchResult[]>({
-    operator: new AsyncMapOperator(async q => await searchAPI(q)),
+  .to(createAsyncConditionTransfer<string>({ shouldAccept: q => q.length >= 3 }))
+  .to(createAsyncConvertTransfer<string, SearchResult[]>({
+    operator: createAsyncMapOperator(async q => await searchAPI(q)),
   }))
-  .finish(new AsyncSinkTransfer<SearchResult[]>({
+  .finish(createAsyncSinkTransfer<SearchResult[]>({
     callback: results => render(results),
   }), { owned: true });
 
@@ -998,10 +1019,10 @@ The `linkTransfers(lhs, rhs)` function connects an output transfer (LHS) to an i
 Returns `SubscriberInterface` for breaking the link.
 
 ```typescript
-import { PushChannelTransfer, SinkTransfer, linkTransfers } from 'transferum';
+import { createPushChannelTransfer, createSinkTransfer, linkTransfers } from 'transferum';
 
-const source = new PushChannelTransfer<number>();
-const target = new SinkTransfer<number>({ callback: (n) => console.log(n) });
+const source = createPushChannelTransfer<number>();
+const target = createSinkTransfer<number>({ callback: (n) => console.log(n) });
 
 const link = linkTransfers(source, target);
 source.push(42); // → callback called
@@ -1024,9 +1045,9 @@ const link = linkTransfers(source, asyncTarget, { onError: (e) => console.error(
 This behavior is intentional: `undefined` means "no data" in the library, not "empty value." If you need to propagate an empty value, use `null`:
 
 ```typescript
-import { PushStoredChannelTransfer } from 'transferum';
+import { createPushStoredChannelTransfer } from 'transferum';
 
-const channel = new PushStoredChannelTransfer<string | null>({ initialValue: null });
+const channel = createPushStoredChannelTransfer<string | null>({ initialValue: null });
 
 channel.subscribe((data) => console.log(data));
 
@@ -1116,9 +1137,9 @@ Reactive channel with automatic emission to subscribers on `push()`. Data is not
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`
 
 ```typescript
-import { PushChannelTransfer } from 'transferum';
+import { createPushChannelTransfer } from 'transferum';
 
-const channel = new PushChannelTransfer<number>();
+const channel = createPushChannelTransfer<number>();
 
 channel.subscribe((data) => console.log(data));
 channel.push(42); // → 42
@@ -1132,9 +1153,9 @@ Reactive channel with delayed emission to subscribers on `push()`. Each `push()`
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`
 
 ```typescript
-import { DelayedPushChannelTransfer } from 'transferum';
+import { createDelayedPushChannelTransfer } from 'transferum';
 
-const channel = new DelayedPushChannelTransfer<number>({ delay: 100 });
+const channel = createDelayedPushChannelTransfer<number>({ delay: 100 });
 
 channel.subscribe((data) => console.log(data));
 channel.push(42); // → 42 will be logged after 100 ms
@@ -1154,9 +1175,9 @@ Reactive channel with debounced emission to subscribers on `push()`. Each `push(
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`
 
 ```typescript
-import { DebounceTransfer } from 'transferum';
+import { createDebounceTransfer } from 'transferum';
 
-const channel = new DebounceTransfer<number>({ delay: 200 });
+const channel = createDebounceTransfer<number>({ delay: 200 });
 
 channel.subscribe((data) => console.log(data));
 channel.push(1); // resets timer
@@ -1179,9 +1200,9 @@ Reactive channel with throttled emission to subscribers on `push()`. The first `
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`
 
 ```typescript
-import { ThrottleTransfer } from 'transferum';
+import { createThrottleTransfer } from 'transferum';
 
-const channel = new ThrottleTransfer<number>({ interval: 100 });
+const channel = createThrottleTransfer<number>({ interval: 100 });
 
 channel.subscribe((data) => console.log(data));
 channel.push(1); // → 1 (leading edge, immediately)
@@ -1202,9 +1223,9 @@ Reactive channel with last-value retention. The value is available for `pull()` 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isPullable`, `isSubscribable`, `isTriggerable`
 
 ```typescript
-import { PushStoredChannelTransfer } from 'transferum';
+import { createPushStoredChannelTransfer } from 'transferum';
 
-const channel = new PushStoredChannelTransfer<number>({ initialValue: 0 });
+const channel = createPushStoredChannelTransfer<number>({ initialValue: 0 });
 
 channel.subscribe((data) => console.log(data));
 channel.push(42); // → subscribers notified, value retained
@@ -1220,9 +1241,9 @@ Passive buffer with push/pull mechanics (no notifications). `pull()` extracts th
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isPullable`
 
 ```typescript
-import { BufferTransfer } from 'transferum';
+import { createBufferTransfer } from 'transferum';
 
-const buffer = new BufferTransfer<number>();
+const buffer = createBufferTransfer<number>();
 
 buffer.push(42);
 console.log(buffer.pull()); // 42
@@ -1236,9 +1257,9 @@ Buffer with manual read control via `trigger()`. `pull()` returns data only afte
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isPullable`, `isTriggerable`
 
 ```typescript
-import { ManualBufferTransfer } from 'transferum';
+import { createManualBufferTransfer } from 'transferum';
 
-const buffer = new ManualBufferTransfer<number>();
+const buffer = createManualBufferTransfer<number>();
 
 buffer.push(42);
 console.log(buffer.pull()); // undefined (trigger not called)
@@ -1254,9 +1275,9 @@ Reactive stream with manual emission control. `push()` writes the value, `trigge
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`, `isTriggerable`
 
 ```typescript
-import { ManualFlowTransfer } from 'transferum';
+import { createManualFlowTransfer } from 'transferum';
 
-const flow = new ManualFlowTransfer<number>();
+const flow = createManualFlowTransfer<number>();
 
 flow.subscribe((data) => console.log(data));
 flow.push(42); // subscribers NOT notified
@@ -1270,9 +1291,9 @@ Transfer with state management (gate). Passes data only when `active === true`.
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`, `isGate`
 
 ```typescript
-import { GateTransfer } from 'transferum';
+import { createGateTransfer } from 'transferum';
 
-const gate = new GateTransfer<number>({ activated: false });
+const gate = createGateTransfer<number>({ activated: false });
 
 gate.subscribe((data) => console.log(data));
 gate.push(42); // ignored (gate closed)
@@ -1289,9 +1310,9 @@ console.log(gate.toggle()); // true (open)
 **Subscribing to state changes:**
 
 ```typescript
-import { GateTransfer } from 'transferum';
+import { createGateTransfer } from 'transferum';
 
-const gate = new GateTransfer<number>({ activated: false });
+const gate = createGateTransfer<number>({ activated: false });
 
 gate.onStateChange((g) => {
   console.log(`Gate state changed: active=${g.active}`);
@@ -1310,12 +1331,12 @@ Aggregator of multiple sources into a single stream. Automatically subscribes to
 **Capabilities:** `isOutput`, `isPushable`, `isSubscribable`
 
 ```typescript
-import { PushStoredChannelTransfer, MergeTransfer } from 'transferum';
+import { createPushStoredChannelTransfer, createMergeTransfer } from 'transferum';
 
-const source1 = new PushStoredChannelTransfer<number>();
-const source2 = new PushStoredChannelTransfer<number>();
+const source1 = createPushStoredChannelTransfer<number>();
+const source2 = createPushStoredChannelTransfer<number>();
 
-const merge = new MergeTransfer<number>({ sources: [source1, source2] });
+const merge = createMergeTransfer<number>({ sources: [source1, source2] });
 
 merge.subscribe((data) => console.log(data));
 source1.push(1); // → 1
@@ -1329,12 +1350,12 @@ Stream splitter to multiple targets (broadcast). `push()` sends data to all targ
 **Capabilities:** `isInput`, `isPushable`
 
 ```typescript
-import { PushStoredChannelTransfer, SplitTransfer } from 'transferum';
+import { createPushStoredChannelTransfer, createSplitTransfer } from 'transferum';
 
-const target1 = new PushStoredChannelTransfer<number>();
-const target2 = new PushStoredChannelTransfer<number>();
+const target1 = createPushStoredChannelTransfer<number>();
+const target2 = createPushStoredChannelTransfer<number>();
 
-const split = new SplitTransfer<number>({ targets: [target1, target2] });
+const split = createSplitTransfer<number>({ targets: [target1, target2] });
 
 split.push(42); // sent to target1 and target2
 ```
@@ -1346,9 +1367,9 @@ Output transfer with internal polling of a data source. A `Ticker` calls `trigge
 **Capabilities:** `isOutput`, `isPollingSource`, `isPullable`, `isSubscribable`, `isTriggerable`, `isGate`
 
 ```typescript
-import { PollingSourceTransfer } from 'transferum';
+import { createPollingSourceTransfer } from 'transferum';
 
-const polling = new PollingSourceTransfer<number>({
+const polling = createPollingSourceTransfer<number>({
   fetcher: () => Date.now(),
   interval: 1000,
   activated: true,
@@ -1369,9 +1390,9 @@ Duplex transfer with polling that receives its `fetcher` from the previous node 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPollingProxy`, `isPollingSource`, `isPullable`, `isSubscribable`, `isTriggerable`, `isGate`
 
 ```typescript
-import { PollingProxyTransfer } from 'transferum';
+import { createPollingProxyTransfer } from 'transferum';
 
-const poller = new PollingProxyTransfer<number>({
+const poller = createPollingProxyTransfer<number>({
   interval: 1000,
   activated: false,
 });
@@ -1389,10 +1410,10 @@ Output transfer with polling from `OutputFlowInterface` (e.g., Storage).
 **Capabilities:** `isOutput`, `isPollingSource`, `isPullable`, `isSubscribable`, `isTriggerable`, `isGate`
 
 ```typescript
-import { LatestStorage, PollingFlowTransfer } from 'transferum';
+import { createLatestStorage, createPollingFlowTransfer } from 'transferum';
 
-const storage = new LatestStorage<number>(0);
-const polling = new PollingFlowTransfer<number>({
+const storage = createLatestStorage<number>(0);
+const polling = createPollingFlowTransfer<number>({
   flow: storage,
   interval: 1000,
   activated: true,
@@ -1409,9 +1430,9 @@ Reactive channel with fallback polling on idle. If no data arrived via `push()` 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`, `isPollingSource`, `isTriggerable`, `isGate`
 
 ```typescript
-import { IdlePollingTransfer } from 'transferum';
+import { createIdlePollingTransfer } from 'transferum';
 
-const channel = new IdlePollingTransfer<number>({
+const channel = createIdlePollingTransfer<number>({
   fetcher: () => fetchLatest(),
   timeout: 5000,   // 5 seconds without push → start polling
   interval: 1000,  // poll fetcher every second
@@ -1430,9 +1451,9 @@ Output channel with external management via `setup`/`destroy` callbacks. Used fo
 **Capabilities:** `isOutput`, `isSubscribable`
 
 ```typescript
-import { ChannelTransfer } from 'transferum';
+import { createChannelTransfer } from 'transferum';
 
-const channel = new ChannelTransfer<number>({
+const channel = createChannelTransfer<number>({
   setup: (emit) => {
     const id = setInterval(() => emit(Date.now()), 1000);
   },
@@ -1452,11 +1473,11 @@ Channel with last-value retention and external management. The value is availabl
 **Capabilities:** `isOutput`, `isPullable`, `isTriggerable`, `isSubscribable`
 
 ```typescript
-import { StoredChannelTransfer, PushStoredChannelTransfer } from 'transferum';
+import { createStoredChannelTransfer } from 'transferum';
 
 let emit: (data: number) => void;
 
-const channel = new StoredChannelTransfer<number>({
+const channel = createStoredChannelTransfer<number>({
   setup: (e) => { emit = e; },
   destroy: () => {},
   initialValue: 0,
@@ -1476,9 +1497,9 @@ Terminal destination — calls a callback on receiving data.
 **Capabilities:** `isInput`, `isPushable`
 
 ```typescript
-import { SinkTransfer } from 'transferum';
+import { createSinkTransfer } from 'transferum';
 
-const sink = new SinkTransfer<number>({
+const sink = createSinkTransfer<number>({
   callback: (data) => console.log('Received:', data),
 });
 
@@ -1492,10 +1513,10 @@ Write adapter for an arbitrary `InputFlowInterface` (e.g., Storage).
 **Capabilities:** `isInput`, `isPushable`
 
 ```typescript
-import { LatestStorage, WriteTransfer } from 'transferum';
+import { createLatestStorage, createWriteTransfer } from 'transferum';
 
-const storage = new LatestStorage<number>();
-const writer = new WriteTransfer<number>({ flow: storage });
+const storage = createLatestStorage<number>();
+const writer = createWriteTransfer<number>({ flow: storage });
 
 writer.push(42); // storage.write(42)
 ```
@@ -1507,11 +1528,11 @@ Read adapter for an arbitrary `OutputFlowInterface` (e.g., Storage).
 **Capabilities:** `isOutput`, `isPullable`
 
 ```typescript
-import { LatestStorage, ReadTransfer } from 'transferum';
+import { createLatestStorage, createReadTransfer } from 'transferum';
 
-const storage = new LatestStorage<number>();
+const storage = createLatestStorage<number>();
 storage.write(42);
-const reader = new ReadTransfer<number>({ flow: storage });
+const reader = createReadTransfer<number>({ flow: storage });
 
 console.log(reader.pull()); // 42
 ```
@@ -1523,10 +1544,10 @@ Converter transfer: transforms input data via an `Operator` and sends the result
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`
 
 ```typescript
-import { ConvertTransfer, MapOperator } from 'transferum';
+import { createConvertTransfer, createMapOperator } from 'transferum';
 
-const converter = new ConvertTransfer<number, string>({
-  operator: new MapOperator((n: number) => `val_${n}`),
+const converter = createConvertTransfer<number, string>({
+  operator: createMapOperator((n: number) => `val_${n}`),
 });
 
 converter.subscribe((data) => console.log(data));
@@ -1540,9 +1561,9 @@ Transfer with conditional filtering on input (`shouldAccept`) and output (`shoul
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`
 
 ```typescript
-import { ConditionTransfer } from 'transferum';
+import { createConditionTransfer } from 'transferum';
 
-const condition = new ConditionTransfer<number>({
+const condition = createConditionTransfer<number>({
   shouldAccept: (n) => n > 0,        // input filter
   shouldEmit: (n) => n !== undefined && n < 100, // output filter
 });
@@ -1563,9 +1584,13 @@ Universal composite transfer — combines an input and an output transfer into a
 3. `config.output` (if it has the corresponding flag)
 
 ```typescript
-import { PushStoredChannelTransfer, UniversalCompositeTransfer, DuplexPipelineBuilder, AsyncDuplexPipelineBuilder } from 'transferum';
+import {
+  createPushStoredChannelTransfer,
+  DuplexPipelineBuilder,
+  UniversalCompositeTransfer,
+} from 'transferum';
 
-const transfer = new PushStoredChannelTransfer<number>();
+const transfer = createPushStoredChannelTransfer<number>();
 
 const composite = new UniversalCompositeTransfer({
   input: transfer,
@@ -1608,9 +1633,9 @@ Async terminal sink — calls a callback on receiving data via `asyncPush`.
 **Capabilities:** `isInput`, `isAsyncPushable`
 
 ```typescript
-import { AsyncSinkTransfer } from 'transferum';
+import { createAsyncSinkTransfer } from 'transferum';
 
-const sink = new AsyncSinkTransfer<number>({
+const sink = createAsyncSinkTransfer<number>({
   callback: async (n) => { await fetch('/api', { body: JSON.stringify(n) }); },
 });
 
@@ -1624,9 +1649,9 @@ Async write adapter for `AsyncInputFlowInterface` (or synchronous `InputFlowInte
 **Capabilities:** `isInput`, `isAsyncPushable`
 
 ```typescript
-import { AsyncWriteTransfer } from 'transferum';
+import { createAsyncWriteTransfer } from 'transferum';
 
-const writer = new AsyncWriteTransfer<number>({ flow: asyncStorage });
+const writer = createAsyncWriteTransfer<number>({ flow: asyncStorage });
 
 await writer.asyncPush(42); // → await flow.write(42)
 ```
@@ -1638,9 +1663,9 @@ Async read adapter for `AsyncOutputFlowInterface` (or synchronous `OutputFlowInt
 **Capabilities:** `isOutput`, `isAsyncPullable`
 
 ```typescript
-import { AsyncReadTransfer } from 'transferum';
+import { createAsyncReadTransfer } from 'transferum';
 
-const reader = new AsyncReadTransfer<number>({ flow: asyncStorage });
+const reader = createAsyncReadTransfer<number>({ flow: asyncStorage });
 
 const value = await reader.asyncPull(); // → await flow.read()
 ```
@@ -1652,10 +1677,10 @@ Async converter transfer: transforms input data via an `AsyncOperator` and sends
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isAsyncPushable`, `isSubscribable`
 
 ```typescript
-import { AsyncConvertTransfer, AsyncMapOperator } from 'transferum';
+import { createAsyncConvertTransfer, createAsyncMapOperator } from 'transferum';
 
-const converter = new AsyncConvertTransfer<number, string>({
-  operator: new AsyncMapOperator(async (n: number) => `val_${n}`),
+const converter = createAsyncConvertTransfer<number, string>({
+  operator: createAsyncMapOperator(async (n: number) => `val_${n}`),
 });
 
 converter.subscribe((data) => console.log(data));
@@ -1669,9 +1694,9 @@ Transfer with asynchronous conditional filtering. The `shouldAccept` and `should
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isAsyncPushable`, `isSubscribable`
 
 ```typescript
-import { AsyncConditionTransfer } from 'transferum';
+import { createAsyncConditionTransfer } from 'transferum';
 
-const condition = new AsyncConditionTransfer<number>({
+const condition = createAsyncConditionTransfer<number>({
   shouldAccept: async (n) => (await check(n)).valid,
   shouldEmit: (n) => n !== undefined && n < 100,
 });
@@ -1687,9 +1712,9 @@ Output transfer with asynchronous internal polling. The ticker calls `_safeTrigg
 **Capabilities:** `isOutput`, `isPollingSource`, `isAsyncPullable`, `isSubscribable`, `isAsyncTriggerable`, `isGate`
 
 ```typescript
-import { AsyncPollingSourceTransfer } from 'transferum';
+import { createAsyncPollingSourceTransfer } from 'transferum';
 
-const polling = new AsyncPollingSourceTransfer<number>({
+const polling = createAsyncPollingSourceTransfer<number>({
   fetcher: async () => (await fetch('/api/data')).json(),
   interval: 1000,
   activated: true,
@@ -1706,9 +1731,9 @@ Duplex transfer with async polling that receives its fetcher from the previous n
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isAsyncPollingProxy`, `isPollingSource`, `isAsyncPullable`, `isSubscribable`, `isAsyncTriggerable`, `isGate`
 
 ```typescript
-import { AsyncPollingProxyTransfer } from 'transferum';
+import { createAsyncPollingProxyTransfer } from 'transferum';
 
-const poller = new AsyncPollingProxyTransfer<number>({
+const poller = createAsyncPollingProxyTransfer<number>({
   interval: 1000,
   activated: false,
 });
@@ -1726,9 +1751,9 @@ Output transfer with async polling from `AsyncOutputFlowInterface`. Similar to `
 **Capabilities:** `isOutput`, `isPollingSource`, `isAsyncPullable`, `isSubscribable`, `isAsyncTriggerable`, `isGate`
 
 ```typescript
-import { AsyncPollingFlowTransfer } from 'transferum';
+import { createAsyncPollingFlowTransfer } from 'transferum';
 
-const polling = new AsyncPollingFlowTransfer<number>({
+const polling = createAsyncPollingFlowTransfer<number>({
   flow: asyncStorage,
   interval: 1000,
   activated: true,
@@ -1744,9 +1769,9 @@ Reactive channel with async fallback polling on idle. `push()` and `trigger()` a
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`, `isPollingSource`, `isTriggerable`, `isGate`
 
 ```typescript
-import { AsyncIdlePollingTransfer } from 'transferum';
+import { createAsyncIdlePollingTransfer } from 'transferum';
 
-const channel = new AsyncIdlePollingTransfer<number>({
+const channel = createAsyncIdlePollingTransfer<number>({
   fetcher: async () => (await fetch('/api/latest')).json(),
   timeout: 5000,   // 5 seconds without push → start polling
   interval: 1000,  // poll fetcher every second
@@ -1765,11 +1790,11 @@ Channel with value retention, external management, and async interface. `setup`/
 **Capabilities:** `isOutput`, `isSubscribable`, `isAsyncPullable`, `isAsyncTriggerable`
 
 ```typescript
-import { AsyncStoredChannelTransfer, PushStoredChannelTransfer } from 'transferum';
+import { createAsyncStoredChannelTransfer } from 'transferum';
 
 let emit: (data: number) => void;
 
-const channel = new AsyncStoredChannelTransfer<number>({
+const channel = createAsyncStoredChannelTransfer<number>({
   setup: (e) => { emit = e; },
   destroy: () => {},
   initialValue: 0,
@@ -1815,12 +1840,12 @@ Operators implement `OperatorInterface<TInput, TOutput>` with the method `apply(
 | `ReducerOperator` | —                                                     | Returns `T \| undefined` — array aggregate |
 
 ```typescript
-import { PipelineOperator, MapOperator, GuardOperator } from 'transferum';
+import { createPipelineOperator, createMapOperator, createGuardOperator } from 'transferum';
 
-const op = new PipelineOperator<number, string>([
-  new MapOperator((n: number) => n * 2),
-  new MapOperator((n: number) => n.toString()),
-  new GuardOperator((s: string) => s.length > 0),
+const op = createPipelineOperator<number, string>([
+  createMapOperator((n: number) => n * 2),
+  createMapOperator((n: number) => n.toString()),
+  createGuardOperator((s: string) => s.length > 0),
 ]);
 
 console.log(op.apply(21)); // "42"
@@ -1831,12 +1856,12 @@ console.log(op.apply(21)); // "42"
 Async operators implement `AsyncOperatorInterface<TInput, TOutput>` with the method `apply(data: TInput): Promise<TOutput>`. Mappers and predicates can be synchronous or asynchronous (return `Promise`).
 
 ```typescript
-import { AsyncPipelineOperator, AsyncMapOperator, MapOperator, AsyncGuardOperator } from 'transferum';
+import { createAsyncPipelineOperator, createAsyncMapOperator, createMapOperator, createAsyncGuardOperator } from 'transferum';
 
-const op = new AsyncPipelineOperator<number, string>([
-  new AsyncMapOperator(async (n: number) => n * 2),
-  new MapOperator((n: number) => n.toString()),      // sync operator in async chain
-  new AsyncGuardOperator(async (s: string) => s.length > 0),
+const op = createAsyncPipelineOperator<number, string>([
+  createAsyncMapOperator(async (n: number) => n * 2),
+  createMapOperator((n: number) => n.toString()),      // sync operator in async chain
+  createAsyncGuardOperator(async (s: string) => s.length > 0),
 ]);
 
 console.log(await op.apply(21)); // "42"
@@ -1885,9 +1910,9 @@ Storages implement `StorageInterface<TInput, TOutput>` (write/read/clear/reset/s
 | Sink for `WriteTransfer`                       | Any (via `WriteTransfer`)                         |
 
 ```typescript
-import { QueueStorage } from 'transferum';
+import { createQueueStorage } from 'transferum';
 
-const queue = new QueueStorage<number>(3);
+const queue = createQueueStorage<number>(3);
 queue.write(1);
 queue.write(2);
 queue.write(3);
@@ -2064,12 +2089,12 @@ Bridges implement `BridgeInterface` (active/activate/deactivate/toggle/destroy) 
 | Simultaneous activation of multiple routes                       | `BridgeMultiSelector` |
 
 ```typescript
-import { PushStoredChannelTransfer, SinkTransfer, PassBridge } from 'transferum';
+import { createPushStoredChannelTransfer, createSinkTransfer, createPassBridge } from 'transferum';
 
-const source = new PushStoredChannelTransfer<number>();
-const target = new SinkTransfer<number>({ callback: (n) => console.log(n) });
+const source = createPushStoredChannelTransfer<number>();
+const target = createSinkTransfer<number>({ callback: (n) => console.log(n) });
 
-const bridge = new PassBridge<number>({
+const bridge = createPassBridge<number>({
   source,
   target,
   activated: true,
@@ -2086,14 +2111,14 @@ bridge.destroy(); // breaks all links
 ### BridgeSelector
 
 ```typescript
-import { BridgeSelector, createPassBridge } from 'transferum';
+import { createBridgeSelector, createPassBridge } from 'transferum';
 
 const bridges = {
   fast: createPassBridge({ source, target1, activated: false }),
   slow: createPassBridge({ source, target2, activated: false }),
 };
 
-const selector = new BridgeSelector({
+const selector = createBridgeSelector({
   bridges,
   initialKey: 'fast',
   activated: true,
@@ -2105,9 +2130,9 @@ selector.select('slow'); // switch to the second bridge
 ### BridgeMultiSelector
 
 ```typescript
-import { BridgeMultiSelector } from 'transferum';
+import { createBridgeMultiSelector } from 'transferum';
 
-const selector = new BridgeMultiSelector({
+const selector = createBridgeMultiSelector({
   bridges,
   initialKeys: ['fast'],
   activated: true,
@@ -2124,12 +2149,12 @@ Bridge with asynchronous data type transformation via `AsyncOperator`. Gate and 
 **Flow structure:** source → gate → asyncConverter → target
 
 ```typescript
-import { AsyncTransformBridge, AsyncMapOperator } from 'transferum';
+import { createAsyncTransformBridge, createAsyncMapOperator } from 'transferum';
 
-const bridge = new AsyncTransformBridge<number, string>({
+const bridge = createAsyncTransformBridge<number, string>({
   source,
   target,
-  operator: new AsyncMapOperator(async (n: number) => `val_${n}`),
+  operator: createAsyncMapOperator(async (n: number) => `val_${n}`),
   activated: true,
   onError: (e) => console.error(e),
 });
@@ -2148,12 +2173,18 @@ Builders provide a fluent API for assembling transfer chains with automatic link
 Builds an input pipeline: `start(Duplex) → to(Duplex)* → finish(Input)`.
 
 ```typescript
-import { InputPipelineBuilder, PushStoredChannelTransfer, ConvertTransfer, MapOperator, SinkTransfer } from 'transferum';
+import {
+  InputPipelineBuilder,
+  createPushStoredChannelTransfer,
+  createConvertTransfer,
+  createSinkTransfer,
+  createMapOperator,
+} from 'transferum';
 
 const pipeline = InputPipelineBuilder
-  .start(new PushStoredChannelTransfer<number>())
-  .to(new ConvertTransfer<number, string>({ operator: new MapOperator((n) => n.toString()) }))
-  .finish(new SinkTransfer<string>({ callback: (s) => console.log(s) }));
+  .start(createPushStoredChannelTransfer<number>())
+  .to(createConvertTransfer<number, string>({ operator: createMapOperator((n) => n.toString()) }))
+  .finish(createSinkTransfer<string>({ callback: (s) => console.log(s) }));
 
 pipeline.push(21); // → "21"
 ```
@@ -2163,12 +2194,18 @@ pipeline.push(21); // → "21"
 Builds an output pipeline: `start(Output) → to(Duplex)* → finish(Duplex)`.
 
 ```typescript
-import { OutputPipelineBuilder, PollingSourceTransfer, ConvertTransfer, MapOperator, PushStoredChannelTransfer } from 'transferum';
+import {
+  OutputPipelineBuilder,
+  createPollingSourceTransfer,
+  createConvertTransfer,
+  createPushStoredChannelTransfer,
+  createMapOperator,
+} from 'transferum';
 
 const pipeline = OutputPipelineBuilder
-  .start(new PollingSourceTransfer<number>({ fetcher: () => 42, interval: 1000, activated: true }))
-  .to(new ConvertTransfer<number, string>({ operator: new MapOperator((n) => n.toString()) }))
-  .finish(new PushStoredChannelTransfer<string>());
+  .start(createPollingSourceTransfer<number>({ fetcher: () => 42, interval: 1000, activated: true }))
+  .to(createConvertTransfer<number, string>({ operator: createMapOperator((n) => n.toString()) }))
+  .finish(createPushStoredChannelTransfer<string>());
 
 pipeline.subscribe((data) => console.log(data));
 ```
@@ -2178,12 +2215,12 @@ pipeline.subscribe((data) => console.log(data));
 Builds a full-duplex pipeline: `start(Duplex) → to(Duplex)* → finish(Output)`.
 
 ```typescript
-import { DuplexPipelineBuilder, PushStoredChannelTransfer, ConditionTransfer } from 'transferum';
+import { DuplexPipelineBuilder, createPushStoredChannelTransfer, createConditionTransfer } from 'transferum';
 
 const pipeline = DuplexPipelineBuilder
-  .start(new PushStoredChannelTransfer<number>())
-  .to(new ConditionTransfer<number>({ shouldAccept: (n) => n > 0 }))
-  .finish(new PushStoredChannelTransfer<number>(), { owned: true });
+  .start(createPushStoredChannelTransfer<number>())
+  .to(createConditionTransfer<number>({ shouldAccept: (n) => n > 0 }))
+  .finish(createPushStoredChannelTransfer<number>(), { owned: true });
 
 pipeline.push(42);
 pipeline.subscribe((data) => console.log(data));
@@ -2197,13 +2234,13 @@ pipeline.destroy(); // destroys owned resources
 Builds a chain of operators with type checking at each step.
 
 ```typescript
-import { OperatorPipelineBuilder, MapOperator, GuardOperator } from 'transferum';
+import { OperatorPipelineBuilder, createMapOperator, createGuardOperator } from 'transferum';
 
 const operator = OperatorPipelineBuilder
   .create()
-  .add(new MapOperator<number, number>((n) => n * 2))
-  .add(new MapOperator<number, string>((n) => n.toString()))
-  .add(new GuardOperator<string>((s) => s.length > 0))
+  .add(createMapOperator<number, number>((n) => n * 2))
+  .add(createMapOperator<number, string>((n) => n.toString()))
+  .add(createGuardOperator<string>((s) => s.length > 0))
   .build();
 
 console.log(operator.apply(21)); // "42"
@@ -2242,14 +2279,19 @@ Async builders are analogous to sync builders, but:
 | `AsyncOperatorPipelineBuilder` | `OperatorPipelineBuilder` | Accepts sync and async operators, `build()` returns `AsyncPipelineOperator` |
 
 ```typescript
-import { AsyncDuplexPipelineBuilder, PushStoredChannelTransfer, AsyncConvertTransfer, AsyncMapOperator } from 'transferum';
+import {
+  AsyncDuplexPipelineBuilder,
+  createPushStoredChannelTransfer,
+  createAsyncConvertTransfer,
+  createAsyncMapOperator,
+} from 'transferum';
 
 const pipeline = AsyncDuplexPipelineBuilder
-  .start(new PushStoredChannelTransfer<number>())
-  .to(new AsyncConvertTransfer<number, string>({
-    operator: new AsyncMapOperator(async (n) => n.toString()),
+  .start(createPushStoredChannelTransfer<number>())
+  .to(createAsyncConvertTransfer<number, string>({
+    operator: createAsyncMapOperator(async (n) => n.toString()),
   }))
-  .finish(new PushStoredChannelTransfer<string>(), {
+  .finish(createPushStoredChannelTransfer<string>(), {
     owned: true,
     linkOnError: (e) => console.error(e),
   });
@@ -2259,12 +2301,12 @@ pipeline.subscribe((data) => console.log(data)); // → "42"
 ```
 
 ```typescript
-import { AsyncOperatorPipelineBuilder, MapOperator, AsyncMapOperator } from 'transferum';
+import { AsyncOperatorPipelineBuilder, createMapOperator, createAsyncMapOperator } from 'transferum';
 
 const operator = AsyncOperatorPipelineBuilder
   .create()
-  .add(new MapOperator<number, number>((n) => n * 2))       // sync operator
-  .add(new AsyncMapOperator<number, string>(async (n) => n.toString())) // async operator
+  .add(createMapOperator<number, number>((n) => n * 2))                   // sync operator
+  .add(createAsyncMapOperator<number, string>(async (n) => n.toString())) // async operator
   .build();
 
 console.log(await operator.apply(21)); // "42"
