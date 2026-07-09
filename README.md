@@ -864,7 +864,7 @@ const channel = new PushStoredChannelTransfer<string | null>({ initialValue: nul
 
 channel.subscribe((data) => console.log(data));
 
-channel.push('hello');  // → "hello"
+channel.push('hello');   // → "hello"
 channel.push(null);      // → null (null MUST reach the subscriber)
 channel.push(undefined); // → nothing happens (subscribers NOT notified)
 ```
@@ -908,18 +908,18 @@ If the data type allows `null` (e.g., `string | null`), use it as an explicit em
 
 ### Async Transfer Comparison Table
 
-| Transfer                    | aPush | aPull | aTrig | Sub | Gate |  Poll   | In | Out | Purpose                                            |
-|-----------------------------|:-----:|:-----:|:-----:|:---:|:----:|:-------:|:--:|:---:|-------------------------------------------------------|
-| AsyncSinkTransfer           |  ✓    |  —    |  —    |  —  |  —   |    —    | ✓  |  —  | Async terminal sink (callback)          |
-| AsyncWriteTransfer          |  ✓    |  —    |  —    |  —  |  —   |    —    | ✓  |  —  | Async write to `AsyncInputFlowInterface`        |
-| AsyncReadTransfer           |  —    |  ✓    |  —    |  —  |  —   |    —    | —  |  ✓  | Async read from `AsyncOutputFlowInterface`      |
-| AsyncConvertTransfer        |  ✓    |  —    |  —    |  ✓  |  —   |    —    | ✓  |  ✓  | Async transform via `AsyncOperator`      |
-| AsyncConditionTransfer      |  ✓    |  —    |  —    |  ✓  |  —   |    —    | ✓  |  ✓  | Async conditional filtering (async predicates)     |
-| AsyncPollingSourceTransfer  |  —    |  ✓    |  ✓    |  ✓  |  ✓   |   Src   | —  |  ✓  | Async poll external `fetcher` on a timer       |
-| AsyncPollingProxyTransfer   |  —    |  ✓    |  ✓    |  ✓  |  ✓   | Src+aPrx | ✓  |  ✓  | Async poll previous node on a timer         |
-| AsyncPollingFlowTransfer    |  —    |  ✓    |   ✓   |  ✓  |  ✓   |   Src   | —  |  ✓  | Async poll from `AsyncOutputFlowInterface`       |
-| AsyncIdlePollingTransfer    |  ✓*   |  —    |  ✓*   |  ✓  |  ✓   |   Src   | ✓  |  ✓  | Fallback async polling on idle incoming data   |
-| AsyncStoredChannelTransfer  |  —    |  ✓    |  ✓    |  ✓  |  —   |    —    | —  |  ✓  | Channel with storage + external source + async interface |
+| Transfer                   | aPush | aPull | aTrig | Sub | Gate |   Poll   | In | Out | Purpose                                                  |
+|----------------------------|:-----:|:-----:|:-----:|:---:|:----:|:--------:|:--:|:---:|----------------------------------------------------------|
+| AsyncSinkTransfer          |   ✓   |   —   |   —   |  —  |  —   |    —     | ✓  |  —  | Async terminal sink (callback)                           |
+| AsyncWriteTransfer         |   ✓   |   —   |   —   |  —  |  —   |    —     | ✓  |  —  | Async write to `AsyncInputFlowInterface`                 |
+| AsyncReadTransfer          |   —   |   ✓   |   —   |  —  |  —   |    —     | —  |  ✓  | Async read from `AsyncOutputFlowInterface`               |
+| AsyncConvertTransfer       |   ✓   |   —   |   —   |  ✓  |  —   |    —     | ✓  |  ✓  | Async transform via `AsyncOperator`                      |
+| AsyncConditionTransfer     |   ✓   |   —   |   —   |  ✓  |  —   |    —     | ✓  |  ✓  | Async conditional filtering (async predicates)           |
+| AsyncPollingSourceTransfer |   —   |   ✓   |   ✓   |  ✓  |  ✓   |   Src    | —  |  ✓  | Async poll external `fetcher` on a timer                 |
+| AsyncPollingProxyTransfer  |   —   |   ✓   |   ✓   |  ✓  |  ✓   | Src+aPrx | ✓  |  ✓  | Async poll previous node on a timer                      |
+| AsyncPollingFlowTransfer   |   —   |   ✓   |   ✓   |  ✓  |  ✓   |   Src    | —  |  ✓  | Async poll from `AsyncOutputFlowInterface`               |
+| AsyncIdlePollingTransfer   |  ✓*   |   —   |  ✓*   |  ✓  |  ✓   |   Src    | ✓  |  ✓  | Fallback async polling on idle incoming data             |
+| AsyncStoredChannelTransfer |   —   |   ✓   |   ✓   |  ✓  |  —   |    —     | —  |  ✓  | Channel with storage + external source + async interface |
 
 > **Legend:** aPush = `isAsyncPushable`, aPull = `isAsyncPullable`, aTrig = `isAsyncTriggerable`, aPrx = `isAsyncPollingProxy`. `✓*` — method is synchronous (`push`/`trigger`), but fetcher is asynchronous.
 >
