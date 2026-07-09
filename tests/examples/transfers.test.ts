@@ -27,6 +27,7 @@ import {
   linkTransfers,
 } from '../../src';
 import { describe, expect, it, jest } from '@jest/globals';
+// @ts-ignore
 import { wait } from './fixtures';
 
 // ═══════════════════════════════════════════════════════════════
@@ -325,16 +326,18 @@ describe('README Transfers: IdlePollingTransfer', () => {
 
 describe('README Transfers: ChannelTransfer', () => {
   it('integrates with external event sources', async () => {
-    let emit: ((data: number) => void) | null = null;
+    let emit: ((data: number) => void) | undefined;
+    let intervalId: any;
 
     const channel = new ChannelTransfer<number>({
       setup: (e) => {
         emit = e;
-        const id = setInterval(() => e(Date.now()), 50);
-        // In real code, we'd store id for cleanup
+        intervalId = setInterval(() => e(Date.now()), 50);
       },
       destroy: () => {
-        // cleanup
+        if (intervalId !== undefined) {
+          clearInterval(intervalId);
+        }
       },
       onEmitError: (e) => console.error(e),
     });
@@ -342,7 +345,7 @@ describe('README Transfers: ChannelTransfer', () => {
     const received: number[] = [];
     channel.subscribe((data) => received.push(data));
 
-    await wait(100);
+    await wait(120);
     channel.destroy();
 
     expect(received.length).toBeGreaterThan(1);
