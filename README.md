@@ -36,6 +36,13 @@ The library provides type-safe primitives for building data flows: **transfers**
   - [UI/UX Applications](#uiux-applications)
   - [Monitoring & Logging Systems](#monitoring--logging-systems)
   - [Financial Applications](#financial-applications)
+- [Comparison with Alternatives](#comparison-with-alternatives)
+  - [Transferum vs RxJS](#transferum-vs-rxjs)
+  - [Transferum vs Most.js](#transferum-vs-mostjs)
+  - [Transferum vs Bacon.js / Kefir](#transferum-vs-baconjs--kefir)
+  - [Quick Comparison Table](#quick-comparison-table)
+  - [When to Choose Transferum](#when-to-choose-transferum)
+  - [When to Consider Alternatives](#when-to-consider-alternatives)
 - [Installation & Import](#installation--import)
 - [Core Concepts](#core-concepts)
   - [Capability Flags System](#capability-flags-system)
@@ -616,6 +623,165 @@ if (marketVolatility > HIGH_THRESHOLD) {
   strategyRouter.select('conservative');
 }
 ```
+
+---
+
+## Comparison with Alternatives
+
+Transferum exists in a rich ecosystem of reactive and stream-processing libraries. This section compares it with popular alternatives to help you make an informed choice.
+
+### Transferum vs RxJS
+
+**RxJS** is the most widely adopted reactive programming library for JavaScript/TypeScript.
+
+| Aspect                           | Transferum                                  | RxJS                                                                       |
+|----------------------------------|---------------------------------------------|----------------------------------------------------------------------------|
+| **Bundle size**                  | ~15 KB minified                             | ~35 KB minified (full), <5 KB (selective imports)                          |
+| **Dependencies**                 | Zero                                        | Zero (v7+)                                                                 |
+| **Learning curve**               | Moderate — explicit primitives              | Steep — 100+ operators, complex concepts                                   |
+| **Type inference**               | Strong — tuple-based pipeline types         | Strong — but complex generic chains                                        |
+| **Sync/Async unify**             | Built-in — `linkTransfers` handles both     | Manual — `from()`, `toPromise()`, `firstValueFrom()`                       |
+| **Pull-based**                   | Native — `Pullable`, `PollingProxy`         | Limited — mostly push-based                                                |
+| **Gate/Flow control**            | Built-in — `GateTransfer`, `BridgeSelector` | Manual — `takeUntil()`, `switchMap()`, subjects                            |
+| **Resource cleanup**             | Explicit — `destroy()` on every transfer    | Subscription-based — `subscription.unsubscribe()`                          |
+| **Undefined handling**           | Suppressed — `undefined` never propagates   | Propagated — `undefined` is a valid value                                  |
+| **Operators**                    | ~10 core operators                          | 100+ operators (creation, transformation, filtering, combination, utility) |
+| **Flow control / Rate limiting** | Built-in — buffers, throttles, debounces    | Built-in — `throttle()`, `buffer()`, `sample()`                            |
+| **Testing**                      | Simple — fake timers, direct method calls   | Complex — `TestScheduler`, marble diagrams                                 |
+| **Community**                    | Small — single maintainer                   | Large — Google, widespread adoption                                        |
+
+**Key differences:**
+
+- **Architecture:** RxJS uses `Observable` + `Operator` + `Subscription` model. Transferum uses `Transfer` + `Bridge` + `Builder` with capability flags.
+- **Composability:** RxJS operators are functions that transform observables. Transferum transfers are objects that can be linked via `linkTransfers()` automatically.
+- **Error handling:** RxJS errors terminate the stream unless caught with `catchError()`. Transferum errors are suppressed with optional `onError` handlers, keeping the stream alive.
+- **Scheduling:** RxJS has `Scheduler` abstraction (async, asyncSchedule, animationFrame). Transferum has `Ticker` (RAFTicker, IntervalTicker) for polling.
+
+**Code comparison — Debounced search:**
+
+```typescript
+// RxJS
+import { fromEvent } from 'rxjs';
+import { debounceTime, switchMap, filter, map } from 'rxjs/operators';
+
+fromEvent(searchInput, 'input')
+  .pipe(
+    debounceTime(300),
+    map((e: Event) => (e.target as HTMLInputElement).value),
+    filter(query => query.length >= 3),
+    switchMap(query => fetch(`/api/search?q=${query}`))
+  )
+  .subscribe(results => render(results));
+```
+
+```typescript
+// Transferum
+import { DebounceTransfer, AsyncInputPipelineBuilder, AsyncConditionTransfer, AsyncConvertTransfer, AsyncSinkTransfer, AsyncMapOperator } from 'transferum';
+
+const input = new DebounceTransfer<string>({ delay: 300 });
+
+const pipeline = AsyncInputPipelineBuilder
+  .start(input)
+  .to(new AsyncConditionTransfer<string>({ shouldAccept: q => q.length >= 3 }))
+  .to(new AsyncConvertTransfer<string, SearchResult[]>({
+    operator: new AsyncMapOperator(async q => await searchAPI(q)),
+  }))
+  .finish(new AsyncSinkTransfer<SearchResult[]>({
+    callback: results => render(results),
+  }), { owned: true });
+
+input.push(query); // manually push, or integrate with DOM event
+```
+
+---
+
+### Transferum vs Most.js
+
+**Most.js** is a lightweight, high-performance FRP library.
+
+| Aspect            | Transferum                       | Most.js                  |
+|-------------------|----------------------------------|--------------------------|
+| **Bundle size**   | ~15 KB                           | ~7 KB                    |
+| **Status**        | Active (2026)                    | Maintenance mode (2020+) |
+| **Async support** | Built-in async transfers         | Native async event loop  |
+| **Pull-based**    | Yes — `Pullable`, `PollingProxy` | No — push-only           |
+| **TypeScript**    | First-class, strict types        | Community typings        |
+| **Operators**     | ~10                              | ~40                      |
+
+Most.js excels in raw performance for push-based streams but lacks Transferum's pull-based primitives and unified sync/async model.
+
+---
+
+### Transferum vs Bacon.js / Kefir
+
+**Bacon.js** and **Kefir** are Functional Reactive Programming (FRP) libraries with `Property` (stateful) and `EventStream` (stateless) abstractions.
+
+| Aspect             | Transferum                                        | Bacon.js / Kefir                     |
+|--------------------|---------------------------------------------------|--------------------------------------|
+| **State model**    | Explicit — `ProxyReference<T>` per transfer       | Implicit — `Property` holds state    |
+| **Stream types**   | Capability flags (`isSubscribable`, `isPullable`) | Two types: `EventStream`, `Property` |
+| **Error handling** | Suppressed with `onError`                         | Error events terminate stream        |
+| **Async**          | First-class async transfers                       | Via `fromPromise()`                  |
+| **Bundle size**    | ~15 KB                                            | ~12 KB (Bacon), ~8 KB (Kefir)        |
+| **Status**         | Active                                            | Bacon: maintenance, Kefir: archived  |
+
+Transferum's capability flags provide more granularity than the two-type model, allowing fine-grained control over data flow mechanics.
+
+---
+
+### Quick Comparison Table
+
+| Feature                    | Transferum               | RxJS       | Most.js     | Bacon.js    | Kefir    |
+|----------------------------|--------------------------|------------|-------------|-------------|----------|
+| **Bundle size (minified)** | ~15 KB                   | ~35 KB     | ~7 KB       | ~12 KB      | ~8 KB    |
+| **Dependencies**           | 0                        | 0          | 0           | 0           | 0        |
+| **Pull-based**             | ✓                        | ✗          | ✗           | ✗           | ✗        |
+| **Sync/Async unify**       | ✓                        | Partial    | Partial     | Partial     | Partial  |
+| **Built-in polling**       | ✓ (Ticker)               | ✗ (manual) | ✗           | ✗           | ✗        |
+| **Gate/Flow control**      | ✓ (GateTransfer, Bridge) | Manual     | Manual      | Manual      | Manual   |
+| **Undefined suppression**  | ✓                        | ✗          | ✗           | ✗           | ✗        |
+| **Operators count**        | ~10                      | 100+       | ~40         | ~60         | ~50      |
+| **TypeScript support**     | Excellent                | Excellent  | Good        | Fair        | Fair     |
+| **Community size**         | Small                    | Very large | Medium      | Small       | Small    |
+| **Maintenance status**     | Active                   | Active     | Maintenance | Maintenance | Archived |
+
+---
+
+### When to Choose Transferum
+
+**Transferum is ideal for:**
+
+1. **TypeScript-first projects** — Strict type inference, capability flags checked at compile time.
+2. **Mixed sync/async pipelines** — Unified model without manual conversion.
+3. **Pull-based data acquisition** — Polling APIs, sensors, or storage with `PollingProxy`.
+4. **Explicit flow control** — Gates, bridges, and selectors for runtime routing.
+5. **Resource-conscious environments** — Smaller bundle than RxJS, zero dependencies.
+6. **Predictable error handling** — Errors suppressed with handlers, streams stay alive.
+7. **Game development / IoT** — Frame-aligned tickers, idle polling, sensor aggregation.
+
+**Example fit:** Real-time dashboard with API polling, debounced user input, conditional routing to multiple visualizations, and graceful error recovery.
+
+---
+
+### When to Consider Alternatives
+
+**Consider RxJS if:**
+
+- You need 100+ operators out of the box (windowing, combining, error recovery).
+- Your team already has RxJS expertise.
+- You need advanced scheduling (test scheduler, virtual time).
+- You need complex stream combination operators (e.g., combining 5+ distinct data sources with intricate join logic).
+- Community support and long-term stability are top priorities.
+
+**Consider Most.js if:**
+
+- Raw performance is the top priority.
+- You need a small, push-only stream library.
+- You don't need pull-based or polling primitives.
+
+**Consider Bacon.js (or maintaining Kefir) only if:**
+
+- You are working on a legacy codebase already locked into these specific FRP abstractions.
 
 ---
 
