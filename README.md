@@ -136,6 +136,8 @@ Transferum solves these by providing **composable, type-safe building blocks** w
 #### Real-time UI updates from API polling
 
 ```typescript
+import { PollingSourceTransfer, DuplexPipelineBuilder, ConvertTransfer, MapOperator, PushStoredChannelTransfer } from 'transferum';
+
 // Poll an API every 5 seconds, transform the response, update subscribers
 const polling = new PollingSourceTransfer<ServerState>({
   fetcher: () => fetch('/api/state').then(r => r.json()),
@@ -156,6 +158,8 @@ pipeline.subscribe((vm) => renderUI(vm));
 #### Debounced user input with async validation
 
 ```typescript
+import { DebounceTransfer, AsyncDuplexPipelineBuilder, AsyncConditionTransfer, AsyncConvertTransfer, AsyncMapOperator, AsyncSinkTransfer } from 'transferum';
+
 // Debounce input → validate → transform → send to async sink
 const input = new DebounceTransfer<string>({ delay: 300 });
 
@@ -177,6 +181,8 @@ input.push('user@example.com'); // debounced → validated → saved
 #### Merging multiple data sources into a single view
 
 ```typescript
+import { PollingSourceTransfer, PushStoredChannelTransfer, ReadTransfer, MergeTransfer } from 'transferum';
+
 // Merge sensor data + user input + cached state into one stream
 const sensors = new PollingSourceTransfer<SensorData>({ /* ... */ });
 const userInput = new PushStoredChannelTransfer<UserAction>({ initialValue: defaultAction });
@@ -192,6 +198,8 @@ merge.subscribe((state) => updateDashboard(state));
 #### Conditional routing with bridges
 
 ```typescript
+import { BridgeSelector, createPassBridge } from 'transferum';
+
 // Route data to different processing pipelines based on a selector
 const fastBridge = createPassBridge({ source, target: fastPipeline, activated: false });
 const slowBridge = createPassBridge({ source, target: slowPipeline, activated: false });
@@ -209,6 +217,8 @@ router.select('slow');
 #### Idle fallback polling
 
 ```typescript
+import { IdlePollingTransfer } from 'transferum';
+
 // When user stops interacting, fall back to polling for fresh data
 const channel = new IdlePollingTransfer<FeedItem>({
   fetcher: () => fetchLatestFeed(),
@@ -224,6 +234,8 @@ channel.subscribe((item) => appendToFeed(item));
 #### Game loop / animation frame data processing
 
 ```typescript
+import { RAFTicker, PollingSourceTransfer } from 'transferum';
+
 // Use RAFTicker for frame-aligned data processing
 const ticker = new RAFTicker({ callback: () => processFrame(), interval: 16 });
 ticker.start();
@@ -240,6 +252,8 @@ const framePolling = new PollingSourceTransfer<GameState>({
 #### Async data pipeline with storage
 
 ```typescript
+import { AsyncReadTransfer, AsyncWriteTransfer, AsyncOutputPipelineBuilder, AsyncConvertTransfer, AsyncMapOperator, AsyncStoredChannelTransfer } from 'transferum';
+
 // Fetch from API → transform → write to async storage → notify subscribers
 const reader = new AsyncReadTransfer<RawData>({ flow: apiSource });
 const writer = new AsyncWriteTransfer<ProcessedData>({ flow: dataStorage });
@@ -257,6 +271,8 @@ const value = await pipeline.asyncPull(); // → processed data
 #### Broadcast to multiple consumers
 
 ```typescript
+import { PushStoredChannelTransfer, SplitTransfer, SinkTransfer, WriteTransfer, linkTransfers } from 'transferum';
+
 // One source → multiple independent consumers
 const source = new PushStoredChannelTransfer<Telemetry>();
 
@@ -285,6 +301,8 @@ Transferum is designed for building complex, predictable data processing systems
 Collect events from keyboard, mouse, and gamepad → filter (e.g., `DebounceTransfer` to prevent spam) → transform into game commands → route to appropriate systems.
 
 ```typescript
+import { DebounceTransfer, ConvertTransfer, MapOperator, BridgeSelector, createPassBridge } from 'transferum';
+
 const inputChannel = new DebounceTransfer<InputEvent>({ delay: 50 });
 const commandConverter = new ConvertTransfer<InputEvent, GameCommand>({
   operator: new MapOperator((e) => eventToCommand(e)),
@@ -310,6 +328,8 @@ router.select('run');
 Manage game object state, synchronize animations, calculate physics. Use `ThrottleTransfer` to limit UI update frequency, `GateTransfer` to activate/deactivate game mechanics.
 
 ```typescript
+import { PushStoredChannelTransfer, ThrottleTransfer, GateTransfer, linkTransfers } from 'transferum';
+
 const gameState = new PushStoredChannelTransfer<GameState>({ initialValue: initialState });
 const uiUpdate = new ThrottleTransfer<GameState>({ interval: 100 }); // 10 FPS UI updates
 
@@ -326,6 +346,8 @@ physicsGate.deactivate(); // pause physics
 Use `BridgeMultiSelector` to activate multiple effects simultaneously on events (explosion, hit).
 
 ```typescript
+import { BridgeMultiSelector, createPassBridge } from 'transferum';
+
 const effects = new BridgeMultiSelector({
   bridges: {
     explosion: createPassBridge({ source: trigger, target: particleSystem, activated: false }),
@@ -351,6 +373,8 @@ effects.check('shake');
 Read data from multiple sensors (temperature, humidity, motion) via `PollingSourceTransfer` → filter (`ConditionTransfer`) → aggregate → send to cloud or local storage.
 
 ```typescript
+import { PollingSourceTransfer, MergeTransfer, DuplexPipelineBuilder, ConditionTransfer, AsyncWriteTransfer } from 'transferum';
+
 const tempSensor = new PollingSourceTransfer<number>({
   fetcher: () => readTemperatureSensor(),
   interval: 1000,
@@ -380,6 +404,8 @@ const pipeline = DuplexPipelineBuilder
 Process commands from users or external systems → route to specific actuators (`BridgeSelector`) → receive feedback.
 
 ```typescript
+import { BridgeSelector, createPassBridge } from 'transferum';
+
 const commandRouter = new BridgeSelector({
   bridges: {
     light: createPassBridge({ source: commandChannel, target: lightController, activated: false }),
@@ -398,6 +424,8 @@ commandRouter.select('thermostat'); // switch to thermostat control
 Use `IntervalTicker` for periodic device status polling, `DebounceTransfer` for stable-change notifications (e.g., temperature stays above threshold for N seconds).
 
 ```typescript
+import { DebounceTransfer, PollingSourceTransfer } from 'transferum';
+
 const alertChannel = new DebounceTransfer<Alert>({ delay: 5000 }); // 5s stable alert
 
 alertChannel.subscribe((alert) => {
@@ -426,6 +454,8 @@ tempMonitor.subscribe((temp) => {
 Process user input in form fields → validate (`GuardOperator`) → transform (`MapOperator`) → `DebounceTransfer` for autosave or live search.
 
 ```typescript
+import { DebounceTransfer, AsyncDuplexPipelineBuilder, AsyncConditionTransfer, AsyncConvertTransfer, AsyncMapOperator, PushStoredChannelTransfer } from 'transferum';
+
 const searchInput = new DebounceTransfer<string>({ delay: 300 });
 
 const pipeline = AsyncDuplexPipelineBuilder
@@ -447,6 +477,8 @@ searchInput.push('user query');
 Use `PushStoredChannelTransfer` to store component state that other UI parts can subscribe to. `GateTransfer` to control element visibility or activity.
 
 ```typescript
+import { PushStoredChannelTransfer, GateTransfer } from 'transferum';
+
 const componentState = new PushStoredChannelTransfer<ComponentState>({
   initialValue: { loading: false, data: null },
 });
@@ -465,6 +497,8 @@ visibilityGate.deactivate(); // hide element
 Use `RAFTicker` for smooth animations, `ThrottleTransfer` to limit redraw frequency on intensive events (e.g., `mousemove`).
 
 ```typescript
+import { RAFTicker, ThrottleTransfer } from 'transferum';
+
 const frameTicker = new RAFTicker({
   callback: () => updateAnimation(),
   interval: 16, // ~60 FPS
@@ -484,6 +518,8 @@ mouseMove.subscribe((e) => updateCursorPosition(e));
 Collect metrics from various sources (server logs, client events) → filter → transform → send to multiple monitoring systems (`BridgeMultiSelector` for Prometheus, ELK, Sentry simultaneously).
 
 ```typescript
+import { PushStoredChannelTransfer, BridgeMultiSelector, createPassBridge } from 'transferum';
+
 const metricsChannel = new PushStoredChannelTransfer<Metric>();
 
 const destinations = new BridgeMultiSelector({
@@ -504,6 +540,8 @@ metricsChannel.push({ name: 'request_latency', value: 150 });
 Use `SplitTransfer` to separate log streams by severity level, `ConditionTransfer` for anomaly detection.
 
 ```typescript
+import { SplitTransfer, ConditionTransfer } from 'transferum';
+
 const logSplit = new SplitTransfer<LogEntry>({
   targets: [
     new ConditionTransfer({ shouldEmit: (l) => l.level === 'ERROR' }),
@@ -530,6 +568,8 @@ anomalyDetector.subscribe((anomalousLog) => {
 Receive streaming quotes → calculate indicators (`ReducerOperator`) → filter by conditions (`FilterOperator`) → execute trading strategies.
 
 ```typescript
+import { PushStoredChannelTransfer, DuplexPipelineBuilder, ConvertTransfer, ReducerOperator, ConditionTransfer, AsyncSinkTransfer } from 'transferum';
+
 const quoteStream = new PushStoredChannelTransfer<Quote>({ initialValue: null });
 
 const indicatorPipeline = DuplexPipelineBuilder
@@ -556,6 +596,8 @@ quoteStream.subscribe((quote) => {
 Use `BridgeSelector` to switch between different strategies or data sources.
 
 ```typescript
+import { BridgeSelector, createPassBridge } from 'transferum';
+
 const strategyRouter = new BridgeSelector({
   bridges: {
     conservative: createPassBridge({ source: marketData, target: conservativeStrategy, activated: false }),
@@ -801,6 +843,8 @@ link.unsubscribe(); // break the link
 For async links (`subscribable → asyncPushable`), you can pass `options.onError` to intercept rejections:
 
 ```typescript
+import { linkTransfers } from 'transferum';
+
 const link = linkTransfers(source, asyncTarget, { onError: (e) => console.error(e) });
 ```
 
@@ -811,6 +855,8 @@ const link = linkTransfers(source, asyncTarget, { onError: (e) => console.error(
 This behavior is intentional: `undefined` means "no data" in the library, not "empty value." If you need to propagate an empty value, use `null`:
 
 ```typescript
+import { PushStoredChannelTransfer } from 'transferum';
+
 const channel = new PushStoredChannelTransfer<string | null>({ initialValue: null });
 
 channel.subscribe((data) => console.log(data));
@@ -901,6 +947,8 @@ Reactive channel with automatic emission to subscribers on `push()`. Data is not
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`
 
 ```typescript
+import { PushChannelTransfer } from 'transferum';
+
 const channel = new PushChannelTransfer<number>();
 
 channel.subscribe((data) => console.log(data));
@@ -915,6 +963,8 @@ Reactive channel with delayed emission to subscribers on `push()`. Each `push()`
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`
 
 ```typescript
+import { DelayedPushChannelTransfer } from 'transferum';
+
 const channel = new DelayedPushChannelTransfer<number>({ delay: 100 });
 
 channel.subscribe((data) => console.log(data));
@@ -935,6 +985,8 @@ Reactive channel with debounced emission to subscribers on `push()`. Each `push(
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`
 
 ```typescript
+import { DebounceTransfer } from 'transferum';
+
 const channel = new DebounceTransfer<number>({ delay: 200 });
 
 channel.subscribe((data) => console.log(data));
@@ -958,6 +1010,8 @@ Reactive channel with throttled emission to subscribers on `push()`. The first `
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`
 
 ```typescript
+import { ThrottleTransfer } from 'transferum';
+
 const channel = new ThrottleTransfer<number>({ interval: 100 });
 
 channel.subscribe((data) => console.log(data));
@@ -979,6 +1033,8 @@ Reactive channel with last-value retention. The value is available for `pull()` 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isPullable`, `isSubscribable`, `isTriggerable`
 
 ```typescript
+import { PushStoredChannelTransfer } from 'transferum';
+
 const channel = new PushStoredChannelTransfer<number>({ initialValue: 0 });
 
 channel.subscribe((data) => console.log(data));
@@ -995,6 +1051,8 @@ Passive buffer with push/pull mechanics (no notifications). `pull()` extracts th
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isPullable`
 
 ```typescript
+import { BufferTransfer } from 'transferum';
+
 const buffer = new BufferTransfer<number>();
 
 buffer.push(42);
@@ -1009,6 +1067,8 @@ Buffer with manual read control via `trigger()`. `pull()` returns data only afte
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isPullable`, `isTriggerable`
 
 ```typescript
+import { ManualBufferTransfer } from 'transferum';
+
 const buffer = new ManualBufferTransfer<number>();
 
 buffer.push(42);
@@ -1025,6 +1085,8 @@ Reactive stream with manual emission control. `push()` writes the value, `trigge
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`, `isTriggerable`
 
 ```typescript
+import { ManualFlowTransfer } from 'transferum';
+
 const flow = new ManualFlowTransfer<number>();
 
 flow.subscribe((data) => console.log(data));
@@ -1039,6 +1101,8 @@ Transfer with state management (gate). Passes data only when `active === true`.
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`, `isGate`
 
 ```typescript
+import { GateTransfer } from 'transferum';
+
 const gate = new GateTransfer<number>({ activated: false });
 
 gate.subscribe((data) => console.log(data));
