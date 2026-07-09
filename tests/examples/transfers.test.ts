@@ -25,6 +25,13 @@ import {
   MapOperator,
   LatestStorage,
   linkTransfers,
+  AsyncSinkTransfer,
+  AsyncWriteTransfer,
+  AsyncReadTransfer,
+  AsyncConvertTransfer,
+  AsyncConditionTransfer,
+  AsyncMapOperator,
+  AsyncStoredChannelTransfer,
 } from '../../src';
 import { describe, expect, it, jest } from '@jest/globals';
 // @ts-ignore
@@ -473,3 +480,128 @@ describe('README Transfers: UniversalCompositeTransfer', () => {
     composite.destroy();
   });
 });
+
+// ═══════════════════════════════════════════════════════════════
+// Async Transfers — Individual Examples
+// ═══════════════════════════════════════════════════════════════
+
+describe('README Async Transfers: AsyncSinkTransfer', () => {
+  it('calls async callback on asyncPush', async () => {
+    const results: number[] = [];
+    const sink = new AsyncSinkTransfer<number>({
+      callback: async (n) => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        results.push(n);
+      },
+    });
+
+    await sink.asyncPush(42);
+    expect(results).toEqual([42]);
+
+    sink.destroy();
+  });
+});
+
+describe('README Async Transfers: AsyncWriteTransfer', () => {
+  it('writes to async storage', async () => {
+    const storage = {
+      _data: 0,
+      async write(value: number): Promise<void> {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        this._data = value;
+      },
+      read(): number {
+        return this._data;
+      },
+    };
+
+    const writer = new AsyncWriteTransfer<number>({ flow: storage });
+
+    await writer.asyncPush(42);
+    expect(storage.read()).toBe(42);
+
+    writer.destroy();
+  });
+});
+
+describe('README Async Transfers: AsyncReadTransfer', () => {
+  it('reads from async storage', async () => {
+    const storage = {
+      _data: 42,
+      async read(): Promise<number> {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return this._data;
+      },
+    };
+
+    const reader = new AsyncReadTransfer<number>({ flow: storage });
+
+    const value = await reader.asyncPull();
+    expect(value).toBe(42);
+
+    reader.destroy();
+  });
+});
+
+describe('README Async Transfers: AsyncConvertTransfer', () => {
+  it('transforms data via async operator', async () => {
+    const converter = new AsyncConvertTransfer<number, string>({
+      operator: new AsyncMapOperator(async (n: number) => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return `val_${n}`;
+      }),
+    });
+
+    const received: string[] = [];
+    converter.subscribe((data) => received.push(data));
+    await converter.asyncPush(42);
+
+    expect(received).toEqual(['val_42']);
+    converter.destroy();
+  });
+});
+
+describe('README Async Transfers: AsyncConditionTransfer', () => {
+  it('filters data with async predicate', async () => {
+    const condition = new AsyncConditionTransfer<number>({
+      shouldAccept: async (n) => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return n > 0;
+      },
+    });
+
+    const received: number[] = [];
+    condition.subscribe((data) => received.push(data));
+    await condition.asyncPush(-5);
+    await condition.asyncPush(50);
+
+    expect(received).toEqual([50]);
+    condition.destroy();
+  });
+});
+
+describe('README Async Transfers: AsyncStoredChannelTransfer', () => {
+  it('retains value with async interface', async () => {
+    let emit: ((data: number) => void) | undefined;
+
+    const channel = new AsyncStoredChannelTransfer<number>({
+      setup: (e) => { emit = e; },
+      destroy: () => {},
+      initialValue: 0,
+    });
+
+    const received: number[] = [];
+    channel.subscribe((data) => received.push(data));
+
+    if (emit !== undefined) {
+      emit(42);
+    }
+    expect(received).toEqual([42]);
+
+    const value = await channel.asyncPull();
+    expect(value).toBe(42);
+
+    channel.destroy();
+  });
+});
+
