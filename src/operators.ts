@@ -32,20 +32,20 @@ export class FilterOperator<T> implements OperatorInterface<T[], T[]> {
 }
 
 /** Array reduce operator — reduces an array to a single value. Returns defaultValue for empty arrays. */
-export class ReducerOperator<TInput, TOutput = TInput> implements OperatorInterface<TInput[], TOutput | undefined> {
-  private readonly _reducer: (acc: TOutput, curr: TInput) => TOutput;
-  private readonly _defaultValue?: TOutput;
+export class ReducerOperator<T> implements OperatorInterface<T[], T | undefined> {
+  private readonly _reducer: (acc: T, curr: T) => T;
+  private readonly _defaultValue?: T;
 
-  constructor(reducer: (acc: TOutput, curr: TInput) => TOutput, defaultValue?: TOutput) {
+  constructor(reducer: (acc: T, curr: T) => T, defaultValue?: T) {
     this._reducer = reducer;
     this._defaultValue = defaultValue;
   }
 
-  apply(data: TInput[]): TOutput | undefined {
+  apply(data: T[]): T | undefined {
     if (data.length === 0) {
       return this._defaultValue;
     }
-    return (data as unknown as TOutput[]).reduce(this._reducer as unknown as (acc: TOutput, curr: TOutput) => TOutput);
+    return data.reduce(this._reducer);
   }
 }
 

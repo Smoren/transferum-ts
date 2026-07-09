@@ -742,8 +742,7 @@ export function createFilterOperator<T>(
 /**
  * Creates a ReducerOperator — an array reduce operator to a single value.
  *
- * @typeParam TInput — array element type
- * @typeParam TOutput — output value type (TInput by default)
+ * @typeParam T — array element type
  * @param reducer — reduce function
  * @param defaultValue — default value for an empty array
  * @example
@@ -751,11 +750,11 @@ export function createFilterOperator<T>(
  * op.apply([1, 2, 3]); // 6
  * op.apply([]); // 0
  */
-export function createReducerOperator<TInput, TOutput = TInput>(
-  reducer: (acc: TOutput, curr: TInput) => TOutput,
-  defaultValue?: TOutput
-): ReducerOperator<TInput, TOutput> {
-  return new ReducerOperator<TInput, TOutput>(reducer, defaultValue);
+export function createReducerOperator<T>(
+  reducer: (acc: T, curr: T) => T,
+  defaultValue?: T
+): ReducerOperator<T> {
+  return new ReducerOperator<T>(reducer, defaultValue);
 }
 
 /**
