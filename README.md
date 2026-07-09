@@ -568,30 +568,29 @@ anomalyDetector.subscribe((anomalousLog) => {
 
 **Stock Market Data Processing**
 
-Receive streaming quotes → calculate indicators (`ReducerOperator`) → filter by conditions (`FilterOperator`) → execute trading strategies.
+Receive streaming quotes → calculate indicators (`MapOperator`) → filter by conditions (`ConditionTransfer`) → execute trading strategies.
 
 ```typescript
-import { PushStoredChannelTransfer, DuplexPipelineBuilder, ConvertTransfer, ReducerOperator, ConditionTransfer, AsyncSinkTransfer } from 'transferum';
+import { PushStoredChannelTransfer, DuplexPipelineBuilder, ConvertTransfer, MapOperator, ConditionTransfer, AsyncSinkTransfer } from 'transferum';
 
 const quoteStream = new PushStoredChannelTransfer<Quote[]>({ initialValue: [] });
 
 const indicatorPipeline = DuplexPipelineBuilder
   .start(quoteStream)
   .to(new ConvertTransfer<Quote[], TechnicalIndicator>({
-    operator: new ReducerOperator<Quote, TechnicalIndicator>((quotes) =>
-      quotes.reduce((sum, q) => sum + q.price, 0) / quotes.length // SMA
-    ),
+    operator: new MapOperator((quotes) => ({
+      value: quotes.reduce((sum, q) => sum + q.price, 0),
+      threshold: 100,
+    })),
   }))
   .to(new ConditionTransfer<TechnicalIndicator>({
-    shouldEmit: (ind) => ind.value > ind.threshold,
+    shouldAccept: (ind) => ind.value > ind.threshold,
   }))
   .finish(new AsyncSinkTransfer<TradingSignal>({
     callback: async (signal) => await executeTrade(signal),
   }));
 
-quoteStream.subscribe((quote) => {
-  // process quote
-});
+quoteStream.push([{ symbol: 'AAPL', price: 150, timestamp: Date.now() }]);
 ```
 
 **Portfolio Management**
