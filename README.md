@@ -779,10 +779,10 @@ Transferum's capability flags provide more granularity than the two-type model, 
 3. **Pull-based data acquisition** — Polling APIs, sensors, or storage with `PollingProxy`.
 4. **Explicit flow control** — Gates, bridges, and selectors for runtime routing.
 5. **Resource-conscious environments** — Smaller bundle than RxJS, zero dependencies.
-6. **Predictable error handling** — Errors suppressed with handlers, streams stay alive.
+6. **Undefined-free data flow** — `undefined` never propagates through the chain — it means "no data," not "empty value," eliminating null-check defects in consumers.
 7. **Game development / IoT** — Frame-aligned tickers, idle polling, sensor aggregation.
 
-**Example fit:** Real-time dashboard with API polling, debounced user input, conditional routing to multiple visualizations, and graceful error recovery.
+**Example fit:** Real-time dashboard with API polling, debounced user input, conditional routing to multiple visualizations, and unified sync/async data flows.
 
 ---
 
