@@ -315,6 +315,7 @@ const router = new BridgeSelector({
   },
   initialKey: 'walk',
   activated: true,
+  owned: true,
 });
 
 inputChannel.subscribe((e) => inputChannel.push(e));
@@ -355,6 +356,7 @@ const effects = new BridgeMultiSelector({
   },
   initialKeys: [],
   activated: true,
+  owned: true,
 });
 
 // On explosion event
@@ -372,7 +374,7 @@ effects.check('shake');
 Read data from multiple sensors (temperature, humidity, motion) via `PollingSourceTransfer` → filter (`ConditionTransfer`) → aggregate → send to cloud or local storage.
 
 ```typescript
-import { PollingSourceTransfer, MergeTransfer, DuplexPipelineBuilder, ConditionTransfer, AsyncWriteTransfer } from 'transferum';
+import { PollingSourceTransfer, MergeTransfer, OutputPipelineBuilder, ConditionTransfer, AsyncWriteTransfer } from 'transferum';
 
 const tempSensor = new PollingSourceTransfer<number>({
   fetcher: () => readTemperatureSensor(),
@@ -390,7 +392,7 @@ const aggregator = new MergeTransfer<SensorData>({
   sources: [tempSensor, humiditySensor],
 });
 
-const pipeline = DuplexPipelineBuilder
+const pipeline = OutputPipelineBuilder
   .start(aggregator)
   .to(new ConditionTransfer<SensorData>({
     shouldAccept: (d) => d.temperature > 0 && d.humidity >= 0,
@@ -413,6 +415,7 @@ const commandRouter = new BridgeSelector({
   },
   initialKey: 'light',
   activated: true,
+  owned: true,
 });
 
 commandRouter.select('thermostat'); // switch to thermostat control
@@ -529,6 +532,7 @@ const destinations = new BridgeMultiSelector({
   },
   initialKeys: ['prometheus', 'elk'],
   activated: true,
+  owned: true,
 });
 
 metricsChannel.push({ name: 'request_latency', value: 150 });
@@ -605,6 +609,7 @@ const strategyRouter = new BridgeSelector({
   },
   initialKey: 'balanced',
   activated: true,
+  owned: true,
 });
 
 // Switch strategy based on market conditions
