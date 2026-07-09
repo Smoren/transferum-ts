@@ -1,22 +1,22 @@
 import {
-  DebounceTransfer,
-  ConvertTransfer,
-  MapOperator,
-  BridgeSelector,
+  createDebounceTransfer,
+  createConvertTransfer,
+  createMapOperator,
+  createBridgeSelector,
   createPassBridge,
-  PushStoredChannelTransfer,
-  ThrottleTransfer,
-  GateTransfer,
+  createPushStoredChannelTransfer,
+  createThrottleTransfer,
+  createGateTransfer,
   linkTransfers,
-  BridgeMultiSelector,
-  PollingSourceTransfer,
-  MergeTransfer,
-  ConditionTransfer,
+  createBridgeMultiSelector,
+  createPollingSourceTransfer,
+  createMergeTransfer,
+  createConditionTransfer,
   DuplexPipelineBuilder,
-  SinkTransfer,
+  createSinkTransfer,
   RAFTicker,
-  PushChannelTransfer,
-  SplitTransfer,
+  createPushChannelTransfer,
+  createSplitTransfer,
   OutputPipelineBuilder,
 } from '../../src';
 import { describe, expect, it, jest } from '@jest/globals';
@@ -46,20 +46,20 @@ import {
 
 describe('README Domain-Specific: Game Development - Input Processing Pipeline', () => {
   it('collects events, filters, transforms, routes to systems', async () => {
-    const inputChannel = new DebounceTransfer<InputEvent>({ delay: 50 });
-    const commandConverter = new ConvertTransfer<InputEvent, GameCommand>({
-      operator: new MapOperator((e) => eventToCommand(e)),
+    const inputChannel = createDebounceTransfer<InputEvent>({ delay: 50 });
+    const commandConverter = createConvertTransfer<InputEvent, GameCommand>({
+      operator: createMapOperator((e) => eventToCommand(e)),
     });
 
     const walkTarget: GameCommand[] = [];
     const runTarget: GameCommand[] = [];
     const shootTarget: GameCommand[] = [];
 
-    const router = new BridgeSelector({
+    const router = createBridgeSelector({
       bridges: {
-        walk: createPassBridge({ source: commandConverter, target: new SinkTransfer<GameCommand>({ callback: (c) => walkTarget.push(c) }), activated: false }),
-        run: createPassBridge({ source: commandConverter, target: new SinkTransfer<GameCommand>({ callback: (c) => runTarget.push(c) }), activated: false }),
-        shoot: createPassBridge({ source: commandConverter, target: new SinkTransfer<GameCommand>({ callback: (c) => shootTarget.push(c) }), activated: false }),
+        walk: createPassBridge({ source: commandConverter, target: createSinkTransfer<GameCommand>({ callback: (c) => walkTarget.push(c) }), activated: false }),
+        run: createPassBridge({ source: commandConverter, target: createSinkTransfer<GameCommand>({ callback: (c) => runTarget.push(c) }), activated: false }),
+        shoot: createPassBridge({ source: commandConverter, target: createSinkTransfer<GameCommand>({ callback: (c) => shootTarget.push(c) }), activated: false }),
       },
       initialKey: 'walk',
       activated: true,
@@ -86,8 +86,8 @@ describe('README Domain-Specific: Game Development - Input Processing Pipeline',
 
 describe('README Domain-Specific: Game Development - Game Logic & State Management', () => {
   it('manages game state with throttled UI updates', () => {
-    const gameState = new PushStoredChannelTransfer<GameState>({ initialValue: { score: 0, level: 1 } });
-    const uiUpdate = new ThrottleTransfer<GameState>({ interval: 100 });
+    const gameState = createPushStoredChannelTransfer<GameState>({ initialValue: { score: 0, level: 1 } });
+    const uiUpdate = createThrottleTransfer<GameState>({ interval: 100 });
 
     linkTransfers(gameState, uiUpdate);
 
@@ -99,7 +99,7 @@ describe('README Domain-Specific: Game Development - Game Logic & State Manageme
 
     expect(hudUpdates.length).toBeGreaterThan(0);
 
-    const physicsGate = new GateTransfer<PhysicsEvent>({ activated: true });
+    const physicsGate = createGateTransfer<PhysicsEvent>({ activated: true });
     physicsGate.deactivate();
     expect(physicsGate.active).toBe(false);
 
@@ -111,17 +111,17 @@ describe('README Domain-Specific: Game Development - Game Logic & State Manageme
 
 describe('README Domain-Specific: Game Development - Particle & Sound Effects', () => {
   it('activates multiple effects simultaneously', () => {
-    const trigger = new PushStoredChannelTransfer<string>();
+    const trigger = createPushStoredChannelTransfer<string>();
 
     const particleTarget: string[] = [];
     const audioTarget: string[] = [];
     const cameraTarget: string[] = [];
 
-    const effects = new BridgeMultiSelector({
+    const effects = createBridgeMultiSelector({
       bridges: {
-        explosion: createPassBridge({ source: trigger, target: new SinkTransfer<string>({ callback: (e) => particleTarget.push(e) }), activated: false }),
-        sound: createPassBridge({ source: trigger, target: new SinkTransfer<string>({ callback: (e) => audioTarget.push(e) }), activated: false }),
-        shake: createPassBridge({ source: trigger, target: new SinkTransfer<string>({ callback: (e) => cameraTarget.push(e) }), activated: false }),
+        explosion: createPassBridge({ source: trigger, target: createSinkTransfer<string>({ callback: (e) => particleTarget.push(e) }), activated: false }),
+        sound: createPassBridge({ source: trigger, target: createSinkTransfer<string>({ callback: (e) => audioTarget.push(e) }), activated: false }),
+        shake: createPassBridge({ source: trigger, target: createSinkTransfer<string>({ callback: (e) => cameraTarget.push(e) }), activated: false }),
       },
       initialKeys: [],
       activated: true,
@@ -149,28 +149,28 @@ describe('README Domain-Specific: Game Development - Particle & Sound Effects', 
 
 describe('README Domain-Specific: IoT - Sensor Data Aggregation', () => {
   it('aggregates sensor data with filtering', async () => {
-    const tempSensor = new PollingSourceTransfer<SensorData>({
+    const tempSensor = createPollingSourceTransfer<SensorData>({
       fetcher: () => ({ temperature: 25, humidity: 50 }),
       interval: 50,
       activated: true,
     });
 
-    const humiditySensor = new PollingSourceTransfer<SensorData>({
+    const humiditySensor = createPollingSourceTransfer<SensorData>({
       fetcher: () => ({ temperature: 26, humidity: 55 }),
       interval: 50,
       activated: true,
     });
 
-    const aggregator = new MergeTransfer<SensorData>({
+    const aggregator = createMergeTransfer<SensorData>({
       sources: [tempSensor, humiditySensor],
     });
 
     const pipeline = OutputPipelineBuilder
       .start(aggregator)
-      .to(new ConditionTransfer<SensorData>({
+      .to(createConditionTransfer<SensorData>({
         shouldAccept: (d) => d.temperature > 0 && d.humidity >= 0,
       }))
-      .finish(new PushStoredChannelTransfer<SensorData>());
+      .finish(createPushStoredChannelTransfer<SensorData>());
 
     const received: SensorData[] = [];
     pipeline.subscribe((data) => received.push(data));
@@ -188,17 +188,17 @@ describe('README Domain-Specific: IoT - Sensor Data Aggregation', () => {
 
 describe('README Domain-Specific: IoT - Device Control', () => {
   it('routes commands to specific actuators', () => {
-    const commandChannel = new PushStoredChannelTransfer<string>();
+    const commandChannel = createPushStoredChannelTransfer<string>();
 
     const lightTarget: string[] = [];
     const thermostatTarget: string[] = [];
     const lockTarget: string[] = [];
 
-    const commandRouter = new BridgeSelector({
+    const commandRouter = createBridgeSelector({
       bridges: {
-        light: createPassBridge({ source: commandChannel, target: new SinkTransfer<string>({ callback: (c) => lightTarget.push(c) }), activated: false }),
-        thermostat: createPassBridge({ source: commandChannel, target: new SinkTransfer<string>({ callback: (c) => thermostatTarget.push(c) }), activated: false }),
-        lock: createPassBridge({ source: commandChannel, target: new SinkTransfer<string>({ callback: (c) => lockTarget.push(c) }), activated: false }),
+        light: createPassBridge({ source: commandChannel, target: createSinkTransfer<string>({ callback: (c) => lightTarget.push(c) }), activated: false }),
+        thermostat: createPassBridge({ source: commandChannel, target: createSinkTransfer<string>({ callback: (c) => thermostatTarget.push(c) }), activated: false }),
+        lock: createPassBridge({ source: commandChannel, target: createSinkTransfer<string>({ callback: (c) => lockTarget.push(c) }), activated: false }),
       },
       initialKey: 'light',
       activated: true,
@@ -219,14 +219,14 @@ describe('README Domain-Specific: IoT - Device Control', () => {
 
 describe('README Domain-Specific: IoT - Monitoring & Alerts', () => {
   it('monitors temperature with debounced alerts', async () => {
-    const alertChannel = new DebounceTransfer<Alert>({ delay: 50 });
+    const alertChannel = createDebounceTransfer<Alert>({ delay: 50 });
 
     const alerts: Alert[] = [];
     alertChannel.subscribe((alert) => {
       alerts.push(alert);
     });
 
-    const tempMonitor = new PollingSourceTransfer<number>({
+    const tempMonitor = createPollingSourceTransfer<number>({
       fetcher: () => 30,
       interval: 20,
       activated: true,
@@ -257,7 +257,7 @@ describe('README Domain-Specific: IoT - Monitoring & Alerts', () => {
 
 describe('README Domain-Specific: UI/UX - Component State Management', () => {
   it('manages component state with multiple consumers', () => {
-    const componentState = new PushStoredChannelTransfer<ComponentState>({
+    const componentState = createPushStoredChannelTransfer<ComponentState>({
       initialValue: { loading: false, data: null },
     });
 
@@ -272,7 +272,7 @@ describe('README Domain-Specific: UI/UX - Component State Management', () => {
     expect(contentRenders.length).toBe(1);
     expect(breadcrumbUpdates.length).toBe(1);
 
-    const visibilityGate = new GateTransfer<UIEvent>({ activated: true });
+    const visibilityGate = createGateTransfer<UIEvent>({ activated: true });
     visibilityGate.deactivate();
     expect(visibilityGate.active).toBe(false);
 
@@ -291,7 +291,7 @@ describe('README Domain-Specific: UI/UX - Animations', () => {
     expect(frameTicker.active).toBe(true);
     frameTicker.stop();
 
-    const mouseMove = new ThrottleTransfer<{ x: number; y: number }>({ interval: 50 });
+    const mouseMove = createThrottleTransfer<{ x: number; y: number }>({ interval: 50 });
     const moves: { x: number; y: number }[] = [];
     mouseMove.subscribe((e) => moves.push(e));
     mouseMove.push({ x: 10, y: 20 });
@@ -306,17 +306,17 @@ describe('README Domain-Specific: UI/UX - Animations', () => {
 
 describe('README Domain-Specific: Monitoring - Metrics Collection', () => {
   it('collects metrics and sends to multiple destinations', () => {
-    const metricsChannel = new PushStoredChannelTransfer<Metric>();
+    const metricsChannel = createPushStoredChannelTransfer<Metric>();
 
     const prometheusTarget: Metric[] = [];
     const elkTarget: Metric[] = [];
     const sentryTarget: Metric[] = [];
 
-    const destinations = new BridgeMultiSelector({
+    const destinations = createBridgeMultiSelector({
       bridges: {
-        prometheus: createPassBridge({ source: metricsChannel, target: new SinkTransfer<Metric>({ callback: (m) => prometheusTarget.push(m) }), activated: true }),
-        elk: createPassBridge({ source: metricsChannel, target: new SinkTransfer<Metric>({ callback: (m) => elkTarget.push(m) }), activated: true }),
-        sentry: createPassBridge({ source: metricsChannel, target: new SinkTransfer<Metric>({ callback: (m) => sentryTarget.push(m) }), activated: false }),
+        prometheus: createPassBridge({ source: metricsChannel, target: createSinkTransfer<Metric>({ callback: (m) => prometheusTarget.push(m) }), activated: true }),
+        elk: createPassBridge({ source: metricsChannel, target: createSinkTransfer<Metric>({ callback: (m) => elkTarget.push(m) }), activated: true }),
+        sentry: createPassBridge({ source: metricsChannel, target: createSinkTransfer<Metric>({ callback: (m) => sentryTarget.push(m) }), activated: false }),
       },
       initialKeys: ['prometheus', 'elk'],
       activated: true,
@@ -336,20 +336,20 @@ describe('README Domain-Specific: Monitoring - Metrics Collection', () => {
 
 describe('README Domain-Specific: Monitoring - Real-time Log Analysis', () => {
   it('separates log streams by severity level', () => {
-    const logSplit = new SplitTransfer<LogEntry>({
+    const logSplit = createSplitTransfer<LogEntry>({
       targets: [
-        new ConditionTransfer({ shouldAccept: (l) => l.level === 'ERROR' }),
-        new ConditionTransfer({ shouldAccept: (l) => l.level === 'WARN' }),
-        new ConditionTransfer({ shouldAccept: (l) => l.level === 'INFO' }),
+        createConditionTransfer({ shouldAccept: (l) => l.level === 'ERROR' }),
+        createConditionTransfer({ shouldAccept: (l) => l.level === 'WARN' }),
+        createConditionTransfer({ shouldAccept: (l) => l.level === 'INFO' }),
       ],
     });
 
     linkTransfers(
-      new PushChannelTransfer<LogEntry>(),
+      createPushChannelTransfer<LogEntry>(),
       logSplit
     );
 
-    const anomalyDetector = new ConditionTransfer<LogEntry>({
+    const anomalyDetector = createConditionTransfer<LogEntry>({
       shouldAccept: (l) => detectAnomaly(l),
     });
 
@@ -372,20 +372,20 @@ describe('README Domain-Specific: Monitoring - Real-time Log Analysis', () => {
 
 describe('README Domain-Specific: Financial - Stock Market Data Processing', () => {
   it('processes streaming quotes with indicators', () => {
-    const quoteStream = new PushStoredChannelTransfer<Quote[]>({ initialValue: [] });
+    const quoteStream = createPushStoredChannelTransfer<Quote[]>({ initialValue: [] });
 
     const indicatorPipeline = DuplexPipelineBuilder
       .start(quoteStream)
-      .to(new ConvertTransfer<Quote[], TechnicalIndicator>({
-        operator: new MapOperator((quotes) => ({
+      .to(createConvertTransfer<Quote[], TechnicalIndicator>({
+        operator: createMapOperator((quotes) => ({
           value: quotes.reduce((sum, q) => sum + q.price, 0),
           threshold: 100,
         })),
       }))
-      .to(new ConditionTransfer<TechnicalIndicator>({
+      .to(createConditionTransfer<TechnicalIndicator>({
         shouldAccept: (ind) => ind.value > ind.threshold,
       }))
-      .finish(new PushStoredChannelTransfer<TechnicalIndicator>());
+      .finish(createPushStoredChannelTransfer<TechnicalIndicator>());
 
     const received: TechnicalIndicator[] = [];
     indicatorPipeline.subscribe((ind) => received.push(ind));
@@ -406,17 +406,17 @@ describe('README Domain-Specific: Financial - Stock Market Data Processing', () 
 
 describe('README Domain-Specific: Financial - Portfolio Management', () => {
   it('switches between strategies based on market conditions', () => {
-    const marketData = new PushStoredChannelTransfer<Quote>();
+    const marketData = createPushStoredChannelTransfer<Quote>();
 
     const conservativeTarget: Quote[] = [];
     const aggressiveTarget: Quote[] = [];
     const balancedTarget: Quote[] = [];
 
-    const strategyRouter = new BridgeSelector({
+    const strategyRouter = createBridgeSelector({
       bridges: {
-        conservative: createPassBridge({ source: marketData, target: new SinkTransfer<Quote>({ callback: (q) => conservativeTarget.push(q) }), activated: false }),
-        aggressive: createPassBridge({ source: marketData, target: new SinkTransfer<Quote>({ callback: (q) => aggressiveTarget.push(q) }), activated: false }),
-        balanced: createPassBridge({ source: marketData, target: new SinkTransfer<Quote>({ callback: (q) => balancedTarget.push(q) }), activated: true }),
+        conservative: createPassBridge({ source: marketData, target: createSinkTransfer<Quote>({ callback: (q) => conservativeTarget.push(q) }), activated: false }),
+        aggressive: createPassBridge({ source: marketData, target: createSinkTransfer<Quote>({ callback: (q) => aggressiveTarget.push(q) }), activated: false }),
+        balanced: createPassBridge({ source: marketData, target: createSinkTransfer<Quote>({ callback: (q) => balancedTarget.push(q) }), activated: true }),
       },
       initialKey: 'balanced',
       activated: true,

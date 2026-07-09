@@ -1,33 +1,30 @@
 import {
-  PushChannelTransfer,
-  PushStoredChannelTransfer,
-  PollingSourceTransfer,
-  ConvertTransfer,
-  MapOperator,
-  DebounceTransfer,
-  MergeTransfer,
-  SplitTransfer,
-  SinkTransfer,
-  WriteTransfer,
-  IdlePollingTransfer,
-  AsyncDuplexPipelineBuilder,
-  AsyncConvertTransfer,
-  AsyncMapOperator,
-  AsyncConditionTransfer,
-  AsyncSinkTransfer,
-  BridgeSelector,
-  createPassBridge,
   RAFTicker,
-  linkTransfers,
   LatestStorage,
   OutputPipelineBuilder,
   AsyncInputPipelineBuilder,
+  AsyncDuplexPipelineBuilder,
+  linkTransfers,
+  createPassBridge,
+  createPollingSourceTransfer,
+  createConvertTransfer,
+  createMapOperator,
+  createPushStoredChannelTransfer,
+  createDebounceTransfer,
+  createAsyncConditionTransfer,
+  createAsyncConvertTransfer,
+  createAsyncMapOperator,
+  createAsyncSinkTransfer,
+  createMergeTransfer,
+  createSinkTransfer,
+  createBridgeSelector,
+  createIdlePollingTransfer,
+  createSplitTransfer,
+  createWriteTransfer,
 } from '../../src';
 import { describe, expect, it, jest } from '@jest/globals';
 import {
-  createMockCallback,
   wait,
-  waitForCondition,
   type ServerState,
   type ViewModel,
   type SensorData,
@@ -50,7 +47,7 @@ describe('README Use Cases: Real-time UI updates from API polling', () => {
   it('polls API, transforms response, updates subscribers', async () => {
     const fetcher = jest.fn<() => ServerState>(() => ({ id: 1, status: 'ok' }));
 
-    const polling = new PollingSourceTransfer<ServerState>({
+    const polling = createPollingSourceTransfer<ServerState>({
       fetcher,
       interval: 50,
       activated: true,
@@ -58,10 +55,10 @@ describe('README Use Cases: Real-time UI updates from API polling', () => {
 
     const pipeline = OutputPipelineBuilder
       .start(polling)
-      .to(new ConvertTransfer<ServerState, ViewModel>({
-        operator: new MapOperator((state) => toViewModel(state)),
+      .to(createConvertTransfer<ServerState, ViewModel>({
+        operator: createMapOperator((state) => toViewModel(state)),
       }))
-      .finish(new PushStoredChannelTransfer<ViewModel>());
+      .finish(createPushStoredChannelTransfer<ViewModel>());
 
     const received: ViewModel[] = [];
     pipeline.subscribe((vm) => received.push(vm));
@@ -81,7 +78,7 @@ describe('README Use Cases: Real-time UI updates from API polling', () => {
 
 describe('README Use Cases: Debounced user input with async validation', () => {
   it('debounces input, validates, transforms, sends to async sink', async () => {
-    const input = new DebounceTransfer<string>({ delay: 50 });
+    const input = createDebounceTransfer<string>({ delay: 50 });
 
     const sinkResults: ValidationResult[] = [];
     const saveResult = jest.fn(async (result: ValidationResult) => {
@@ -90,13 +87,13 @@ describe('README Use Cases: Debounced user input with async validation', () => {
 
     const pipeline = AsyncInputPipelineBuilder
       .start(input)
-      .to(new AsyncConditionTransfer<string>({
+      .to(createAsyncConditionTransfer<string>({
         shouldAccept: async (s) => s.length > 0,
       }))
-      .to(new AsyncConvertTransfer<string, ValidationResult>({
-        operator: new AsyncMapOperator(async (s) => await validate(s)),
+      .to(createAsyncConvertTransfer<string, ValidationResult>({
+        operator: createAsyncMapOperator(async (s) => await validate(s)),
       }))
-      .finish(new AsyncSinkTransfer<ValidationResult>({
+      .finish(createAsyncSinkTransfer<ValidationResult>({
         callback: async (result) => await saveResult(result),
       }), { owned: true, linkOnError: (e) => console.error(e) });
 
@@ -116,10 +113,10 @@ describe('README Use Cases: Debounced user input with async validation', () => {
 
 describe('README Use Cases: Merging multiple data sources into a single view', () => {
   it('merges multiple sensor streams into one', () => {
-    const tempSensor = new PushStoredChannelTransfer<SensorData>({ initialValue: { temperature: 25, humidity: 50 } });
-    const humiditySensor = new PushStoredChannelTransfer<SensorData>({ initialValue: { temperature: 26, humidity: 55 } });
+    const tempSensor = createPushStoredChannelTransfer<SensorData>({ initialValue: { temperature: 25, humidity: 50 } });
+    const humiditySensor = createPushStoredChannelTransfer<SensorData>({ initialValue: { temperature: 26, humidity: 55 } });
 
-    const merge = new MergeTransfer<SensorData>({
+    const merge = createMergeTransfer<SensorData>({
       sources: [tempSensor, humiditySensor],
     });
 
@@ -143,22 +140,22 @@ describe('README Use Cases: Merging multiple data sources into a single view', (
 
 describe('README Use Cases: Conditional routing with bridges', () => {
   it('routes data to different pipelines based on a selector', () => {
-    const source = new PushStoredChannelTransfer<number>();
+    const source = createPushStoredChannelTransfer<number>();
     const fastTarget: number[] = [];
     const slowTarget: number[] = [];
 
     const fastBridge = createPassBridge({
       source,
-      target: new SinkTransfer({ callback: (n: number) => fastTarget.push(n) }),
+      target: createSinkTransfer({ callback: (n: number) => fastTarget.push(n) }),
       activated: false,
     });
     const slowBridge = createPassBridge({
       source,
-      target: new SinkTransfer({ callback: (n: number) => slowTarget.push(n) }),
+      target: createSinkTransfer({ callback: (n: number) => slowTarget.push(n) }),
       activated: false,
     });
 
-    const router = new BridgeSelector({
+    const router = createBridgeSelector({
       bridges: { fast: fastBridge, slow: slowBridge },
       initialKey: 'fast',
       activated: true,
@@ -188,7 +185,7 @@ describe('README Use Cases: Idle fallback polling', () => {
     let counter = 0;
     const fetcher = jest.fn<() => FeedItem>(() => ({ id: ++counter, content: `item-${counter}` }));
 
-    const channel = new IdlePollingTransfer<FeedItem>({
+    const channel = createIdlePollingTransfer<FeedItem>({
       fetcher,
       timeout: 50,
       interval: 20,
@@ -231,7 +228,7 @@ describe('README Use Cases: Game loop / animation frame data processing', () => 
   it('uses tickerFactory with PollingSourceTransfer', async () => {
     const fetcher = jest.fn<() => GameState>(() => ({ score: 100, level: 1 }));
 
-    const framePolling = new PollingSourceTransfer<GameState>({
+    const framePolling = createPollingSourceTransfer<GameState>({
       fetcher,
       interval: 16,
       activated: true,
@@ -256,14 +253,14 @@ describe('README Use Cases: Game loop / animation frame data processing', () => 
 
 describe('README Use Cases: Async data pipeline with storage', () => {
   it('pushes data, async transforms, notifies subscribers', async () => {
-    const source = new PushStoredChannelTransfer<RawData>();
+    const source = createPushStoredChannelTransfer<RawData>();
 
     const pipeline = AsyncDuplexPipelineBuilder
       .start(source)
-      .to(new AsyncConvertTransfer<RawData, ProcessedData>({
-        operator: new AsyncMapOperator(async (raw) => ({ processed: raw.raw.toUpperCase() })),
+      .to(createAsyncConvertTransfer<RawData, ProcessedData>({
+        operator: createAsyncMapOperator(async (raw) => ({ processed: raw.raw.toUpperCase() })),
       }))
-      .finish(new PushStoredChannelTransfer<ProcessedData>());
+      .finish(createPushStoredChannelTransfer<ProcessedData>());
 
     const received: ProcessedData[] = [];
     pipeline.subscribe((data) => received.push(data));
@@ -284,17 +281,17 @@ describe('README Use Cases: Async data pipeline with storage', () => {
 
 describe('README Use Cases: Broadcast to multiple consumers', () => {
   it('broadcasts to multiple targets via SplitTransfer', () => {
-    const source = new PushStoredChannelTransfer<Telemetry>();
+    const source = createPushStoredChannelTransfer<Telemetry>();
     const telemetryStorage = new LatestStorage<Telemetry>();
 
     const logged: Telemetry[] = [];
     const charted: Telemetry[] = [];
 
-    const split = new SplitTransfer<Telemetry>({
+    const split = createSplitTransfer<Telemetry>({
       targets: [
-        new SinkTransfer({ callback: (t) => logged.push(t) }),
-        new SinkTransfer({ callback: (t) => charted.push(t) }),
-        new WriteTransfer({ flow: telemetryStorage }),
+        createSinkTransfer({ callback: (t) => logged.push(t) }),
+        createSinkTransfer({ callback: (t) => charted.push(t) }),
+        createWriteTransfer({ flow: telemetryStorage }),
       ],
     });
 
