@@ -116,15 +116,17 @@ The library provides type-safe primitives for building data flows: **transfers**
 
 ### Problems It Solves
 
-In modern TypeScript applications, data often flows through multiple stages: fetching from APIs, validation, transformation, caching, debouncing, UI updates, and more. Without a structured approach, this leads to:
+As data flows grow in complexity, connecting heterogeneous sources becomes a major bottleneck. Mixing push-based streams, pull-based APIs, polling loops, and async operations demands endless bespoke glue code, and this integration cost compounds with every new stage.
 
-- **Spaghetti callbacks** — each data source wires its own handlers, making the flow hard to trace.
-- **Inconsistent error handling** — some paths swallow errors, others crash, with no unified strategy.
-- **No type safety across stages** — data type changes mid-flow are discovered at runtime, not compile time.
-- **Manual lifecycle management** — subscriptions, timers, and resources are cleaned up ad hoc, causing leaks.
-- **Reinventing the wheel** — debounce, throttle, polling, and buffering are reimplemented in every project.
+Transferum addresses the structural issues that emerge at scale:
 
-Transferum solves these by providing **composable, type-safe building blocks** with a uniform capability system. You declare *what* each stage does (push, pull, transform, filter, poll) — the library handles *how* data moves between stages, including sync/async bridging, error propagation, and resource cleanup.
+- **No unified contract between stages** — connecting a subscribable source to a pushable sink, a pullable buffer to a polling proxy, or a sync stream to an async consumer shouldn't require hand-written adapters every time.
+- **Type erosion across boundaries** — as data passes through transformation, filtering, and async stages, input/output types are lost. Mismatches surface at runtime, not at compile time.
+- **Sync/async impedance mismatch** — mixing synchronous reactive streams with async operations typically forces a full migration to one model or manual bridging at every boundary.
+- **Flow control as an afterthought** — gating, routing, rate limiting, and fallback behavior are scattered across conditional flags and ad-hoc timers rather than composed from reusable primitives.
+- **Fragmented lifecycle management** — subscriptions, timers, and intermediate nodes are cleaned up inconsistently. A uniform `destroy()` contract makes resource ownership explicit and leaks detectable.
+
+Transferum provides **composable, type-safe building blocks** with a uniform capability system. You declare *what* each stage does (push, pull, transform, filter, poll) — the library handles *how* data moves between stages, including sync/async bridging, flow control, and resource cleanup.
 
 ### Key Benefits
 
