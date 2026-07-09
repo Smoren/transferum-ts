@@ -136,7 +136,7 @@ Transferum solves these by providing **composable, type-safe building blocks** w
 #### Real-time UI updates from API polling
 
 ```typescript
-import { PollingSourceTransfer, DuplexPipelineBuilder, ConvertTransfer, MapOperator, PushStoredChannelTransfer } from 'transferum';
+import { PollingSourceTransfer, OutputPipelineBuilder, ConvertTransfer, MapOperator, PushStoredChannelTransfer } from 'transferum';
 
 // Poll an API every 5 seconds, transform the response, update subscribers
 const polling = new PollingSourceTransfer<ServerState>({
@@ -145,7 +145,7 @@ const polling = new PollingSourceTransfer<ServerState>({
   activated: true,
 });
 
-const pipeline = DuplexPipelineBuilder
+const pipeline = OutputPipelineBuilder
   .start(polling)
   .to(new ConvertTransfer<ServerState, ViewModel>({
     operator: new MapOperator((state) => toViewModel(state)),
@@ -158,12 +158,12 @@ pipeline.subscribe((vm) => renderUI(vm));
 #### Debounced user input with async validation
 
 ```typescript
-import { DebounceTransfer, AsyncDuplexPipelineBuilder, AsyncConditionTransfer, AsyncConvertTransfer, AsyncMapOperator, AsyncSinkTransfer } from 'transferum';
+import { DebounceTransfer, AsyncInputPipelineBuilder, AsyncConditionTransfer, AsyncConvertTransfer, AsyncMapOperator, AsyncSinkTransfer } from 'transferum';
 
 // Debounce input → validate → transform → send to async sink
 const input = new DebounceTransfer<string>({ delay: 300 });
 
-const pipeline = AsyncDuplexPipelineBuilder
+const pipeline = AsyncInputPipelineBuilder
   .start(input)
   .to(new AsyncConditionTransfer<string>({
     shouldAccept: async (s) => s.length > 0,
@@ -181,18 +181,17 @@ input.push('user@example.com'); // debounced → validated → saved
 #### Merging multiple data sources into a single view
 
 ```typescript
-import { PollingSourceTransfer, PushStoredChannelTransfer, ReadTransfer, MergeTransfer } from 'transferum';
+import { PollingSourceTransfer, PushStoredChannelTransfer, MergeTransfer } from 'transferum';
 
-// Merge sensor data + user input + cached state into one stream
-const sensors = new PollingSourceTransfer<SensorData>({ /* ... */ });
-const userInput = new PushStoredChannelTransfer<UserAction>({ initialValue: defaultAction });
-const cache = new ReadTransfer<CachedState>({ flow: stateStorage });
+// Merge multiple sensor streams into one (all sources must have the same type)
+const tempSensor = new PollingSourceTransfer<SensorData>({ fetcher: () => ({ temperature: 25, humidity: 50 }), interval: 1000, activated: true });
+const humiditySensor = new PollingSourceTransfer<SensorData>({ fetcher: () => ({ temperature: 26, humidity: 55 }), interval: 1000, activated: true });
 
-const merge = new MergeTransfer<UnifiedState>({
-  sources: [sensors, userInput, cache],
+const merge = new MergeTransfer<SensorData>({
+  sources: [tempSensor, humiditySensor],
 });
 
-merge.subscribe((state) => updateDashboard(state));
+merge.subscribe((data) => updateDashboard(data)); // receives data from both sensors
 ```
 
 #### Conditional routing with bridges
@@ -252,20 +251,20 @@ const framePolling = new PollingSourceTransfer<GameState>({
 #### Async data pipeline with storage
 
 ```typescript
-import { AsyncReadTransfer, AsyncWriteTransfer, AsyncOutputPipelineBuilder, AsyncConvertTransfer, AsyncMapOperator, AsyncStoredChannelTransfer } from 'transferum';
+import { PushStoredChannelTransfer, AsyncDuplexPipelineBuilder, AsyncConvertTransfer, AsyncMapOperator } from 'transferum';
 
-// Fetch from API → transform → write to async storage → notify subscribers
-const reader = new AsyncReadTransfer<RawData>({ flow: apiSource });
-const writer = new AsyncWriteTransfer<ProcessedData>({ flow: dataStorage });
+// Push data → async transform → notify subscribers
+const source = new PushStoredChannelTransfer<RawData>();
 
-const pipeline = AsyncOutputPipelineBuilder
-  .start(reader)
+const pipeline = AsyncDuplexPipelineBuilder
+  .start(source)
   .to(new AsyncConvertTransfer<RawData, ProcessedData>({
     operator: new AsyncMapOperator(async (raw) => await process(raw)),
   }))
-  .finish(new AsyncStoredChannelTransfer<ProcessedData>());
+  .finish(new PushStoredChannelTransfer<ProcessedData>());
 
-const value = await pipeline.asyncPull(); // → processed data
+pipeline.subscribe((data) => console.log(data));
+source.push(rawData); // → async transformation → processed data
 ```
 
 #### Broadcast to multiple consumers
