@@ -536,7 +536,7 @@ export class DuplexPipelineBuilder<
    * @returns DuplexCompositeTransfer with computed input and output types
    */
   public finish<
-    TFinishTransfer extends OutputTransfer<any>,
+    TFinishTransfer extends DuplexTransfer<any, any>,
     TTriggerable extends TriggerableInterface | undefined = undefined,
     TGate extends GateInterface | undefined = undefined,
   >(
@@ -943,7 +943,7 @@ export class AsyncDuplexPipelineBuilder<
   }
 
   public finish<
-    TFinishTransfer extends OutputTransfer<any>,
+    TFinishTransfer extends DuplexTransfer<any, any>,
     TTriggerable extends TriggerableInterface | undefined = undefined,
     TAsyncTriggerable extends AsyncTriggerableInterface | undefined = undefined,
     TGate extends GateInterface | undefined = undefined,

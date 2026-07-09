@@ -329,7 +329,7 @@ export interface DuplexPipelineBuilderInterface<
   ): DuplexPipelineBuilderInterface<TNext, TStartTransfer>;
 
   finish<
-    TFinishTransfer extends OutputTransfer<any>,
+    TFinishTransfer extends DuplexTransfer<any, any>,
     TTriggerable extends TriggerableInterface | undefined = undefined,
     TGate extends GateInterface | undefined = undefined,
   >(
@@ -453,7 +453,7 @@ export interface AsyncDuplexPipelineBuilderInterface<
   ): AsyncDuplexPipelineBuilderInterface<TNext, TStartTransfer>;
 
   finish<
-    TFinishTransfer extends OutputTransfer<any>,
+    TFinishTransfer extends DuplexTransfer<any, any>,
     TTriggerable extends TriggerableInterface | undefined = undefined,
     TAsyncTriggerable extends AsyncTriggerableInterface | undefined = undefined,
     TGate extends GateInterface | undefined = undefined,
