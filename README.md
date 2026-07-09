@@ -810,18 +810,18 @@ UniversalCompositeTransfer (separate hierarchy, composition of input + output)
 
 The `linkTransfers(lhs, rhs)` function connects an output transfer (LHS) to an input transfer (RHS), selecting a strategy based on flags:
 
-| LHS | RHS | Strategy |
-|-----|-----|-----------|
-| `isSubscribable` | `isPushable` | Reactive subscription: LHS notifies → RHS accepts |
-| `isPullable` | `isPollingProxy` | Active polling: RHS pulls data via `setFetcher` |
-| `isSubscribable` | `isPollingProxy` | Subscription + last-value buffering for the poller |
-| `isSubscribable` | `isAsyncPushable` | Subscription + `asyncPush` with `.catch()` (no ordering guarantee) |
-| `isAsyncPullable` | `isAsyncPollingProxy` | Active async polling: RHS pulls data via `setAsyncFetcher` |
-| `isPullable` | `isAsyncPollingProxy` | Sync-pull wrapped in an async fetcher |
-| `isSubscribable` | `isAsyncPollingProxy` | Subscription + buffer + async fetcher |
-| `isAsyncPullable` | `isPollingProxy` | **Error** — sync poller cannot `await` |
-| `isPullable` / `isAsyncPullable` | `isPushable` / `isAsyncPushable` | **Error** — a Bridge or Triggerable adapter is required |
-| other | other | **Error** — unsupported combination |
+| LHS                              | RHS                              | Strategy                                                           |
+|----------------------------------|----------------------------------|--------------------------------------------------------------------|
+| `isSubscribable`                 | `isPushable`                     | Reactive subscription: LHS notifies → RHS accepts                  |
+| `isPullable`                     | `isPollingProxy`                 | Active polling: RHS pulls data via `setFetcher`                    |
+| `isSubscribable`                 | `isPollingProxy`                 | Subscription + last-value buffering for the poller                 |
+| `isSubscribable`                 | `isAsyncPushable`                | Subscription + `asyncPush` with `.catch()` (no ordering guarantee) |
+| `isAsyncPullable`                | `isAsyncPollingProxy`            | Active async polling: RHS pulls data via `setAsyncFetcher`         |
+| `isPullable`                     | `isAsyncPollingProxy`            | Sync-pull wrapped in an async fetcher                              |
+| `isSubscribable`                 | `isAsyncPollingProxy`            | Subscription + buffer + async fetcher                              |
+| `isAsyncPullable`                | `isPollingProxy`                 | **Error** — sync poller cannot `await`                             |
+| `isPullable` / `isAsyncPullable` | `isPushable` / `isAsyncPushable` | **Error** — a Bridge or Triggerable adapter is required            |
+| other                            | other                            | **Error** — unsupported combination                                |
 
 > **Sync priority:** If both transfers support sync linking, it is used. Async strategies are applied only when sync is not applicable.
 >
@@ -1419,13 +1419,13 @@ composite.destroy(); // destroys all owned resources
 
 **Async methods** (delegated to `input`/`output`/`asyncTriggerable`):
 
-| Method | Delegation | Condition |
-|-------|---------------|---------|
-| `asyncPush(data)` | `_input.asyncPush(data)` | `isAsyncPushable === true` |
-| `asyncPull()` | `_output.asyncPull()` | `isAsyncPullable === true` |
-| `asyncTrigger()` | `_asyncTriggerable.asyncTrigger()` | `isAsyncTriggerable === true` |
-| `setAsyncFetcher(f)` | `_input.setAsyncFetcher(f)` | `isAsyncPollingProxy === true` |
-| `clearAsyncFetcher()` | `_input.clearAsyncFetcher()` | `isAsyncPollingProxy === true` |
+| Method                | Delegation                         | Condition                      |
+|-----------------------|------------------------------------|--------------------------------|
+| `asyncPush(data)`     | `_input.asyncPush(data)`           | `isAsyncPushable === true`     |
+| `asyncPull()`         | `_output.asyncPull()`              | `isAsyncPullable === true`     |
+| `asyncTrigger()`      | `_asyncTriggerable.asyncTrigger()` | `isAsyncTriggerable === true`  |
+| `setAsyncFetcher(f)`  | `_input.setAsyncFetcher(f)`        | `isAsyncPollingProxy === true` |
+| `clearAsyncFetcher()` | `_input.clearAsyncFetcher()`       | `isAsyncPollingProxy === true` |
 
 `asyncTriggerable` is extracted using the same priorities as `triggerable`/`gate`: explicit config → `input` → `output`.
 
