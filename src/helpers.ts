@@ -45,8 +45,8 @@ export class Subscriber implements SubscriberInterface {
 export class SubscriptionManager<T> implements DisposableInterface {
   private _state: ProxyReference<T>;
 
-  protected _listeners = new Set<DataHandler<T>>();
-  protected _subscribers = new Set<SubscriberInterface>();
+  protected _listeners: Set<DataHandler<T>> = new Set<DataHandler<T>>();
+  protected _subscribers: Set<SubscriberInterface> = new Set<SubscriberInterface>();
 
   constructor(valueRef: ProxyReference<T>) {
     this._state = valueRef;
