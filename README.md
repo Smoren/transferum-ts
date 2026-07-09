@@ -573,12 +573,12 @@ Receive streaming quotes → calculate indicators (`ReducerOperator`) → filter
 ```typescript
 import { PushStoredChannelTransfer, DuplexPipelineBuilder, ConvertTransfer, ReducerOperator, ConditionTransfer, AsyncSinkTransfer } from 'transferum';
 
-const quoteStream = new PushStoredChannelTransfer<Quote>({ initialValue: null });
+const quoteStream = new PushStoredChannelTransfer<Quote[]>({ initialValue: [] });
 
 const indicatorPipeline = DuplexPipelineBuilder
   .start(quoteStream)
   .to(new ConvertTransfer<Quote[], TechnicalIndicator>({
-    operator: new ReducerOperator<Quote>((quotes) =>
+    operator: new ReducerOperator<Quote, TechnicalIndicator>((quotes) =>
       quotes.reduce((sum, q) => sum + q.price, 0) / quotes.length // SMA
     ),
   }))
@@ -1624,17 +1624,17 @@ Operators implement `OperatorInterface<TInput, TOutput>` with the method `apply(
 
 ### Operator Comparison Table
 
-| Operator                           | Input | Output                    | Behavior                                                                   |       Composition       | Use case                                      |
-|------------------------------------|-------|---------------------------|----------------------------------------------------------------------------|:-----------------------:|-----------------------------------------------|
-| `TransparentOperator<T>`           | `T`   | `T`                       | Returns data unchanged (identity)                                          |           Yes           | Stub, pipeline testing without transformation |
-| `MapOperator<TIn, TOut>`           | `TIn` | `TOut`                    | Applies a mapper function to data                                          |           Yes           | Type or value transformation                  |
-| `FilterOperator<T>`                | `T[]` | `T[]`                     | Keeps array elements matching a predicate                                  |           Yes           | Array element filtering                       |
-| `ReducerOperator<T>`               | `T[]` | `T \| undefined`          | Reduces an array to a single value (`undefined` for empty without default) |           Yes           | Aggregation (sum, product, min/max)           |
-| `GuardOperator<T>`                 | `T`   | `T \| undefined`          | Passes data if predicate is `true`, otherwise `undefined`                  |           Yes           | Validation, single-value filtering            |
-| `PipelineOperator<TIn, TOut>`      | `TIn` | `TOut`                    | Sequentially applies a chain of operators                                  |   Composition result    | Complex multi-stage transformations           |
-| `AsyncMapOperator<TIn, TOut>`      | `TIn` | `Promise<TOut>`           | Asynchronously applies a mapper (sync or async)                            | Yes (via AsyncPipeline) | Async type or value transformation            |
-| `AsyncGuardOperator<T>`            | `T`   | `Promise<T \| undefined>` | Asynchronously passes data if predicate is `true`                          | Yes (via AsyncPipeline) | Async validation, filtering                   |
-| `AsyncPipelineOperator<TIn, TOut>` | `TIn` | `Promise<TOut>`           | Sequentially applies a chain of sync/async operators via `await`           |   Composition result    | Complex async multi-stage transformations     |
+| Operator                           | Input   | Output                    | Behavior                                                                   |       Composition       | Use case                                      |
+|------------------------------------|---------|---------------------------|----------------------------------------------------------------------------|:-----------------------:|-----------------------------------------------|
+| `TransparentOperator<T>`           | `T`     | `T`                       | Returns data unchanged (identity)                                          |           Yes           | Stub, pipeline testing without transformation |
+| `MapOperator<TIn, TOut>`           | `TIn`   | `TOut`                    | Applies a mapper function to data                                          |           Yes           | Type or value transformation                  |
+| `FilterOperator<T>`                | `T[]`   | `T[]`                     | Keeps array elements matching a predicate                                  |           Yes           | Array element filtering                       |
+| `ReducerOperator<TIn, TOut>`       | `TIn[]` | `TOut \| undefined`       | Reduces an array to a single value (`undefined` for empty without default) |           Yes           | Aggregation (sum, product, min/max)           |
+| `GuardOperator<T>`                 | `T`     | `T \| undefined`          | Passes data if predicate is `true`, otherwise `undefined`                  |           Yes           | Validation, single-value filtering            |
+| `PipelineOperator<TIn, TOut>`      | `TIn`   | `TOut`                    | Sequentially applies a chain of operators                                  |   Composition result    | Complex multi-stage transformations           |
+| `AsyncMapOperator<TIn, TOut>`      | `TIn`   | `Promise<TOut>`           | Asynchronously applies a mapper (sync or async)                            | Yes (via AsyncPipeline) | Async type or value transformation            |
+| `AsyncGuardOperator<T>`            | `T`     | `Promise<T \| undefined>` | Asynchronously passes data if predicate is `true`                          | Yes (via AsyncPipeline) | Async validation, filtering                   |
+| `AsyncPipelineOperator<TIn, TOut>` | `TIn`   | `Promise<TOut>`           | Sequentially applies a chain of sync/async operators via `await`           |   Composition result    | Complex async multi-stage transformations     |
 
 > **Composition** — the ability to use an operator as a step in `PipelineOperator` (via `OperatorPipelineBuilder`) or as an `operator` in `ConvertTransfer` / `TransformBridge`. All operators support composition.
 

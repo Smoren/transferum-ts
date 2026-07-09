@@ -239,8 +239,9 @@ describe('README Domain-Specific: IoT - Monitoring & Alerts', () => {
       }
     });
 
-    await wait(150);
+    await wait(100);
     tempMonitor.deactivate();
+    await wait(100); // wait for debounce to fire after polling stopped
 
     expect(alerts.length).toBeGreaterThan(0);
     expect(alerts[0].type).toBe('HIGH_TEMP');
@@ -376,10 +377,10 @@ describe('README Domain-Specific: Financial - Stock Market Data Processing', () 
     const indicatorPipeline = DuplexPipelineBuilder
       .start(quoteStream)
       .to(new ConvertTransfer<Quote[], TechnicalIndicator>({
-        operator: new ReducerOperator<Quote>((acc, curr) => ({
-          value: acc.value + curr.price,
+        operator: new MapOperator((quotes) => ({
+          value: quotes.reduce((sum, q) => sum + q.price, 0),
           threshold: 100,
-        }), { value: 0, threshold: 100 }),
+        })),
       }))
       .to(new ConditionTransfer<TechnicalIndicator>({
         shouldAccept: (ind) => ind.value > ind.threshold,
