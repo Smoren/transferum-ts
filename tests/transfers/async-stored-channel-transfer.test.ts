@@ -289,7 +289,7 @@ describe(
       });
 
       expect(onSetupError).toHaveBeenCalledTimes(1);
-      expect(onSetupError).toHaveBeenCalledWith(expect.any(Error));
+      expect(onSetupError).toHaveBeenCalledWith(expect.any(Error), transfer);
 
       transfer.destroy();
     });
@@ -322,7 +322,7 @@ describe(
       transfer.destroy();
 
       expect(onDestroyError).toHaveBeenCalledTimes(1);
-      expect(onDestroyError).toHaveBeenCalledWith(expect.any(Error));
+      expect(onDestroyError).toHaveBeenCalledWith(expect.any(Error), transfer);
     });
   },
 );
@@ -393,7 +393,7 @@ describe(
       await new Promise<void>((resolve) => setTimeout(resolve, 10));
 
       expect(onEmitError).toHaveBeenCalledTimes(1);
-      expect(onEmitError).toHaveBeenCalledWith(expect.any(Error));
+      expect(onEmitError).toHaveBeenCalledWith(expect.any(Error), transfer);
 
       transfer.destroy();
     });

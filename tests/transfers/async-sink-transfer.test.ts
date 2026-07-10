@@ -168,7 +168,7 @@ describe(
       await expect(transfer.asyncPush(42)).resolves.toBeUndefined();
 
       expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(expect.any(Error));
+      expect(onError).toHaveBeenCalledWith(expect.any(Error), transfer);
       expect((onError.mock.calls[0][0] as Error).message).toBe('callback error');
 
       transfer.destroy();
@@ -189,7 +189,7 @@ describe(
       await expect(transfer.asyncPush(42)).resolves.toBeUndefined();
 
       expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(expect.any(Error));
+      expect(onError).toHaveBeenCalledWith(expect.any(Error), transfer);
       expect((onError.mock.calls[0][0] as Error).message).toBe('string error');
 
       transfer.destroy();

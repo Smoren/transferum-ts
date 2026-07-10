@@ -259,7 +259,7 @@ describe(
       const result = transfer.pull();
 
       expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(error);
+      expect(onError).toHaveBeenCalledWith(error, transfer);
       expect(result).toBeUndefined();
 
       transfer.destroy();
@@ -684,7 +684,7 @@ describe(
       transfer.trigger();
 
       expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(error);
+      expect(onError).toHaveBeenCalledWith(error, transfer);
       expect(handler).not.toHaveBeenCalled();
 
       transfer.destroy();

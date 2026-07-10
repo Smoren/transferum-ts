@@ -213,7 +213,7 @@ describe(
       const result = await transfer.asyncPull();
 
       expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(error);
+      expect(onError).toHaveBeenCalledWith(error, transfer);
       expect(result).toBeUndefined();
 
       transfer.destroy();
@@ -421,7 +421,7 @@ describe(
       await transfer.asyncTrigger();
 
       expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(error);
+      expect(onError).toHaveBeenCalledWith(error, transfer);
       expect(handler).not.toHaveBeenCalled();
 
       transfer.destroy();

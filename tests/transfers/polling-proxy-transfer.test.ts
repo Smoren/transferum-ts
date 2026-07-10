@@ -335,7 +335,7 @@ describe(
       transfer.trigger();
 
       expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(error);
+      expect(onError).toHaveBeenCalledWith(error, transfer);
       expect(handler).not.toHaveBeenCalled();
 
       transfer.destroy();

@@ -159,7 +159,7 @@ describe(
       await new Promise<void>((resolve) => setTimeout(resolve, 10));
 
       expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(expect.any(Error));
+      expect(onError).toHaveBeenCalledWith(expect.any(Error), target);
       expect((onError.mock.calls[0][0] as Error).message).toBe('push error');
 
       subscriber.unsubscribe();
@@ -186,7 +186,7 @@ describe(
       await new Promise<void>((resolve) => setTimeout(resolve, 10));
 
       expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(expect.any(Error));
+      expect(onError).toHaveBeenCalledWith(expect.any(Error), target);
       expect((onError.mock.calls[0][0] as Error).message).toBe('string error');
 
       subscriber.unsubscribe();

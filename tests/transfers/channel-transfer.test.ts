@@ -178,7 +178,7 @@ describe(
       });
 
       expect(onSetupError).toHaveBeenCalledTimes(1);
-      expect(onSetupError).toHaveBeenCalledWith(error);
+      expect(onSetupError).toHaveBeenCalledWith(error, transfer);
 
       transfer.destroy();
     });
@@ -219,7 +219,7 @@ describe(
       emit(42);
 
       expect(onEmitError).toHaveBeenCalledTimes(1);
-      expect(onEmitError).toHaveBeenCalledWith(error);
+      expect(onEmitError).toHaveBeenCalledWith(error, transfer);
 
       transfer.destroy();
     });
@@ -266,7 +266,7 @@ describe(
       transfer.destroy();
 
       expect(onDestroyError).toHaveBeenCalledTimes(1);
-      expect(onDestroyError).toHaveBeenCalledWith(error);
+      expect(onDestroyError).toHaveBeenCalledWith(error, transfer);
     });
   },
 );

@@ -1,5 +1,7 @@
-import { handleError } from '../../src';
+import { handleError, PushChannelTransfer } from '../../src';
 import { describe, expect, it, jest } from '@jest/globals';
+
+const source = new PushChannelTransfer<number>();
 
 // ═══════════════════════════════════════════════════════════════
 // handleError
@@ -16,7 +18,7 @@ describe.each([
     it('', () => {
       const error = new Error(errorMessage);
 
-      expect(() => handleError(error)).toThrow(errorMessage);
+      expect(() => handleError(error, source)).toThrow(errorMessage);
     });
   },
 );
@@ -40,9 +42,9 @@ describe.each([
       const error = new Error(errorMessage);
       const onError = jest.fn();
 
-      expect(() => handleError(error, onError)).not.toThrow();
+      expect(() => handleError(error, source, onError)).not.toThrow();
       expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(error);
+      expect(onError).toHaveBeenCalledWith(error, source);
     });
   },
 );
@@ -67,7 +69,7 @@ describe.each([
       const onError = jest.fn();
 
       // Exception suppressed
-      expect(() => handleError(error, onError)).not.toThrow();
+      expect(() => handleError(error, source, onError)).not.toThrow();
     });
   },
 );
@@ -87,7 +89,7 @@ describe.each([
     it('', () => {
       const onError = jest.fn();
 
-      handleError(errorValue, onError);
+      handleError(errorValue, source, onError);
 
       expect(onError).toHaveBeenCalledTimes(1);
       const calledError = onError.mock.calls[0][0];
@@ -115,7 +117,7 @@ describe.each([
     it('', () => {
       const onError = jest.fn();
 
-      handleError(errorCode, onError);
+      handleError(errorCode, source, onError);
 
       expect(onError).toHaveBeenCalledTimes(1);
       const calledError = onError.mock.calls[0][0];
@@ -141,7 +143,7 @@ describe.each([
   'handleError throws Error when non-Error passed without onError test',
   (errorValue: string) => {
     it('', () => {
-      expect(() => handleError(errorValue)).toThrow(errorValue);
+      expect(() => handleError(errorValue, source)).toThrow(errorValue);
     });
   },
 );

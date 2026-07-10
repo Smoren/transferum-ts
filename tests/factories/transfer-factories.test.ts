@@ -1310,7 +1310,7 @@ describe(
       });
 
       expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'Setup error' }));
+      expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'Setup error' }), channel);
 
       channel.destroy();
     });
