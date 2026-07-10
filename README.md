@@ -2410,7 +2410,7 @@ Configs are defined in `configs.ts`. All configs are types (not classes), passed
 | `IdlePollingTransferConfig<T>`        | `IdlePollingTransfer`        | `fetcher`, `timeout`, `interval`, `activated`            |
 | `ChannelTransferConfig<T>`            | `ChannelTransfer`            | `setup`, `destroy`                                       |
 | `StoredChannelTransferConfig<T>`      | `StoredChannelTransfer`      | `setup`, `destroy`                                       |
-| `SinkTransferConfig<T>`               | `SinkTransfer`               | `callback`                                               |
+| `SinkTransferConfig<T>`               | `SinkTransfer`               | `callback`, `onError?`                                   |
 | `WriteTransferConfig<T>`              | `WriteTransfer`              | `flow`                                                   |
 | `ReadTransferConfig<T>`               | `ReadTransfer`               | `flow`                                                   |
 | `ConvertTransferConfig<TIn, TOut>`    | `ConvertTransfer`            | `operator`                                               |

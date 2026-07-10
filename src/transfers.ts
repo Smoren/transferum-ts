@@ -946,7 +946,12 @@ export class PollingSourceTransfer<T> extends BaseStateTransfer<T> implements Po
       this._subscription.sendState();
       this._state.clear();
     } catch (e) {
-      handleError(e, this, this._onError);
+      try {
+        handleError(e, this, this._onError);
+      } catch (handlerError) {
+        this._ticker.stop();
+        throw handlerError;
+      }
     }
   }
 
@@ -1087,7 +1092,12 @@ export class PollingProxyTransfer<T> extends BaseStateTransfer<T> implements Pol
       this._subscription.sendState();
       this._state.clear();
     } catch (e) {
-      handleError(e, this, this._onError);
+      try {
+        handleError(e, this, this._onError);
+      } catch (handlerError) {
+        this._ticker?.stop();
+        throw handlerError;
+      }
     }
   }
 
@@ -1354,8 +1364,13 @@ export class StoredChannelTransfer<T> extends BaseStateTransfer<T> implements Su
  * 2. push(data) — calls callback(data)
  * 3. destroy() — inherited from BaseStateTransfer, clears _state
  *
+ * Error handling:
+ * - If callback() throws an exception, onError is called.
+ * - With onError provided, the exception is suppressed. Without onError — rethrown.
+ *
  * Configuration (SinkTransferConfig):
  * - callback: DataHandler<T> — incoming data handler
+ * - onError?: ErrorHandler — error handler
  * - initialValue?: T — initial value (unused)
  *
  * Difference from CallbackTransfer (old version):
@@ -1374,14 +1389,20 @@ export class SinkTransfer<T> extends BaseStateTransfer<T> implements PushableTra
   override readonly isPushable = true;
 
   private readonly _callback: DataHandler<T>;
+  private readonly _onError?: ErrorHandler<SinkTransfer<T>>;
 
   constructor(config: SinkTransferConfig<T>) {
     super({ ...config, initialValue: undefined });
     this._callback = config.callback;
+    this._onError = config.onError;
   }
 
   push(data: T): void {
-    this._callback(data);
+    try {
+      this._callback(data);
+    } catch (e) {
+      handleError(e, this, this._onError);
+    }
   }
 }
 

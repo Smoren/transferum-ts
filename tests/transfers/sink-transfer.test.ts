@@ -125,6 +125,71 @@ describe(
 );
 
 // ═══════════════════════════════════════════════════════════════
+// SinkTransfer Error Handling
+// ═══════════════════════════════════════════════════════════════
+
+describe(
+  'SinkTransfer push with onError suppresses error test',
+  () => {
+    it('', () => {
+      const error = new Error('callback error');
+      const onError = jest.fn();
+      const transfer = new SinkTransfer<number>({
+        callback: () => { throw error; },
+        onError,
+      });
+
+      transfer.push(42);
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith(error, transfer);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'SinkTransfer push without onError rethrows test',
+  () => {
+    it('', () => {
+      const transfer = new SinkTransfer<number>({
+        callback: () => { throw new Error('callback error'); },
+      });
+
+      expect(() => transfer.push(42)).toThrow('callback error');
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'SinkTransfer push with onError continues after error test',
+  () => {
+    it('', () => {
+      let callCount = 0;
+      const onError = jest.fn();
+      const transfer = new SinkTransfer<number>({
+        callback: (n) => {
+          callCount++;
+          if (callCount === 1) { throw new Error('first error'); }
+        },
+        onError,
+      });
+
+      transfer.push(1); // throws, suppressed
+      transfer.push(2); // succeeds
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(callCount).toBe(2);
+
+      transfer.destroy();
+    });
+  },
+);
+
+// ═══════════════════════════════════════════════════════════════
 // SinkTransfer Complex Data Types
 // ═══════════════════════════════════════════════════════════════
 

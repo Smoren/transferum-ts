@@ -47,6 +47,7 @@ import type {
   PollingProxyTransfer,
   PollingSourceTransfer,
   ReadTransfer,
+  SinkTransfer,
   StoredChannelTransfer,
   WriteTransfer,
 } from "./transfers";
@@ -113,8 +114,8 @@ export type PollingSourceTransferConfig<T> = GateConfig & ErrorHandlingConfig<Po
   readonly tickerFactory?: TickerFactory;
 }
 
-/** Configuration for SinkTransfer — callback invoked on each incoming data. */
-export type SinkTransferConfig<T> = {
+/** Configuration for SinkTransfer — callback invoked on each incoming data, with optional error handler. */
+export type SinkTransferConfig<T> = ErrorHandlingConfig<SinkTransfer<T>> & {
   readonly callback: DataHandler<T>;
 }
 
