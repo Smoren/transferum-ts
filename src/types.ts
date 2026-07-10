@@ -38,7 +38,7 @@ export type AsyncDataHandler<T> = (data: T) => Promise<void> | void;
 /** Asynchronous data fetcher — returns a Promise of T or undefined. */
 export type AsyncDataFetcher<T> = () => Promise<T | undefined>;
 /** Error handler — receives an Error and returns void. */
-export type ErrorHandler = (e: Error) => void;
+export type ErrorHandler<TSource> = (e: Error, source: TSource) => void;
 /** Callback invoked by a Ticker on each tick. */
 export type TickerCallback = () => void;
 /** Factory function that creates a TickerInterface from a TickerConfig. */

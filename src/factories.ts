@@ -348,7 +348,7 @@ export function createPollingSourceTransfer<T>(
  * // setFetcher is called via linkTransfers
  */
 export function createPollingProxyTransfer<T>(
-  config: PollingProxyConfig,
+  config: PollingProxyConfig<T>,
 ): Transfer<T, [PollingProxy, Pullable, Subscribable, Triggerable, Gate]> {
   return new PollingProxyTransfer<T>(config);
 }
@@ -861,7 +861,7 @@ export function createAsyncPollingSourceTransfer<T>(
  * @param config — configuration (interval, activated, tickerFactory, onError)
  */
 export function createAsyncPollingProxyTransfer<T>(
-  config: AsyncPollingProxyConfig
+  config: AsyncPollingProxyConfig<T>
 ): Transfer<T, [AsyncPollingProxy, AsyncPullable, Subscribable, AsyncTriggerable, Gate]> {
   return new AsyncPollingProxyTransfer<T>(config);
 }

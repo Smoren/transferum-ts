@@ -903,7 +903,7 @@ export class PollingSourceTransfer<T> extends BaseStateTransfer<T> implements Po
   private readonly _gateState: StateSubscriptionManager<GateInterface>;
   private readonly _ticker: TickerInterface;
   private readonly _fetcher: DataFetcher<T>;
-  private readonly _onError?: ErrorHandler;
+  private readonly _onError?: ErrorHandler<PollingSourceTransfer<T>>;
 
   constructor(config: PollingSourceConfig<T>) {
     super({ ...config, initialValue: undefined });
@@ -927,7 +927,7 @@ export class PollingSourceTransfer<T> extends BaseStateTransfer<T> implements Po
     try {
       return this._fetcher();
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
       return undefined;
     }
   }
@@ -946,7 +946,7 @@ export class PollingSourceTransfer<T> extends BaseStateTransfer<T> implements Po
       this._subscription.sendState();
       this._state.clear();
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
     }
   }
 
@@ -1035,13 +1035,13 @@ export class PollingProxyTransfer<T> extends BaseStateTransfer<T> implements Pol
   private readonly _gateState: StateSubscriptionManager<GateInterface>;
   private readonly _interval: number;
   private readonly _tickerFactory: TickerFactory;
-  private readonly _onError?: ErrorHandler;
+  private readonly _onError?: ErrorHandler<PollingProxyTransfer<T>>;
 
   private _active: boolean;
   private _ticker: TickerInterface | undefined;
   private _fetcher: DataFetcher<T> | undefined;
 
-  constructor(config: PollingProxyConfig) {
+  constructor(config: PollingProxyConfig<T>) {
     super({ ...config, initialValue: undefined });
     this._subscription = new SubscriptionManager(this._state);
     this._gateState = new StateSubscriptionManager<GateInterface>(this);
@@ -1061,7 +1061,7 @@ export class PollingProxyTransfer<T> extends BaseStateTransfer<T> implements Pol
     try {
       return this._fetcher();
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
       return undefined;
     }
   }
@@ -1087,7 +1087,7 @@ export class PollingProxyTransfer<T> extends BaseStateTransfer<T> implements Pol
       this._subscription.sendState();
       this._state.clear();
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
     }
   }
 
@@ -1193,9 +1193,9 @@ export class ChannelTransfer<T> extends BaseStateTransfer<T> implements Subscrib
 
   protected readonly _emit: DataHandler<T>;
   protected readonly _destroy: () => void;
-  protected readonly _onSetupError?: ErrorHandler;
-  protected readonly _onEmitError?: ErrorHandler;
-  protected readonly _onDestroyError?: ErrorHandler;
+  protected readonly _onSetupError?: ErrorHandler<ChannelTransfer<T>>;
+  protected readonly _onEmitError?: ErrorHandler<ChannelTransfer<T>>;
+  protected readonly _onDestroyError?: ErrorHandler<ChannelTransfer<T>>;
 
   private readonly _subscription: SubscriptionManager<T>;
 
@@ -1212,7 +1212,7 @@ export class ChannelTransfer<T> extends BaseStateTransfer<T> implements Subscrib
       try {
         this._subscription.sendState();
       } catch (e) {
-        handleError(e, this._onEmitError);
+        handleError(e, this, this._onEmitError);
       }
       this._state.clear();
     };
@@ -1220,7 +1220,7 @@ export class ChannelTransfer<T> extends BaseStateTransfer<T> implements Subscrib
     try {
       config.setup(this._emit);
     } catch (e) {
-      handleError(e, this._onSetupError);
+      handleError(e, this, this._onSetupError);
     }
   }
 
@@ -1233,7 +1233,7 @@ export class ChannelTransfer<T> extends BaseStateTransfer<T> implements Subscrib
     try {
       this._destroy();
     } catch (e) {
-      handleError(e, this._onDestroyError);
+      handleError(e, this, this._onDestroyError);
     }
     super.destroy();
   }
@@ -1289,9 +1289,9 @@ export class StoredChannelTransfer<T> extends BaseStateTransfer<T> implements Su
 
   protected readonly _emit: DataHandler<T>;
   protected readonly _destroy: () => void;
-  protected readonly _onSetupError?: ErrorHandler;
-  protected readonly _onEmitError?: ErrorHandler;
-  protected readonly _onDestroyError?: ErrorHandler;
+  protected readonly _onSetupError?: ErrorHandler<StoredChannelTransfer<T>>;
+  protected readonly _onEmitError?: ErrorHandler<StoredChannelTransfer<T>>;
+  protected readonly _onDestroyError?: ErrorHandler<StoredChannelTransfer<T>>;
 
   private readonly _subscription: SubscriptionManager<T>;
 
@@ -1310,7 +1310,7 @@ export class StoredChannelTransfer<T> extends BaseStateTransfer<T> implements Su
     try {
       config.setup(this._emit);
     } catch (e) {
-      handleError(e, this._onSetupError);
+      handleError(e, this, this._onSetupError);
     }
   }
 
@@ -1326,7 +1326,7 @@ export class StoredChannelTransfer<T> extends BaseStateTransfer<T> implements Su
     try {
       this._subscription.sendState();
     } catch (e) {
-      handleError(e, this._onEmitError);
+      handleError(e, this, this._onEmitError);
     }
   }
 
@@ -1335,7 +1335,7 @@ export class StoredChannelTransfer<T> extends BaseStateTransfer<T> implements Su
     try {
       this._destroy();
     } catch (e) {
-      handleError(e, this._onDestroyError);
+      handleError(e, this, this._onDestroyError);
     }
     super.destroy();
   }
@@ -1417,7 +1417,7 @@ export class WriteTransfer<T> extends BaseTransfer implements PushableTransferIn
   override readonly isPushable = true;
 
   private readonly _flow: InputFlowInterface<T>;
-  private readonly _onError?: ErrorHandler;
+  private readonly _onError?: ErrorHandler<WriteTransfer<T>>;
 
   constructor(config: WriteTransferConfig<T>) {
     super();
@@ -1429,7 +1429,7 @@ export class WriteTransfer<T> extends BaseTransfer implements PushableTransferIn
     try {
       this._flow.write(data);
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
     }
   }
 
@@ -1471,7 +1471,7 @@ export class ReadTransfer<T> extends BaseTransfer implements PullableTransferInt
   override readonly isPullable = true;
 
   private readonly _flow: OutputFlowInterface<T>;
-  private readonly _onError?: ErrorHandler;
+  private readonly _onError?: ErrorHandler<ReadTransfer<T>>;
 
   constructor(config: ReadTransferConfig<T>) {
     super();
@@ -1483,7 +1483,7 @@ export class ReadTransfer<T> extends BaseTransfer implements PullableTransferInt
     try {
       return this._flow.read();
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
       return undefined;
     }
   }
@@ -1540,7 +1540,7 @@ export class ConvertTransfer<TInput, TOutput> extends BaseStateTransfer<TOutput>
 
   private readonly _subscription: SubscriptionManager<TOutput>;
   private readonly _operator: OperatorInterface<TInput, TOutput | undefined>;
-  private readonly _onError?: ErrorHandler;
+  private readonly _onError?: ErrorHandler<ConvertTransfer<TInput, TOutput>>;
 
   constructor(config: ConvertTransferConfig<TInput, TOutput>) {
     super();
@@ -1555,7 +1555,7 @@ export class ConvertTransfer<TInput, TOutput> extends BaseStateTransfer<TOutput>
       this._subscription.sendState();
       this._state.clear();
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
     }
   }
 
@@ -1612,7 +1612,7 @@ export class ConditionTransfer<T> extends BaseStateTransfer<T> implements Pushab
   private readonly _subscription: SubscriptionManager<T>;
   private readonly _shouldAccept: (incomingData: T) => boolean;
   private readonly _shouldEmit: (currentState: T | undefined) => boolean;
-  private readonly _onError?: ErrorHandler;
+  private readonly _onError?: ErrorHandler<ConditionTransfer<T>>;
 
   constructor(config: ConditionTransferConfig<T>) {
     super();
@@ -1629,7 +1629,7 @@ export class ConditionTransfer<T> extends BaseStateTransfer<T> implements Pushab
         return;
       }
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
       return;
     }
 
@@ -1647,7 +1647,7 @@ export class ConditionTransfer<T> extends BaseStateTransfer<T> implements Pushab
         return;
       }
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
       return;
     }
 
@@ -1716,7 +1716,7 @@ export class PollingFlowTransfer<T> extends BaseStateTransfer<T> implements Poll
   private readonly _gateState: StateSubscriptionManager<GateInterface>;
   private readonly _flow: OutputFlowInterface<T>;
   private readonly _ticker: TickerInterface;
-  private readonly _onError?: ErrorHandler;
+  private readonly _onError?: ErrorHandler<PollingFlowTransfer<T>>;
 
   constructor(config: PollingFlowTransferConfig<T>) {
     super({ ...config, initialValue: undefined });
@@ -1740,7 +1740,7 @@ export class PollingFlowTransfer<T> extends BaseStateTransfer<T> implements Poll
     try {
       return this._flow.read();
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
       return undefined;
     }
   }
@@ -1759,7 +1759,7 @@ export class PollingFlowTransfer<T> extends BaseStateTransfer<T> implements Poll
       this._subscription.sendState();
       this._state.clear();
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
     }
   }
 
@@ -1846,7 +1846,7 @@ export class IdlePollingTransfer<T> extends BaseStateTransfer<T> implements Push
   private readonly _timeout: number;
   private readonly _interval: number;
   private readonly _fetcher: DataFetcher<T>;
-  private readonly _onError?: ErrorHandler;
+  private readonly _onError?: ErrorHandler<IdlePollingTransfer<T>>;
   private readonly _tickerFactory: TickerFactory;
 
   private _active: boolean;
@@ -1888,7 +1888,7 @@ export class IdlePollingTransfer<T> extends BaseStateTransfer<T> implements Push
     try {
       return this._fetcher();
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
       return undefined;
     }
   }
@@ -1981,7 +1981,7 @@ export class IdlePollingTransfer<T> extends BaseStateTransfer<T> implements Push
       this._subscription.sendState();
       this._state.clear();
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
     }
   }
 }
@@ -2017,7 +2017,7 @@ export class AsyncSinkTransfer<T> extends BaseStateTransfer<T> implements AsyncP
   override readonly isAsyncPushable = true;
 
   private readonly _callback: AsyncDataHandler<T>;
-  private readonly _onError?: ErrorHandler;
+  private readonly _onError?: ErrorHandler<AsyncSinkTransfer<T>>;
 
   constructor(config: AsyncSinkTransferConfig<T>) {
     super({ ...config, initialValue: undefined });
@@ -2029,7 +2029,7 @@ export class AsyncSinkTransfer<T> extends BaseStateTransfer<T> implements AsyncP
     try {
       await this._callback(data);
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
     }
   }
 }
@@ -2065,7 +2065,7 @@ export class AsyncWriteTransfer<T> extends BaseTransfer implements AsyncPushable
   override readonly isAsyncPushable = true;
 
   private readonly _flow: AsyncInputFlowInterface<T> | InputFlowInterface<T>;
-  private readonly _onError?: ErrorHandler;
+  private readonly _onError?: ErrorHandler<AsyncWriteTransfer<T>>;
 
   constructor(config: AsyncWriteTransferConfig<T>) {
     super();
@@ -2077,7 +2077,7 @@ export class AsyncWriteTransfer<T> extends BaseTransfer implements AsyncPushable
     try {
       await this._flow.write(data);
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
     }
   }
 
@@ -2118,7 +2118,7 @@ export class AsyncReadTransfer<T> extends BaseTransfer implements AsyncPullableT
   override readonly isAsyncPullable = true;
 
   private readonly _flow: AsyncOutputFlowInterface<T> | OutputFlowInterface<T>;
-  private readonly _onError?: ErrorHandler;
+  private readonly _onError?: ErrorHandler<AsyncReadTransfer<T>>;
 
   constructor(config: AsyncReadTransferConfig<T>) {
     super();
@@ -2130,7 +2130,7 @@ export class AsyncReadTransfer<T> extends BaseTransfer implements AsyncPullableT
     try {
       return await this._flow.read();
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
       return undefined;
     }
   }
@@ -2182,7 +2182,7 @@ export class AsyncPollingSourceTransfer<T> extends BaseStateTransfer<T> implemen
   private readonly _gateState: StateSubscriptionManager<GateInterface>;
   private readonly _ticker: TickerInterface;
   private readonly _fetcher: AsyncDataFetcher<T>;
-  private readonly _onError?: ErrorHandler;
+  private readonly _onError?: ErrorHandler<AsyncPollingSourceTransfer<T>>;
   private _polling: boolean = false;
 
   constructor(config: AsyncPollingSourceConfig<T>) {
@@ -2207,7 +2207,7 @@ export class AsyncPollingSourceTransfer<T> extends BaseStateTransfer<T> implemen
     try {
       return await this._fetcher();
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
       return undefined;
     }
   }
@@ -2230,7 +2230,7 @@ export class AsyncPollingSourceTransfer<T> extends BaseStateTransfer<T> implemen
       this._subscription.sendState();
       this._state.clear();
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
     } finally {
       this._polling = false;
     }
@@ -2300,7 +2300,7 @@ export class AsyncPollingFlowTransfer<T> extends BaseStateTransfer<T> implements
   private readonly _gateState: StateSubscriptionManager<GateInterface>;
   private readonly _flow: AsyncOutputFlowInterface<T>;
   private readonly _ticker: TickerInterface;
-  private readonly _onError?: ErrorHandler;
+  private readonly _onError?: ErrorHandler<AsyncPollingFlowTransfer<T>>;
   private _polling: boolean = false;
 
   constructor(config: AsyncPollingFlowTransferConfig<T>) {
@@ -2325,7 +2325,7 @@ export class AsyncPollingFlowTransfer<T> extends BaseStateTransfer<T> implements
     try {
       return await this._flow.read();
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
       return undefined;
     }
   }
@@ -2348,7 +2348,7 @@ export class AsyncPollingFlowTransfer<T> extends BaseStateTransfer<T> implements
       this._subscription.sendState();
       this._state.clear();
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
     } finally {
       this._polling = false;
     }
@@ -2434,14 +2434,14 @@ export class AsyncPollingProxyTransfer<T> extends BaseStateTransfer<T> implement
   private readonly _gateState: StateSubscriptionManager<GateInterface>;
   private readonly _interval: number;
   private readonly _tickerFactory: TickerFactory;
-  private readonly _onError?: ErrorHandler;
+  private readonly _onError?: ErrorHandler<AsyncPollingProxyTransfer<T>>;
 
   private _active: boolean;
   private _ticker: TickerInterface | undefined;
   private _fetcher: AsyncDataFetcher<T> | undefined;
   private _polling: boolean = false;
 
-  constructor(config: AsyncPollingProxyConfig) {
+  constructor(config: AsyncPollingProxyConfig<T>) {
     super({ ...config, initialValue: undefined });
     this._subscription = new SubscriptionManager(this._state);
     this._gateState = new StateSubscriptionManager<GateInterface>(this);
@@ -2461,7 +2461,7 @@ export class AsyncPollingProxyTransfer<T> extends BaseStateTransfer<T> implement
     try {
       return await this._fetcher();
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
       return undefined;
     }
   }
@@ -2490,7 +2490,7 @@ export class AsyncPollingProxyTransfer<T> extends BaseStateTransfer<T> implement
       this._subscription.sendState();
       this._state.clear();
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
     } finally {
       this._polling = false;
     }
@@ -2610,7 +2610,7 @@ export class AsyncIdlePollingTransfer<T> extends BaseStateTransfer<T> implements
   private readonly _timeout: number;
   private readonly _interval: number;
   private readonly _fetcher: AsyncDataFetcher<T>;
-  private readonly _onError?: ErrorHandler;
+  private readonly _onError?: ErrorHandler<AsyncIdlePollingTransfer<T>>;
   private readonly _tickerFactory: TickerFactory;
 
   private _active: boolean;
@@ -2657,7 +2657,7 @@ export class AsyncIdlePollingTransfer<T> extends BaseStateTransfer<T> implements
     try {
       return await this._fetcher();
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
       return undefined;
     }
   }
@@ -2756,7 +2756,7 @@ export class AsyncIdlePollingTransfer<T> extends BaseStateTransfer<T> implements
       this._subscription.sendState();
       this._state.clear();
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
     } finally {
       this._polling = false;
     }
@@ -2796,7 +2796,7 @@ export class AsyncConvertTransfer<TInput, TOutput> extends BaseStateTransfer<TOu
 
   private readonly _subscription: SubscriptionManager<TOutput>;
   private readonly _operator: AsyncOperatorInterface<TInput, TOutput | undefined>;
-  private readonly _onError?: ErrorHandler;
+  private readonly _onError?: ErrorHandler<AsyncConvertTransfer<TInput, TOutput>>;
 
   constructor(config: AsyncConvertTransferConfig<TInput, TOutput>) {
     super();
@@ -2811,7 +2811,7 @@ export class AsyncConvertTransfer<TInput, TOutput> extends BaseStateTransfer<TOu
       this._subscription.sendState();
       this._state.clear();
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
     }
   }
 
@@ -2859,7 +2859,7 @@ export class AsyncConditionTransfer<T> extends BaseStateTransfer<T> implements A
   private readonly _subscription: SubscriptionManager<T>;
   private readonly _shouldAccept: (incomingData: T) => Promise<boolean> | boolean;
   private readonly _shouldEmit: (currentState: T | undefined) => Promise<boolean> | boolean;
-  private readonly _onError?: ErrorHandler;
+  private readonly _onError?: ErrorHandler<AsyncConditionTransfer<T>>;
 
   constructor(config: AsyncConditionTransferConfig<T>) {
     super();
@@ -2875,7 +2875,7 @@ export class AsyncConditionTransfer<T> extends BaseStateTransfer<T> implements A
         return;
       }
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
       return;
     }
 
@@ -2886,7 +2886,7 @@ export class AsyncConditionTransfer<T> extends BaseStateTransfer<T> implements A
         return;
       }
     } catch (e) {
-      handleError(e, this._onError);
+      handleError(e, this, this._onError);
       return;
     }
 
@@ -2937,9 +2937,9 @@ export class AsyncStoredChannelTransfer<T> extends BaseStateTransfer<T> implemen
 
   protected readonly _emit: DataHandler<T>;
   protected readonly _destroy: () => void;
-  protected readonly _onSetupError?: ErrorHandler;
-  protected readonly _onEmitError?: ErrorHandler;
-  protected readonly _onDestroyError?: ErrorHandler;
+  protected readonly _onSetupError?: ErrorHandler<AsyncStoredChannelTransfer<T>>;
+  protected readonly _onEmitError?: ErrorHandler<AsyncStoredChannelTransfer<T>>;
+  protected readonly _onDestroyError?: ErrorHandler<AsyncStoredChannelTransfer<T>>;
 
   private readonly _subscription: SubscriptionManager<T>;
 
@@ -2958,7 +2958,7 @@ export class AsyncStoredChannelTransfer<T> extends BaseStateTransfer<T> implemen
     try {
       config.setup(this._emit);
     } catch (e) {
-      handleError(e, this._onSetupError);
+      handleError(e, this, this._onSetupError);
     }
   }
 
@@ -2974,7 +2974,7 @@ export class AsyncStoredChannelTransfer<T> extends BaseStateTransfer<T> implemen
     try {
       this._subscription.sendState();
     } catch (e) {
-      handleError(e, this._onEmitError);
+      handleError(e, this, this._onEmitError);
     }
   }
 
@@ -2989,7 +2989,7 @@ export class AsyncStoredChannelTransfer<T> extends BaseStateTransfer<T> implemen
     try {
       this._destroy();
     } catch (e) {
-      handleError(e, this._onDestroyError);
+      handleError(e, this, this._onDestroyError);
     }
     super.destroy();
   }

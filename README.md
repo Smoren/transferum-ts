@@ -2336,10 +2336,10 @@ Full list of factories:
 ### linkTransfers
 
 ```typescript
-function linkTransfers<T>(
+function linkTransfers<T, RTransfer extends InputTransfer<T>>(
   lhs: OutputTransfer<T>,
-  rhs: InputTransfer<T>,
-  options?: LinkConfig,
+  rhs: RTransfer,
+  options?: LinkConfig<RTransfer>,
 ): SubscriberInterface
 ```
 
@@ -2437,7 +2437,7 @@ Configs are defined in `configs.ts`. All configs are types (not classes), passed
 | `AsyncConditionTransferConfig<T>`       | `AsyncConditionTransfer`           | — (predicates are optional, sync or async)    |
 | `AsyncStoredChannelTransferConfig<T>`   | `AsyncStoredChannelTransfer`       | `setup`, `destroy`                            |
 | `AsyncTransformBridgeConfig<TIn, TOut>` | `AsyncTransformBridge`             | `source`, `target`, `operator`, `activated`   |
-| `LinkConfig`                            | `linkTransfers` (async strategies) | `onError?`                                    |
+| `LinkConfig<TTargetTransfer>`           | `linkTransfers` (async strategies) | `onError?`                                    |
 
 All polling transfers support an optional `tickerFactory?: TickerFactory` to replace the default ticker (`RAFTicker.factory`).
 

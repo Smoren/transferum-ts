@@ -7,6 +7,7 @@ import type {
   AsyncPushableTransferInterface,
   AsyncPullableTransferInterface,
   AsyncPollingProxyTransferInterface,
+  BaseTransferInterface,
 } from "./interfaces";
 import type { ErrorHandler, InputTransfer, OutputTransfer } from "./types";
 import type { LinkConfig } from "./configs";
@@ -47,10 +48,10 @@ import { Subscriber } from "./helpers";
  * @param options — optional link config (onError for async-push rejection)
  * @returns SubscriberInterface for breaking the link
  */
-export function linkTransfers<T>(
+export function linkTransfers<T, RTransfer extends InputTransfer<T>>(
   lhs: OutputTransfer<T>,
-  rhs: InputTransfer<T>,
-  options?: LinkConfig,
+  rhs: RTransfer,
+  options?: LinkConfig<RTransfer>,
 ): SubscriberInterface {
   // ═══════════════════════════════════════════════════════════════
   // SYNC CASES (priority)
@@ -114,7 +115,8 @@ export function linkTransfers<T>(
     return subscribableLhs.subscribe((data) => {
       asyncPushableRhs.asyncPush(data).catch((e) => {
         if (onError !== undefined) {
-          onError(e instanceof Error ? e : new Error(String(e)));
+          // TODO сделать через handleError ?
+          onError(e instanceof Error ? e : new Error(String(e)), rhs);
         }
       });
     });
@@ -200,10 +202,10 @@ export function linkTransfers<T>(
  * If onError is provided — calls it and suppresses the exception.
  * If onError is not provided — rethrows the exception.
  */
-export function handleError(error: unknown, onError?: ErrorHandler): void {
+export function handleError<TSource extends BaseTransferInterface>(error: unknown, source: TSource, onError?: ErrorHandler<TSource>): void {
   const err = error instanceof Error ? error : new Error(String(error));
   if (onError !== undefined) {
-    onError(err);
+    onError(err, source);
   } else {
     throw err;
   }

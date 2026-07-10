@@ -12,6 +12,7 @@ import type {
   AsyncOutputFlowInterface,
   AsyncOperatorInterface,
   AsyncTriggerableInterface,
+  BaseTransferInterface,
 } from "./interfaces";
 import type {
   BaseSelectorKey,
@@ -27,6 +28,28 @@ import type {
   TickerCallback,
   TickerFactory,
 } from "./types";
+import type {
+  AsyncConditionTransfer,
+  AsyncConvertTransfer,
+  AsyncIdlePollingTransfer,
+  AsyncPollingFlowTransfer,
+  AsyncPollingProxyTransfer,
+  AsyncPollingSourceTransfer,
+  AsyncReadTransfer,
+  AsyncSinkTransfer,
+  AsyncStoredChannelTransfer,
+  AsyncWriteTransfer,
+  ChannelTransfer,
+  ConditionTransfer,
+  ConvertTransfer,
+  IdlePollingTransfer,
+  PollingFlowTransfer,
+  PollingProxyTransfer,
+  PollingSourceTransfer,
+  ReadTransfer,
+  StoredChannelTransfer,
+  WriteTransfer,
+} from "./transfers";
 
 /** Configuration for Ticker — callback and optional interval (ms). */
 export type TickerConfig = {
@@ -40,8 +63,8 @@ export type GateConfig = {
 }
 
 /** Shared error-handling config — optional onError callback. */
-export type ErrorHandlingConfig = {
-  readonly onError?: ErrorHandler;
+export type ErrorHandlingConfig<TSource> = {
+  readonly onError?: ErrorHandler<TSource>;
 }
 
 /** Configuration for BaseStateTransfer — optional initial value. */
@@ -78,14 +101,16 @@ export type SplitTransferConfig<T> = {
 }
 
 /** Configuration for polling proxy transfers — interval, gate state, optional ticker factory and error handler. */
-export type PollingProxyConfig = GateConfig & ErrorHandlingConfig & {
+export type PollingProxyConfig<T> = GateConfig & ErrorHandlingConfig<PollingProxyTransfer<T>> & {
   readonly interval: number;
   readonly tickerFactory?: TickerFactory;
 }
 
 /** Configuration for PollingSourceTransfer — polling proxy config plus a sync fetcher. */
-export type PollingSourceConfig<T> = PollingProxyConfig & {
+export type PollingSourceConfig<T> = GateConfig & ErrorHandlingConfig<PollingSourceTransfer<T>> & {
+  readonly interval: number;
   readonly fetcher: DataFetcher<T>;
+  readonly tickerFactory?: TickerFactory;
 }
 
 /** Configuration for SinkTransfer — callback invoked on each incoming data. */
@@ -97,50 +122,54 @@ export type SinkTransferConfig<T> = {
 export type ChannelTransferConfig<T> = {
   readonly setup: (emit: DataHandler<T>) => void;
   readonly destroy: () => void;
-  readonly onSetupError?: ErrorHandler;
-  readonly onEmitError?: ErrorHandler;
-  readonly onDestroyError?: ErrorHandler;
+  readonly onSetupError?: ErrorHandler<ChannelTransfer<T>>;
+  readonly onEmitError?: ErrorHandler<ChannelTransfer<T>>;
+  readonly onDestroyError?: ErrorHandler<ChannelTransfer<T>>;
 }
 
 /** Configuration for StoredChannelTransfer — channel config plus optional initial value. */
 export type StoredChannelTransferConfig<T> = BaseStateTransferConfig<T> & {
   readonly setup: (emit: DataHandler<T>) => void;
   readonly destroy: () => void;
-  readonly onSetupError?: ErrorHandler;
-  readonly onEmitError?: ErrorHandler;
-  readonly onDestroyError?: ErrorHandler;
+  readonly onSetupError?: ErrorHandler<StoredChannelTransfer<T>>;
+  readonly onEmitError?: ErrorHandler<StoredChannelTransfer<T>>;
+  readonly onDestroyError?: ErrorHandler<StoredChannelTransfer<T>>;
 }
 
 /** Configuration for WriteTransfer — target flow with write() and optional error handler. */
-export type WriteTransferConfig<T> = ErrorHandlingConfig & {
+export type WriteTransferConfig<T> = ErrorHandlingConfig<WriteTransfer<T>> & {
   readonly flow: InputFlowInterface<T>;
 }
 
 /** Configuration for ReadTransfer — source flow with read() and optional error handler. */
-export type ReadTransferConfig<T> = ErrorHandlingConfig & {
+export type ReadTransferConfig<T> = ErrorHandlingConfig<ReadTransfer<T>> & {
   readonly flow: OutputFlowInterface<T>;
 }
 
 /** Configuration for ConvertTransfer — operator for data transformation and optional error handler. */
-export type ConvertTransferConfig<TInput, TOutput> = ErrorHandlingConfig & {
+export type ConvertTransferConfig<TInput, TOutput> = ErrorHandlingConfig<ConvertTransfer<TInput, TOutput>> & {
   readonly operator: OperatorInterface<TInput, TOutput | undefined>;
 }
 
 /** Configuration for ConditionTransfer — optional input/output predicates and error handler. */
-export type ConditionTransferConfig<T> = ErrorHandlingConfig & {
+export type ConditionTransferConfig<T> = ErrorHandlingConfig<ConditionTransfer<T>> & {
   readonly shouldAccept?: (incomingData: T) => boolean;
   readonly shouldEmit?: (currentState: T | undefined) => boolean;
 }
 
 /** Configuration for PollingFlowTransfer — polling proxy config plus an output flow source. */
-export type PollingFlowTransferConfig<T> = PollingProxyConfig & {
+export type PollingFlowTransferConfig<T> = GateConfig & ErrorHandlingConfig<PollingFlowTransfer<T>> &  {
+  readonly interval: number;
   readonly flow: OutputFlowInterface<T>;
+  readonly tickerFactory?: TickerFactory;
 }
 
 /** Configuration for IdlePollingTransfer — fetcher, idle timeout, polling interval, gate state, and optional initial value. */
-export type IdlePollingTransferConfig<T> = BaseStateTransferConfig<T> & PollingProxyConfig & GateConfig & ErrorHandlingConfig & {
+export type IdlePollingTransferConfig<T> = BaseStateTransferConfig<T> & ErrorHandlingConfig<IdlePollingTransfer<T>> & GateConfig & {
+  readonly interval: number;
   readonly fetcher: DataFetcher<T>;
   readonly timeout: number;
+  readonly tickerFactory?: TickerFactory;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -148,49 +177,55 @@ export type IdlePollingTransferConfig<T> = BaseStateTransferConfig<T> & PollingP
 // ═══════════════════════════════════════════════════════════════
 
 /** Configuration for async polling proxy transfers — interval, gate state, optional ticker factory and error handler. */
-export type AsyncPollingProxyConfig = GateConfig & ErrorHandlingConfig & {
+export type AsyncPollingProxyConfig<T> = GateConfig & ErrorHandlingConfig<AsyncPollingProxyTransfer<T>> & {
   readonly interval: number;
   readonly tickerFactory?: TickerFactory;
 }
 
 /** Configuration for AsyncPollingSourceTransfer — async polling config plus an async fetcher. */
-export type AsyncPollingSourceConfig<T> = AsyncPollingProxyConfig & {
+export type AsyncPollingSourceConfig<T> = GateConfig & ErrorHandlingConfig<AsyncPollingSourceTransfer<T>> & {
+  readonly interval: number;
   readonly fetcher: AsyncDataFetcher<T>;
+  readonly tickerFactory?: TickerFactory;
 }
 
 /** Configuration for AsyncPollingFlowTransfer — async polling config plus an async output flow source. */
-export type AsyncPollingFlowTransferConfig<T> = AsyncPollingProxyConfig & {
+export type AsyncPollingFlowTransferConfig<T> = GateConfig & ErrorHandlingConfig<AsyncPollingFlowTransfer<T>> & {
+  readonly interval: number;
   readonly flow: AsyncOutputFlowInterface<T>;
+  readonly tickerFactory?: TickerFactory;
 }
 
 /** Configuration for AsyncIdlePollingTransfer — async fetcher, idle timeout, polling interval, gate state, and optional initial value. */
-export type AsyncIdlePollingTransferConfig<T> = BaseStateTransferConfig<T> & AsyncPollingProxyConfig & GateConfig & ErrorHandlingConfig & {
+export type AsyncIdlePollingTransferConfig<T> = BaseStateTransferConfig<T> & ErrorHandlingConfig<AsyncIdlePollingTransfer<T>> & GateConfig & {
+  readonly interval: number;
   readonly fetcher: AsyncDataFetcher<T>;
   readonly timeout: number;
+  readonly tickerFactory?: TickerFactory;
 }
 
 /** Configuration for AsyncSinkTransfer — sync or async callback invoked on each incoming data, with optional error handler. */
-export type AsyncSinkTransferConfig<T> = ErrorHandlingConfig & {
+export type AsyncSinkTransferConfig<T> = ErrorHandlingConfig<AsyncSinkTransfer<T>> & {
   readonly callback: AsyncDataHandler<T> | DataHandler<T>;
 }
 
 /** Configuration for AsyncWriteTransfer — async or sync target flow with write() and optional error handler. */
-export type AsyncWriteTransferConfig<T> = ErrorHandlingConfig & {
+export type AsyncWriteTransferConfig<T> = ErrorHandlingConfig<AsyncWriteTransfer<T>> & {
   readonly flow: AsyncInputFlowInterface<T> | InputFlowInterface<T>;
 }
 
 /** Configuration for AsyncReadTransfer — async or sync source flow with read() and optional error handler. */
-export type AsyncReadTransferConfig<T> = ErrorHandlingConfig & {
+export type AsyncReadTransferConfig<T> = ErrorHandlingConfig<AsyncReadTransfer<T>> & {
   readonly flow: AsyncOutputFlowInterface<T> | OutputFlowInterface<T>;
 }
 
 /** Configuration for AsyncConvertTransfer — async operator for data transformation and optional error handler. */
-export type AsyncConvertTransferConfig<TInput, TOutput> = ErrorHandlingConfig & {
+export type AsyncConvertTransferConfig<TInput, TOutput> = ErrorHandlingConfig<AsyncConvertTransfer<TInput, TOutput>> & {
   readonly operator: AsyncOperatorInterface<TInput, TOutput | undefined>;
 }
 
 /** Configuration for AsyncConditionTransfer — optional sync/async input/output predicates and error handler. */
-export type AsyncConditionTransferConfig<T> = ErrorHandlingConfig & {
+export type AsyncConditionTransferConfig<T> = ErrorHandlingConfig<AsyncConditionTransfer<T>> & {
   readonly shouldAccept?: (incomingData: T) => Promise<boolean> | boolean;
   readonly shouldEmit?: (currentState: T | undefined) => Promise<boolean> | boolean;
 }
@@ -199,9 +234,9 @@ export type AsyncConditionTransferConfig<T> = ErrorHandlingConfig & {
 export type AsyncStoredChannelTransferConfig<T> = BaseStateTransferConfig<T> & {
   readonly setup: (emit: DataHandler<T>) => void;
   readonly destroy: () => void;
-  readonly onSetupError?: ErrorHandler;
-  readonly onEmitError?: ErrorHandler;
-  readonly onDestroyError?: ErrorHandler;
+  readonly onSetupError?: ErrorHandler<AsyncStoredChannelTransfer<T>>;
+  readonly onEmitError?: ErrorHandler<AsyncStoredChannelTransfer<T>>;
+  readonly onDestroyError?: ErrorHandler<AsyncStoredChannelTransfer<T>>;
 }
 
 /** Configuration for UniversalCompositeTransfer — combines input/output transfers with optional explicit trigger/gate and owned resources. */
@@ -262,7 +297,7 @@ export type BridgeMultiSelectorConfig<TMap extends Record<BaseSelectorKey, Bridg
 };
 
 /** Configuration for AsyncTransformBridge — source, target, async operator, gate state, and optional error handler. */
-export type AsyncTransformBridgeConfig<TInput, TOutput> = ErrorHandlingConfig & {
+export type AsyncTransformBridgeConfig<TInput, TOutput> = ErrorHandlingConfig<AsyncConvertTransfer<TInput, TOutput>> & {
   readonly source: OutputTransfer<TInput>;
   readonly target: InputTransfer<TOutput>;
   readonly operator: AsyncOperatorInterface<TInput, TOutput | undefined>;
@@ -270,7 +305,6 @@ export type AsyncTransformBridgeConfig<TInput, TOutput> = ErrorHandlingConfig & 
 }
 
 /** Configuration for linkTransfers() — provides an optional error handler for async-push rejection. */
-export type LinkConfig = {
-  readonly onError?: ErrorHandler;
+export type LinkConfig<TTargetTransfer extends BaseTransferInterface> = {
+  readonly onError?: ErrorHandler<TTargetTransfer>;
 }
-

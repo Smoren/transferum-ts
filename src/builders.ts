@@ -99,15 +99,15 @@ import { linkTransfers } from "./utils";
  */
 export class InputPipelineBuilder<
   TCurrent,
-  TStartTransfer extends InputTransfer<any>
+  TStartTransfer extends InputTransfer<unknown>
 > implements InputPipelineBuilderInterface<TCurrent, TStartTransfer> {
   private readonly _startTransfer: TStartTransfer;
-  private readonly _currentTransfer: DuplexTransfer<any, TCurrent>;
+  private readonly _currentTransfer: DuplexTransfer<unknown, TCurrent>;
   private readonly _ownedResources: DisposableInterface[];
 
   private constructor(
     startTransfer: TStartTransfer,
-    currentTransfer: DuplexTransfer<any, TCurrent>,
+    currentTransfer: DuplexTransfer<unknown, TCurrent>,
     ownedResources: DisposableInterface[] = [],
   ) {
     this._startTransfer = startTransfer;
@@ -123,7 +123,7 @@ export class InputPipelineBuilder<
    * @param startTransfer — initial duplex transfer
    * @returns A new InputPipelineBuilder instance
    */
-  public static start<TCurrent, TStartTransfer extends DuplexTransfer<any, TCurrent>>(
+  public static start<TCurrent, TStartTransfer extends DuplexTransfer<unknown, TCurrent>>(
     startTransfer: TStartTransfer,
   ): InputPipelineBuilderInterface<TCurrent, TStartTransfer> {
     return new InputPipelineBuilder<TCurrent, TStartTransfer>(startTransfer, startTransfer, []);
@@ -202,7 +202,7 @@ export class InputPipelineBuilder<
     // Create the composite instance, passing explicitly provided configurations
     const composite = new UniversalCompositeTransfer<InputTransferDataType<TStartTransfer>, never>({
       input: this._startTransfer,
-      output: lastTransfer as any,
+      output: lastTransfer as OutputTransfer<never>,
       owned: finalOwnedResources,
       triggerable: options?.triggerable,
       gate: options?.gate,
@@ -272,12 +272,12 @@ export class InputPipelineBuilder<
  * ```
  */
 export class OutputPipelineBuilder implements OutputPipelineBuilderInterface {
-  private readonly _startTransfer: OutputTransfer<any>;
-  private readonly _currentTransfer: DuplexTransfer<any, any>;
+  private readonly _startTransfer: OutputTransfer<unknown>;
+  private readonly _currentTransfer: DuplexTransfer<unknown, unknown>;
   private readonly _ownedResources: DisposableInterface[];
 
   private constructor(
-    startTransfer: OutputTransfer<any>,
+    startTransfer: OutputTransfer<unknown>,
     currentTransfer: DuplexTransfer<unknown, unknown>,
     ownedResources: DisposableInterface[] = [],
   ) {
@@ -350,7 +350,7 @@ export class OutputPipelineBuilder implements OutputPipelineBuilderInterface {
    * @returns OutputCompositeTransfer with computed types
    */
   public finish<
-    TFinishTransfer extends DuplexTransfer<any, any>,
+    TFinishTransfer extends DuplexTransfer<unknown, any>,
     TTriggerable extends TriggerableInterface | undefined = undefined,
     TGate extends GateInterface | undefined = undefined,
   >(
@@ -361,7 +361,7 @@ export class OutputPipelineBuilder implements OutputPipelineBuilderInterface {
       owned?: boolean;
     },
   ): CompositeOutputTransfer<OutputTransferDataType<TFinishTransfer>, TFinishTransfer, TTriggerable, undefined, TGate> {
-    const subscriber = linkTransfers(this._currentTransfer as any, lastTransfer);
+    const subscriber = linkTransfers(this._currentTransfer, lastTransfer);
     const finalOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
 
     if (options?.owned) {
@@ -369,7 +369,7 @@ export class OutputPipelineBuilder implements OutputPipelineBuilderInterface {
     }
 
     const composite = new UniversalCompositeTransfer({
-      input: this._startTransfer as any, // Mute the input side to never
+      input: this._startTransfer as InputTransfer<never>,
       output: lastTransfer,
       owned: finalOwnedResources,
       triggerable: options?.triggerable,
@@ -452,15 +452,15 @@ export class OutputPipelineBuilder implements OutputPipelineBuilderInterface {
  */
 export class DuplexPipelineBuilder<
   TCurrent,
-  TStartTransfer extends InputTransfer<any>
+  TStartTransfer extends InputTransfer<unknown>
 > implements DuplexPipelineBuilderInterface<TCurrent, TStartTransfer> {
   private readonly _startTransfer: TStartTransfer;
-  private readonly _currentTransfer: DuplexTransfer<any, TCurrent>;
+  private readonly _currentTransfer: DuplexTransfer<unknown, TCurrent>;
   private readonly _ownedResources: DisposableInterface[];
 
   private constructor(
     startTransfer: TStartTransfer,
-    currentTransfer: DuplexTransfer<any, TCurrent>,
+    currentTransfer: DuplexTransfer<unknown, TCurrent>,
     ownedResources: DisposableInterface[] = [],
   ) {
     this._startTransfer = startTransfer;
@@ -476,7 +476,7 @@ export class DuplexPipelineBuilder<
    * @param startTransfer — initial duplex transfer
    * @returns A new DuplexPipelineBuilder instance
    */
-  public static start<TCurrent, TStartTransfer extends DuplexTransfer<any, TCurrent>>(
+  public static start<TCurrent, TStartTransfer extends DuplexTransfer<unknown, TCurrent>>(
     startTransfer: TStartTransfer,
   ): DuplexPipelineBuilderInterface<TCurrent, TStartTransfer> {
     return new DuplexPipelineBuilder<TCurrent, TStartTransfer>(startTransfer, startTransfer, []);
@@ -536,7 +536,7 @@ export class DuplexPipelineBuilder<
    * @returns DuplexCompositeTransfer with computed input and output types
    */
   public finish<
-    TFinishTransfer extends DuplexTransfer<any, any>,
+    TFinishTransfer extends DuplexTransfer<unknown, any>,
     TTriggerable extends TriggerableInterface | undefined = undefined,
     TGate extends GateInterface | undefined = undefined,
   >(
@@ -555,7 +555,7 @@ export class DuplexPipelineBuilder<
     undefined,
     TGate
   > {
-    const subscriber = linkTransfers(this._currentTransfer, lastTransfer as any);
+    const subscriber = linkTransfers(this._currentTransfer, lastTransfer);
     const finalOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
 
     if (options?.owned) {
@@ -719,15 +719,15 @@ export class OperatorPipelineBuilder<TFlow extends readonly unknown[]> implement
  */
 export class AsyncInputPipelineBuilder<
   TCurrent,
-  TStartTransfer extends InputTransfer<any>
+  TStartTransfer extends InputTransfer<unknown>
 > implements AsyncInputPipelineBuilderInterface<TCurrent, TStartTransfer> {
   private readonly _startTransfer: TStartTransfer;
-  private readonly _currentTransfer: DuplexTransfer<any, TCurrent>;
+  private readonly _currentTransfer: DuplexTransfer<unknown, TCurrent>;
   private readonly _ownedResources: DisposableInterface[];
 
   private constructor(
     startTransfer: TStartTransfer,
-    currentTransfer: DuplexTransfer<any, TCurrent>,
+    currentTransfer: DuplexTransfer<unknown, TCurrent>,
     ownedResources: DisposableInterface[] = [],
   ) {
     this._startTransfer = startTransfer;
@@ -735,7 +735,7 @@ export class AsyncInputPipelineBuilder<
     this._ownedResources = ownedResources;
   }
 
-  public static start<TCurrent, TStartTransfer extends DuplexTransfer<any, TCurrent>>(
+  public static start<TCurrent, TStartTransfer extends DuplexTransfer<unknown, TCurrent>>(
     startTransfer: TStartTransfer,
   ): AsyncInputPipelineBuilderInterface<TCurrent, TStartTransfer> {
     return new AsyncInputPipelineBuilder<TCurrent, TStartTransfer>(startTransfer, startTransfer, []);
@@ -770,10 +770,10 @@ export class AsyncInputPipelineBuilder<
       asyncTriggerable?: TAsyncTriggerable;
       gate?: TGate;
       owned?: boolean;
-      linkOnError?: ErrorHandler;
+      linkOnError?: ErrorHandler<InputTransfer<TCurrent>>;
     },
   ): CompositeInputTransfer<InputTransferDataType<TStartTransfer>, TStartTransfer, TTriggerable, TAsyncTriggerable, TGate> {
-    const linkConfig: LinkConfig | undefined = options?.linkOnError !== undefined
+    const linkConfig: LinkConfig<InputTransfer<TCurrent>> | undefined = options?.linkOnError !== undefined
       ? { onError: options.linkOnError }
       : undefined;
 
@@ -786,7 +786,7 @@ export class AsyncInputPipelineBuilder<
 
     const composite = new UniversalCompositeTransfer<InputTransferDataType<TStartTransfer>, never>({
       input: this._startTransfer,
-      output: lastTransfer as any,
+      output: lastTransfer as OutputTransfer<never>,
       owned: finalOwnedResources,
       triggerable: options?.triggerable,
       asyncTriggerable: options?.asyncTriggerable,
@@ -808,12 +808,12 @@ export class AsyncInputPipelineBuilder<
  * - finish() accepts asyncTriggerable in addition to triggerable
  */
 export class AsyncOutputPipelineBuilder implements AsyncOutputPipelineBuilderInterface {
-  private readonly _startTransfer: OutputTransfer<any>;
-  private readonly _currentTransfer: DuplexTransfer<any, any>;
+  private readonly _startTransfer: OutputTransfer<unknown>;
+  private readonly _currentTransfer: DuplexTransfer<unknown, any>;
   private readonly _ownedResources: DisposableInterface[];
 
   private constructor(
-    startTransfer: OutputTransfer<any>,
+    startTransfer: OutputTransfer<unknown>,
     currentTransfer: DuplexTransfer<unknown, unknown>,
     ownedResources: DisposableInterface[] = [],
   ) {
@@ -849,7 +849,7 @@ export class AsyncOutputPipelineBuilder implements AsyncOutputPipelineBuilderInt
   }
 
   public finish<
-    TFinishTransfer extends DuplexTransfer<any, any>,
+    TFinishTransfer extends DuplexTransfer<unknown, any>,
     TTriggerable extends TriggerableInterface | undefined = undefined,
     TAsyncTriggerable extends AsyncTriggerableInterface | undefined = undefined,
     TGate extends GateInterface | undefined = undefined,
@@ -860,14 +860,14 @@ export class AsyncOutputPipelineBuilder implements AsyncOutputPipelineBuilderInt
       asyncTriggerable?: TAsyncTriggerable;
       gate?: TGate;
       owned?: boolean;
-      linkOnError?: ErrorHandler;
+      linkOnError?: ErrorHandler<TFinishTransfer>;
     },
   ): CompositeOutputTransfer<OutputTransferDataType<TFinishTransfer>, TFinishTransfer, TTriggerable, TAsyncTriggerable, TGate> {
-    const linkConfig: LinkConfig | undefined = options?.linkOnError !== undefined
+    const linkConfig: LinkConfig<TFinishTransfer> | undefined = options?.linkOnError !== undefined
       ? { onError: options.linkOnError }
       : undefined;
 
-    const subscriber = linkTransfers(this._currentTransfer as any, lastTransfer, linkConfig);
+    const subscriber = linkTransfers(this._currentTransfer, lastTransfer, linkConfig);
     const finalOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
 
     if (options?.owned) {
@@ -875,7 +875,7 @@ export class AsyncOutputPipelineBuilder implements AsyncOutputPipelineBuilderInt
     }
 
     const composite = new UniversalCompositeTransfer({
-      input: this._startTransfer as any,
+      input: this._startTransfer as InputTransfer<never>,
       output: lastTransfer,
       owned: finalOwnedResources,
       triggerable: options?.triggerable,
@@ -902,15 +902,15 @@ export class AsyncOutputPipelineBuilder implements AsyncOutputPipelineBuilderInt
  */
 export class AsyncDuplexPipelineBuilder<
   TCurrent,
-  TStartTransfer extends InputTransfer<any>
+  TStartTransfer extends InputTransfer<unknown>
 > implements AsyncDuplexPipelineBuilderInterface<TCurrent, TStartTransfer> {
   private readonly _startTransfer: TStartTransfer;
-  private readonly _currentTransfer: DuplexTransfer<any, TCurrent>;
+  private readonly _currentTransfer: DuplexTransfer<unknown, TCurrent>;
   private readonly _ownedResources: DisposableInterface[];
 
   private constructor(
     startTransfer: TStartTransfer,
-    currentTransfer: DuplexTransfer<any, TCurrent>,
+    currentTransfer: DuplexTransfer<unknown, TCurrent>,
     ownedResources: DisposableInterface[] = [],
   ) {
     this._startTransfer = startTransfer;
@@ -918,12 +918,12 @@ export class AsyncDuplexPipelineBuilder<
     this._ownedResources = ownedResources;
   }
 
-  public static start<TStart extends InputTransfer<any>>(
+  public static start<TStart extends InputTransfer<unknown>>(
     startTransfer: TStart,
   ): AsyncDuplexPipelineBuilderInterface<InputTransferDataType<TStart>, TStart> {
     return new AsyncDuplexPipelineBuilder<InputTransferDataType<TStart>, TStart>(
       startTransfer,
-      startTransfer as any, // Приведение к any безопасно, так как на старте это дуплекс-точка
+      startTransfer as DuplexTransfer<unknown, any>,
       []
     );
   }
@@ -947,7 +947,7 @@ export class AsyncDuplexPipelineBuilder<
   }
 
   public finish<
-    TFinishTransfer extends DuplexTransfer<any, any>,
+    TFinishTransfer extends DuplexTransfer<unknown, any>,
     TTriggerable extends TriggerableInterface | undefined = undefined,
     TAsyncTriggerable extends AsyncTriggerableInterface | undefined = undefined,
     TGate extends GateInterface | undefined = undefined,
@@ -958,7 +958,7 @@ export class AsyncDuplexPipelineBuilder<
       asyncTriggerable?: TAsyncTriggerable;
       gate?: TGate;
       owned?: boolean;
-      linkOnError?: ErrorHandler;
+      linkOnError?: ErrorHandler<TFinishTransfer>;
     },
   ): CompositeDuplexTransfer<
     InputTransferDataType<TStartTransfer>,
@@ -969,11 +969,11 @@ export class AsyncDuplexPipelineBuilder<
     TAsyncTriggerable,
     TGate
   > {
-    const linkConfig: LinkConfig | undefined = options?.linkOnError !== undefined
+    const linkConfig: LinkConfig<TFinishTransfer> | undefined = options?.linkOnError !== undefined
       ? { onError: options.linkOnError }
       : undefined;
 
-    const subscriber = linkTransfers(this._currentTransfer, lastTransfer as any, linkConfig);
+    const subscriber = linkTransfers(this._currentTransfer, lastTransfer, linkConfig);
     const finalOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
 
     if (options?.owned) {

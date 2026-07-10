@@ -268,7 +268,7 @@ export interface AsyncPollingProxyTransferInterface<T> extends AsyncPollingProxy
  * Pipeline structure: TStartTransfer [→ DuplexTransfer → …] → InputTransfer.
  * The start transfer must be duplex; the finish transfer is input-only (no output methods exposed).
  */
-export interface InputPipelineBuilderInterface<TCurrent, TStartTransfer extends InputTransfer<any>> {
+export interface InputPipelineBuilderInterface<TCurrent, TStartTransfer extends InputTransfer<unknown>> {
   to<TNext>(
     nextTransfer: DuplexTransfer<TCurrent, TNext>,
     owned?: boolean,
@@ -300,7 +300,7 @@ export interface OutputPipelineBuilderInterface {
   ): OutputPipelineBuilderInterface;
 
   finish<
-    TFinishTransfer extends DuplexTransfer<any, any>,
+    TFinishTransfer extends DuplexTransfer<unknown, any>,
     TTriggerable extends TriggerableInterface | undefined = undefined,
     TGate extends GateInterface | undefined = undefined,
   >(
@@ -321,7 +321,7 @@ export interface OutputPipelineBuilderInterface {
  */
 export interface DuplexPipelineBuilderInterface<
   TCurrent,
-  TStartTransfer extends InputTransfer<any>,
+  TStartTransfer extends InputTransfer<unknown>,
 > {
   to<TNext>(
     nextTransfer: DuplexTransfer<TCurrent, TNext>,
@@ -329,7 +329,7 @@ export interface DuplexPipelineBuilderInterface<
   ): DuplexPipelineBuilderInterface<TNext, TStartTransfer>;
 
   finish<
-    TFinishTransfer extends DuplexTransfer<any, any>,
+    TFinishTransfer extends DuplexTransfer<unknown, any>,
     TTriggerable extends TriggerableInterface | undefined = undefined,
     TGate extends GateInterface | undefined = undefined,
   >(
@@ -390,7 +390,7 @@ export interface OperatorPipelineBuilderInterface<TFlow extends readonly unknown
  * Async input pipeline builder interface — like InputPipelineBuilderInterface,
  * but supports async triggerable and linkOnError for async-push rejection handling.
  */
-export interface AsyncInputPipelineBuilderInterface<TCurrent, TStartTransfer extends InputTransfer<any>> {
+export interface AsyncInputPipelineBuilderInterface<TCurrent, TStartTransfer extends InputTransfer<unknown>> {
   to<TNext>(
     nextTransfer: DuplexTransfer<TCurrent, TNext>,
     owned?: boolean,
@@ -407,7 +407,7 @@ export interface AsyncInputPipelineBuilderInterface<TCurrent, TStartTransfer ext
       asyncTriggerable?: TAsyncTriggerable;
       gate?: TGate;
       owned?: boolean;
-      linkOnError?: ErrorHandler;
+      linkOnError?: ErrorHandler<InputTransfer<TCurrent>>;
     },
   ): CompositeInputTransfer<InputTransferDataType<TStartTransfer>, TStartTransfer, TTriggerable, TAsyncTriggerable, TGate>;
 }
@@ -423,7 +423,7 @@ export interface AsyncOutputPipelineBuilderInterface {
   ): AsyncOutputPipelineBuilderInterface;
 
   finish<
-    TFinishTransfer extends DuplexTransfer<any, any>,
+    TFinishTransfer extends DuplexTransfer<unknown, any>,
     TTriggerable extends TriggerableInterface | undefined = undefined,
     TAsyncTriggerable extends AsyncTriggerableInterface | undefined = undefined,
     TGate extends GateInterface | undefined = undefined,
@@ -434,7 +434,7 @@ export interface AsyncOutputPipelineBuilderInterface {
       asyncTriggerable?: TAsyncTriggerable;
       gate?: TGate;
       owned?: boolean;
-      linkOnError?: ErrorHandler;
+      linkOnError?: ErrorHandler<TFinishTransfer>;
     },
   ): CompositeOutputTransfer<OutputTransferDataType<TFinishTransfer>, TFinishTransfer, TTriggerable, TAsyncTriggerable, TGate>;
 }
@@ -445,7 +445,7 @@ export interface AsyncOutputPipelineBuilderInterface {
  */
 export interface AsyncDuplexPipelineBuilderInterface<
   TCurrent,
-  TStartTransfer extends InputTransfer<any>,
+  TStartTransfer extends InputTransfer<unknown>,
 > {
   to<TNext>(
     nextTransfer: DuplexTransfer<TCurrent, TNext>,
@@ -453,7 +453,7 @@ export interface AsyncDuplexPipelineBuilderInterface<
   ): AsyncDuplexPipelineBuilderInterface<TNext, TStartTransfer>;
 
   finish<
-    TFinishTransfer extends DuplexTransfer<any, any>,
+    TFinishTransfer extends DuplexTransfer<unknown, any>,
     TTriggerable extends TriggerableInterface | undefined = undefined,
     TAsyncTriggerable extends AsyncTriggerableInterface | undefined = undefined,
     TGate extends GateInterface | undefined = undefined,
@@ -464,7 +464,7 @@ export interface AsyncDuplexPipelineBuilderInterface<
       asyncTriggerable?: TAsyncTriggerable;
       gate?: TGate;
       owned?: boolean;
-      linkOnError?: ErrorHandler;
+      linkOnError?: ErrorHandler<TFinishTransfer>;
     },
   ): CompositeDuplexTransfer<
     InputTransferDataType<TStartTransfer>,
