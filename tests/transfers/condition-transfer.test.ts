@@ -264,23 +264,23 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'ConditionTransfer push with shouldAccept error and onError suppresses test',
+  'ConditionTransfer push with shouldAccept error and onAcceptError suppresses test',
   () => {
     it('', () => {
       const error = new Error('shouldAccept error');
-      const onError = jest.fn();
+      const onAcceptError = jest.fn();
       const transfer = new ConditionTransfer<number>({
         shouldAccept: () => { throw error; },
         shouldEmit: () => true,
-        onError,
+        onAcceptError,
       });
       const handler = jest.fn();
 
       transfer.subscribe(handler);
       transfer.push(42);
 
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(error, transfer);
+      expect(onAcceptError).toHaveBeenCalledTimes(1);
+      expect(onAcceptError).toHaveBeenCalledWith(error, transfer);
       expect(handler).not.toHaveBeenCalled();
 
       transfer.destroy();
@@ -289,7 +289,7 @@ describe(
 );
 
 describe(
-  'ConditionTransfer push with shouldAccept error without onError rethrows test',
+  'ConditionTransfer push with shouldAccept error without onAcceptError rethrows test',
   () => {
     it('', () => {
       const transfer = new ConditionTransfer<number>({
@@ -300,7 +300,7 @@ describe(
 
       transfer.subscribe(handler);
 
-      // Error is rethrown when onError is not provided
+      // Error is rethrown when onAcceptError is not provided
       expect(() => transfer.push(42)).toThrow('shouldAccept error');
       expect(handler).not.toHaveBeenCalled();
 
@@ -310,7 +310,7 @@ describe(
 );
 
 describe(
-  'ConditionTransfer trigger with shouldEmit error without onError rethrows test',
+  'ConditionTransfer trigger with shouldEmit error without onEmitError rethrows test',
   () => {
     it('', () => {
       const transfer = new ConditionTransfer<number>({
@@ -321,10 +321,10 @@ describe(
 
       transfer.subscribe(handler);
 
-      // Error is rethrown when onError is not provided
+      // Error is rethrown when onEmitError is not provided
       expect(() => transfer.push(42)).toThrow('shouldEmit error');
 
-      // Error is rethrown when onError is not provided
+      // Error is rethrown when onEmitError is not provided
       expect(() => transfer.trigger()).toThrow('shouldEmit error');
 
       expect(handler).not.toHaveBeenCalled();
@@ -335,24 +335,52 @@ describe(
 );
 
 describe(
-  'ConditionTransfer trigger with shouldEmit error and onError suppresses test',
+  'ConditionTransfer trigger with shouldEmit error and onEmitError suppresses test',
   () => {
     it('', () => {
       const error = new Error('shouldEmit error');
-      const onError = jest.fn();
+      const onEmitError = jest.fn();
       const transfer = new ConditionTransfer<number>({
         shouldAccept: () => true,
-        shouldEmit: () => { throw error; },
-        onError,
+        shouldEmit: () => {
+          throw error;
+        },
+        onEmitError,
       });
       const handler = jest.fn();
 
       transfer.subscribe(handler);
       transfer.push(42);
 
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(error, transfer);
+      expect(onEmitError).toHaveBeenCalledTimes(1);
+      expect(onEmitError).toHaveBeenCalledWith(error, transfer);
       expect(handler).not.toHaveBeenCalled();
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'ConditionTransfer shouldAccept and shouldEmit errors use separate handlers test',
+  () => {
+    it('', () => {
+      const onAcceptError = jest.fn();
+      const onEmitError = jest.fn();
+      const transfer = new ConditionTransfer<number>({
+        shouldAccept: () => { throw new Error('accept error'); },
+        shouldEmit: () => { throw new Error('emit error'); },
+        onAcceptError,
+        onEmitError,
+      });
+      const handler = jest.fn();
+
+      transfer.subscribe(handler);
+      transfer.push(42);
+
+      // shouldAccept fires first — onAcceptError called, onEmitError not called
+      expect(onAcceptError).toHaveBeenCalledTimes(1);
+      expect(onEmitError).not.toHaveBeenCalled();
 
       transfer.destroy();
     });

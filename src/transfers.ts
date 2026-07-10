@@ -1173,16 +1173,16 @@ export class PollingProxyTransfer<T> extends BaseStateTransfer<T> implements Pol
  * 4. destroy() — calls config.destroy(), unsubscribes subscribers
  *
  * Error handling:
- * - onSetupError — for errors in setup() (constructor)
  * - onEmitError — for errors in emit() (when sending data to subscribers)
  * - onDestroyError — for errors in destroy()
  * - With the corresponding handler provided, the exception is suppressed.
  * - Without a handler, the exception is rethrown.
+ * - setup() errors are always rethrown (no onSetupError — a failed setup
+ *   means the transfer is unusable, suppressing would create a zombie object).
  *
  * Configuration (ChannelTransferConfig):
  * - setup: (emit: DataHandler<T>) => void — channel initialization
  * - destroy: () => void — channel cleanup
- * - onSetupError?: ErrorHandler — setup() error handler
  * - onEmitError?: ErrorHandler — emit() error handler
  * - onDestroyError?: ErrorHandler — destroy() error handler
  *
@@ -1608,13 +1608,15 @@ export class ConvertTransfer<TInput, TOutput> extends BaseStateTransfer<TOutput>
  * 5. destroy() — unsubscribes subscribers, clears state
  *
  * Error handling:
- * - If shouldAccept or shouldEmit throws an exception, onError is called.
- * - With onError provided, the exception is suppressed.
+ * - If shouldAccept throws an exception, onAcceptError is called.
+ * - If shouldEmit throws an exception, onEmitError is called.
+ * - With the corresponding handler provided, the exception is suppressed.
  *
  * Configuration (ConditionTransferConfig):
  * - shouldAccept?: (data: T) => boolean — input filter (default: always true)
  * - shouldEmit?: (state: T | undefined) => boolean — output filter (default: always true)
- * - onError?: ErrorHandler — error handler
+ * - onAcceptError?: ErrorHandler — shouldAccept error handler
+ * - onEmitError?: ErrorHandler — shouldEmit error handler
  *
  * Use cases:
  * - Filtering data by value (e.g., only even numbers)
@@ -1633,14 +1635,16 @@ export class ConditionTransfer<T> extends BaseStateTransfer<T> implements Pushab
   private readonly _subscription: SubscriptionManager<T>;
   private readonly _shouldAccept: (incomingData: T) => boolean;
   private readonly _shouldEmit: (currentState: T | undefined) => boolean;
-  private readonly _onError?: ErrorHandler<ConditionTransfer<T>>;
+  private readonly _onAcceptError?: ErrorHandler<ConditionTransfer<T>>;
+  private readonly _onEmitError?: ErrorHandler<ConditionTransfer<T>>;
 
   constructor(config: ConditionTransferConfig<T>) {
     super();
     this._subscription = new SubscriptionManager(this._state);
     this._shouldAccept = config.shouldAccept ?? (() => true);
     this._shouldEmit = config.shouldEmit ?? (() => true);
-    this._onError = config.onError;
+    this._onAcceptError = config.onAcceptError;
+    this._onEmitError = config.onEmitError;
   }
 
   public push(data: T): void {
@@ -1650,7 +1654,7 @@ export class ConditionTransfer<T> extends BaseStateTransfer<T> implements Pushab
         return;
       }
     } catch (e) {
-      handleError(e, this, this._onError);
+      handleError(e, this, this._onAcceptError);
       return;
     }
 
@@ -1668,7 +1672,7 @@ export class ConditionTransfer<T> extends BaseStateTransfer<T> implements Pushab
         return;
       }
     } catch (e) {
-      handleError(e, this, this._onError);
+      handleError(e, this, this._onEmitError);
       return;
     }
 
@@ -1780,7 +1784,12 @@ export class PollingFlowTransfer<T> extends BaseStateTransfer<T> implements Poll
       this._subscription.sendState();
       this._state.clear();
     } catch (e) {
-      handleError(e, this, this._onError);
+      try {
+        handleError(e, this, this._onError);
+      } catch (handlerError) {
+        this._ticker.stop();
+        throw handlerError;
+      }
     }
   }
 
@@ -2002,7 +2011,12 @@ export class IdlePollingTransfer<T> extends BaseStateTransfer<T> implements Push
       this._subscription.sendState();
       this._state.clear();
     } catch (e) {
-      handleError(e, this, this._onError);
+      try {
+        handleError(e, this, this._onError);
+      } catch (handlerError) {
+        this._stopPolling();
+        throw handlerError;
+      }
     }
   }
 }
@@ -2251,7 +2265,12 @@ export class AsyncPollingSourceTransfer<T> extends BaseStateTransfer<T> implemen
       this._subscription.sendState();
       this._state.clear();
     } catch (e) {
-      handleError(e, this, this._onError);
+      try {
+        handleError(e, this, this._onError);
+      } catch (handlerError) {
+        this._ticker.stop();
+        throw handlerError;
+      }
     } finally {
       this._polling = false;
     }
@@ -2260,8 +2279,9 @@ export class AsyncPollingSourceTransfer<T> extends BaseStateTransfer<T> implemen
   private _safeTrigger(): void {
     this.asyncTrigger().catch(() => {
       // Error already handled in asyncTrigger via handleError.
-      // If onError is not set, handleError rethrew — caught here
-      // to prevent unhandled promise rejection from the ticker.
+      // If onError is not set (or handler threw), handleError rethrew,
+      // ticker was stopped, and the error is caught here to prevent
+      // unhandled promise rejection from the fire-and-forget ticker call.
     });
   }
 
@@ -2369,7 +2389,12 @@ export class AsyncPollingFlowTransfer<T> extends BaseStateTransfer<T> implements
       this._subscription.sendState();
       this._state.clear();
     } catch (e) {
-      handleError(e, this, this._onError);
+      try {
+        handleError(e, this, this._onError);
+      } catch (handlerError) {
+        this._ticker.stop();
+        throw handlerError;
+      }
     } finally {
       this._polling = false;
     }
@@ -2378,6 +2403,7 @@ export class AsyncPollingFlowTransfer<T> extends BaseStateTransfer<T> implements
   private _safeTrigger(): void {
     this.asyncTrigger().catch(() => {
       // Error already handled in asyncTrigger via handleError.
+      // Ticker stopped on rethrow, caught here to prevent unhandled rejection.
     });
   }
 
@@ -2511,7 +2537,12 @@ export class AsyncPollingProxyTransfer<T> extends BaseStateTransfer<T> implement
       this._subscription.sendState();
       this._state.clear();
     } catch (e) {
-      handleError(e, this, this._onError);
+      try {
+        handleError(e, this, this._onError);
+      } catch (handlerError) {
+        this._ticker?.stop();
+        throw handlerError;
+      }
     } finally {
       this._polling = false;
     }
@@ -2520,6 +2551,7 @@ export class AsyncPollingProxyTransfer<T> extends BaseStateTransfer<T> implement
   private _safeTrigger(): void {
     this.asyncTrigger().catch(() => {
       // Error already handled in asyncTrigger via handleError.
+      // Ticker stopped on rethrow, caught here to prevent unhandled rejection.
     });
   }
 
@@ -2764,6 +2796,7 @@ export class AsyncIdlePollingTransfer<T> extends BaseStateTransfer<T> implements
   private _safePoll(): void {
     this._doPoll().catch(() => {
       // Error already handled in _doPoll via handleError.
+      // Ticker stopped on rethrow, caught here to prevent unhandled rejection.
     });
   }
 
@@ -2777,7 +2810,12 @@ export class AsyncIdlePollingTransfer<T> extends BaseStateTransfer<T> implements
       this._subscription.sendState();
       this._state.clear();
     } catch (e) {
-      handleError(e, this, this._onError);
+      try {
+        handleError(e, this, this._onError);
+      } catch (handlerError) {
+        this._stopPolling();
+        throw handlerError;
+      }
     } finally {
       this._polling = false;
     }
@@ -2861,13 +2899,15 @@ export class AsyncConvertTransfer<TInput, TOutput> extends BaseStateTransfer<TOu
  * 4. Predicates can be sync or async (return Promise<boolean> | boolean)
  *
  * Error handling:
- * - If shouldAccept or shouldEmit throws an exception, onError is called.
- * - With onError provided, the exception is suppressed.
+ * - If shouldAccept throws an exception, onAcceptError is called.
+ * - If shouldEmit throws an exception, onEmitError is called.
+ * - With the corresponding handler provided, the exception is suppressed.
  *
  * Configuration (AsyncConditionTransferConfig):
  * - shouldAccept?: (data: T) => Promise<boolean> | boolean
  * - shouldEmit?: (state: T | undefined) => Promise<boolean> | boolean
- * - onError?: ErrorHandler
+ * - onAcceptError?: ErrorHandler
+ * - onEmitError?: ErrorHandler
  */
 export class AsyncConditionTransfer<T> extends BaseStateTransfer<T> implements AsyncPushableTransferInterface<T>, SubscribableTransferInterface<T> {
   override readonly isInput = true;
@@ -2880,14 +2920,16 @@ export class AsyncConditionTransfer<T> extends BaseStateTransfer<T> implements A
   private readonly _subscription: SubscriptionManager<T>;
   private readonly _shouldAccept: (incomingData: T) => Promise<boolean> | boolean;
   private readonly _shouldEmit: (currentState: T | undefined) => Promise<boolean> | boolean;
-  private readonly _onError?: ErrorHandler<AsyncConditionTransfer<T>>;
+  private readonly _onAcceptError?: ErrorHandler<AsyncConditionTransfer<T>>;
+  private readonly _onEmitError?: ErrorHandler<AsyncConditionTransfer<T>>;
 
   constructor(config: AsyncConditionTransferConfig<T>) {
     super();
     this._subscription = new SubscriptionManager(this._state);
     this._shouldAccept = config.shouldAccept ?? (() => true);
     this._shouldEmit = config.shouldEmit ?? (() => true);
-    this._onError = config.onError;
+    this._onAcceptError = config.onAcceptError;
+    this._onEmitError = config.onEmitError;
   }
 
   public async asyncPush(data: T): Promise<void> {
@@ -2896,7 +2938,7 @@ export class AsyncConditionTransfer<T> extends BaseStateTransfer<T> implements A
         return;
       }
     } catch (e) {
-      handleError(e, this, this._onError);
+      handleError(e, this, this._onAcceptError);
       return;
     }
 
@@ -2907,7 +2949,7 @@ export class AsyncConditionTransfer<T> extends BaseStateTransfer<T> implements A
         return;
       }
     } catch (e) {
-      handleError(e, this, this._onError);
+      handleError(e, this, this._onEmitError);
       return;
     }
 

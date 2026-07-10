@@ -279,20 +279,20 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'AsyncConditionTransfer shouldAccept error with onError suppresses test',
+  'AsyncConditionTransfer shouldAccept error with onAcceptError suppresses test',
   () => {
     it('', async () => {
-      const onError = jest.fn();
+      const onAcceptError = jest.fn();
       const transfer = new AsyncConditionTransfer<number>({
         shouldAccept: () => { throw new Error('accept error'); },
-        onError,
+        onAcceptError,
       });
       const handler = jest.fn();
 
       transfer.subscribe(handler);
       await transfer.asyncPush(42);
 
-      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onAcceptError).toHaveBeenCalledTimes(1);
       expect(handler).not.toHaveBeenCalled();
 
       transfer.destroy();
@@ -301,20 +301,44 @@ describe(
 );
 
 describe(
-  'AsyncConditionTransfer shouldEmit error with onError suppresses test',
+  'AsyncConditionTransfer shouldEmit error with onEmitError suppresses test',
   () => {
     it('', async () => {
-      const onError = jest.fn();
+      const onEmitError = jest.fn();
       const transfer = new AsyncConditionTransfer<number>({
-        shouldEmit: () => { throw new Error('emit error'); },
-        onError,
+        shouldEmit: () => {
+          throw new Error('emit error');
+        },
+        onEmitError,
       });
       const handler = jest.fn();
 
       transfer.subscribe(handler);
       await transfer.asyncPush(42);
 
-      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onEmitError).toHaveBeenCalledTimes(1);
+      expect(handler).not.toHaveBeenCalled();
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConditionTransfer shouldEmit error with onEmitError suppresses test',
+  () => {
+    it('', async () => {
+      const onEmitError = jest.fn();
+      const transfer = new AsyncConditionTransfer<number>({
+        shouldEmit: () => { throw new Error('emit error'); },
+        onEmitError,
+      });
+      const handler = jest.fn();
+
+      transfer.subscribe(handler);
+      await transfer.asyncPush(42);
+
+      expect(onEmitError).toHaveBeenCalledTimes(1);
       expect(handler).not.toHaveBeenCalled();
 
       transfer.destroy();

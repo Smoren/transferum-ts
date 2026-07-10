@@ -2414,7 +2414,7 @@ Configs are defined in `configs.ts`. All configs are types (not classes), passed
 | `WriteTransferConfig<T>`              | `WriteTransfer`              | `flow`                                                   |
 | `ReadTransferConfig<T>`               | `ReadTransfer`               | `flow`                                                   |
 | `ConvertTransferConfig<TIn, TOut>`    | `ConvertTransfer`            | `operator`                                               |
-| `ConditionTransferConfig<T>`          | `ConditionTransfer`          | — (predicates are optional)                              |
+| `ConditionTransferConfig<T>`          | `ConditionTransfer`          | — (predicates are optional), `onAcceptError?`, `onEmitError?` |
 | `CompositeTransferConfig<TIn, TOut>`  | `UniversalCompositeTransfer` | `input`, `output`                                        |
 | `PassBridgeConfig<T>`                 | `PassBridge`                 | `source`, `target`, `activated`                          |
 | `TransformBridgeConfig<TIn, TOut>`    | `TransformBridge`            | `source`, `target`, `operator`, `activated`              |
@@ -2435,7 +2435,7 @@ Configs are defined in `configs.ts`. All configs are types (not classes), passed
 | `AsyncWriteTransferConfig<T>`           | `AsyncWriteTransfer`               | `flow`                                        |
 | `AsyncReadTransferConfig<T>`            | `AsyncReadTransfer`                | `flow`                                        |
 | `AsyncConvertTransferConfig<TIn, TOut>` | `AsyncConvertTransfer`             | `operator` (AsyncOperatorInterface)           |
-| `AsyncConditionTransferConfig<T>`       | `AsyncConditionTransfer`           | — (predicates are optional, sync or async)    |
+| `AsyncConditionTransferConfig<T>`       | `AsyncConditionTransfer`           | — (predicates are optional, sync or async), `onAcceptError?`, `onEmitError?` |
 | `AsyncStoredChannelTransferConfig<T>`   | `AsyncStoredChannelTransfer`       | `setup`, `destroy`                            |
 | `AsyncTransformBridgeConfig<TIn, TOut>` | `AsyncTransformBridge`             | `source`, `target`, `operator`, `activated`   |
 | `LinkConfig<TTargetTransfer>`           | `linkTransfers` (async strategies) | `onError?`                                    |

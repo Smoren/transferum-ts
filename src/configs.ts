@@ -123,7 +123,6 @@ export type SinkTransferConfig<T> = ErrorHandlingConfig<SinkTransfer<T>> & {
 export type ChannelTransferConfig<T> = {
   readonly setup: (emit: DataHandler<T>) => void;
   readonly destroy: () => void;
-  readonly onSetupError?: ErrorHandler<ChannelTransfer<T>>;
   readonly onEmitError?: ErrorHandler<ChannelTransfer<T>>;
   readonly onDestroyError?: ErrorHandler<ChannelTransfer<T>>;
 }
@@ -132,7 +131,6 @@ export type ChannelTransferConfig<T> = {
 export type StoredChannelTransferConfig<T> = BaseStateTransferConfig<T> & {
   readonly setup: (emit: DataHandler<T>) => void;
   readonly destroy: () => void;
-  readonly onSetupError?: ErrorHandler<StoredChannelTransfer<T>>;
   readonly onEmitError?: ErrorHandler<StoredChannelTransfer<T>>;
   readonly onDestroyError?: ErrorHandler<StoredChannelTransfer<T>>;
 }
@@ -152,10 +150,12 @@ export type ConvertTransferConfig<TInput, TOutput> = ErrorHandlingConfig<Convert
   readonly operator: OperatorInterface<TInput, TOutput | undefined>;
 }
 
-/** Configuration for ConditionTransfer — optional input/output predicates and error handler. */
-export type ConditionTransferConfig<T> = ErrorHandlingConfig<ConditionTransfer<T>> & {
+/** Configuration for ConditionTransfer — optional input/output predicates and per-stage error handlers. */
+export type ConditionTransferConfig<T> = {
   readonly shouldAccept?: (incomingData: T) => boolean;
   readonly shouldEmit?: (currentState: T | undefined) => boolean;
+  readonly onAcceptError?: ErrorHandler<ConditionTransfer<T>>;
+  readonly onEmitError?: ErrorHandler<ConditionTransfer<T>>;
 }
 
 /** Configuration for PollingFlowTransfer — polling proxy config plus an output flow source. */
@@ -225,17 +225,18 @@ export type AsyncConvertTransferConfig<TInput, TOutput> = ErrorHandlingConfig<As
   readonly operator: AsyncOperatorInterface<TInput, TOutput | undefined>;
 }
 
-/** Configuration for AsyncConditionTransfer — optional sync/async input/output predicates and error handler. */
-export type AsyncConditionTransferConfig<T> = ErrorHandlingConfig<AsyncConditionTransfer<T>> & {
+/** Configuration for AsyncConditionTransfer — optional sync/async input/output predicates and per-stage error handlers. */
+export type AsyncConditionTransferConfig<T> = {
   readonly shouldAccept?: (incomingData: T) => Promise<boolean> | boolean;
   readonly shouldEmit?: (currentState: T | undefined) => Promise<boolean> | boolean;
+  readonly onAcceptError?: ErrorHandler<AsyncConditionTransfer<T>>;
+  readonly onEmitError?: ErrorHandler<AsyncConditionTransfer<T>>;
 }
 
 /** Configuration for AsyncStoredChannelTransfer — channel config with async pull/trigger interface plus optional initial value. */
 export type AsyncStoredChannelTransferConfig<T> = BaseStateTransferConfig<T> & {
   readonly setup: (emit: DataHandler<T>) => void;
   readonly destroy: () => void;
-  readonly onSetupError?: ErrorHandler<AsyncStoredChannelTransfer<T>>;
   readonly onEmitError?: ErrorHandler<AsyncStoredChannelTransfer<T>>;
   readonly onDestroyError?: ErrorHandler<AsyncStoredChannelTransfer<T>>;
 }
