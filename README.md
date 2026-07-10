@@ -2393,6 +2393,7 @@ Key types are defined in `types.ts`:
 
 ## Configurations
 
+[//]: # (TODO: add Async configs)
 Configs are defined in `configs.ts`. All configs are types (not classes), passed to transfer and bridge constructors.
 
 | Config                                | For                          | Required fields                                          |
@@ -2403,8 +2404,8 @@ Configs are defined in `configs.ts`. All configs are types (not classes), passed
 | `ThrottleTransferConfig`              | `ThrottleTransfer`           | `interval`                                               |
 | `MergeTransferConfig<T>`              | `MergeTransfer`              | `sources`                                                |
 | `SplitTransferConfig<T>`              | `SplitTransfer`              | `targets`                                                |
-| `PollingSourceConfig<T>`              | `PollingSourceTransfer`      | `fetcher`, `interval`, `activated`                       |
-| `PollingProxyConfig`                  | `PollingProxyTransfer`       | `interval`, `activated`                                  |
+| `PollingSourceTransferConfig<T>`      | `PollingSourceTransfer`      | `fetcher`, `interval`, `activated`                       |
+| `PollingProxyTransferConfig`          | `PollingProxyTransfer`       | `interval`, `activated`                                  |
 | `PollingFlowTransferConfig<T>`        | `PollingFlowTransfer`        | `flow`, `interval`, `activated`                          |
 | `IdlePollingTransferConfig<T>`        | `IdlePollingTransfer`        | `fetcher`, `timeout`, `interval`, `activated`            |
 | `ChannelTransferConfig<T>`            | `ChannelTransfer`            | `setup`, `destroy`                                       |

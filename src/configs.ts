@@ -101,13 +101,13 @@ export type SplitTransferConfig<T> = {
 }
 
 /** Configuration for polling proxy transfers — interval, gate state, optional ticker factory and error handler. */
-export type PollingProxyConfig<T> = GateConfig & ErrorHandlingConfig<PollingProxyTransfer<T>> & {
+export type PollingProxyTransferConfig<T> = GateConfig & ErrorHandlingConfig<PollingProxyTransfer<T>> & {
   readonly interval: number;
   readonly tickerFactory?: TickerFactory;
 }
 
 /** Configuration for PollingSourceTransfer — polling proxy config plus a sync fetcher. */
-export type PollingSourceConfig<T> = GateConfig & ErrorHandlingConfig<PollingSourceTransfer<T>> & {
+export type PollingSourceTransferConfig<T> = GateConfig & ErrorHandlingConfig<PollingSourceTransfer<T>> & {
   readonly interval: number;
   readonly fetcher: DataFetcher<T>;
   readonly tickerFactory?: TickerFactory;
@@ -177,13 +177,13 @@ export type IdlePollingTransferConfig<T> = BaseStateTransferConfig<T> & ErrorHan
 // ═══════════════════════════════════════════════════════════════
 
 /** Configuration for async polling proxy transfers — interval, gate state, optional ticker factory and error handler. */
-export type AsyncPollingProxyConfig<T> = GateConfig & ErrorHandlingConfig<AsyncPollingProxyTransfer<T>> & {
+export type AsyncPollingProxyTransferConfig<T> = GateConfig & ErrorHandlingConfig<AsyncPollingProxyTransfer<T>> & {
   readonly interval: number;
   readonly tickerFactory?: TickerFactory;
 }
 
 /** Configuration for AsyncPollingSourceTransfer — async polling config plus an async fetcher. */
-export type AsyncPollingSourceConfig<T> = GateConfig & ErrorHandlingConfig<AsyncPollingSourceTransfer<T>> & {
+export type AsyncPollingSourceTransferConfig<T> = GateConfig & ErrorHandlingConfig<AsyncPollingSourceTransfer<T>> & {
   readonly interval: number;
   readonly fetcher: AsyncDataFetcher<T>;
   readonly tickerFactory?: TickerFactory;

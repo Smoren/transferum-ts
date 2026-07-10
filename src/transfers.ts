@@ -38,7 +38,7 @@ import type {
   TickerFactory,
 } from "./types";
 import type {
-  PollingSourceConfig,
+  PollingSourceTransferConfig,
   BaseStateTransferConfig,
   DelayedPushChannelTransferConfig,
   DebounceTransferConfig,
@@ -52,7 +52,7 @@ import type {
   ReadTransferConfig,
   ConvertTransferConfig,
   StoredChannelTransferConfig,
-  PollingProxyConfig,
+  PollingProxyTransferConfig,
   ConditionTransferConfig,
   PollingFlowTransferConfig,
   IdlePollingTransferConfig,
@@ -60,8 +60,8 @@ import type {
   AsyncSinkTransferConfig,
   AsyncWriteTransferConfig,
   AsyncReadTransferConfig,
-  AsyncPollingSourceConfig,
-  AsyncPollingProxyConfig,
+  AsyncPollingSourceTransferConfig,
+  AsyncPollingProxyTransferConfig,
   AsyncPollingFlowTransferConfig,
   AsyncIdlePollingTransferConfig,
   AsyncConvertTransferConfig,
@@ -878,7 +878,7 @@ export class SplitTransfer<T> extends BaseTransfer implements PushableTransferIn
  * - With onError provided, the exception is suppressed (polling continues).
  * - Without onError, the exception is rethrown.
  *
- * Configuration (PollingSourceConfig):
+ * Configuration (PollingSourceTransferConfig):
  * - fetcher: DataFetcher<T> — data retrieval function
  * - interval: number — polling interval (ms)
  * - activated: boolean — initial polling state
@@ -905,7 +905,7 @@ export class PollingSourceTransfer<T> extends BaseStateTransfer<T> implements Po
   private readonly _fetcher: DataFetcher<T>;
   private readonly _onError?: ErrorHandler<PollingSourceTransfer<T>>;
 
-  constructor(config: PollingSourceConfig<T>) {
+  constructor(config: PollingSourceTransferConfig<T>) {
     super({ ...config, initialValue: undefined });
 
     this._subscription = new SubscriptionManager(this._state);
@@ -1008,7 +1008,7 @@ export class PollingSourceTransfer<T> extends BaseStateTransfer<T> implements Po
  * - pull()/trigger() without a fetcher throws an Error
  * - pull()/trigger() without active — returns undefined / is ignored
  *
- * Configuration (PollingProxyConfig):
+ * Configuration (PollingProxyTransferConfig):
  * - interval: number — polling interval (ms)
  * - activated: boolean — initial polling state
  * - tickerFactory?: TickerFactory — custom ticker factory (default: RAFTicker.factory)
@@ -1041,7 +1041,7 @@ export class PollingProxyTransfer<T> extends BaseStateTransfer<T> implements Pol
   private _ticker: TickerInterface | undefined;
   private _fetcher: DataFetcher<T> | undefined;
 
-  constructor(config: PollingProxyConfig<T>) {
+  constructor(config: PollingProxyTransferConfig<T>) {
     super({ ...config, initialValue: undefined });
     this._subscription = new SubscriptionManager(this._state);
     this._gateState = new StateSubscriptionManager<GateInterface>(this);
@@ -2162,7 +2162,7 @@ export class AsyncReadTransfer<T> extends BaseTransfer implements AsyncPullableT
  * - Without onError, the exception is rethrown from asyncPull()/asyncTrigger().
  * - The ticker calls _safeTrigger() with .catch() — unhandled rejection is impossible.
  *
- * Configuration (AsyncPollingSourceConfig):
+ * Configuration (AsyncPollingSourceTransferConfig):
  * - fetcher: AsyncDataFetcher<T> — async data retrieval function
  * - interval: number — polling interval (ms)
  * - activated: boolean — initial polling state
@@ -2185,7 +2185,7 @@ export class AsyncPollingSourceTransfer<T> extends BaseStateTransfer<T> implemen
   private readonly _onError?: ErrorHandler<AsyncPollingSourceTransfer<T>>;
   private _polling: boolean = false;
 
-  constructor(config: AsyncPollingSourceConfig<T>) {
+  constructor(config: AsyncPollingSourceTransferConfig<T>) {
     super({ ...config, initialValue: undefined });
 
     this._subscription = new SubscriptionManager(this._state);
@@ -2412,7 +2412,7 @@ export class AsyncPollingFlowTransfer<T> extends BaseStateTransfer<T> implements
  * - The 'Async fetcher is not defined' error is always rethrown.
  * - The ticker calls _safeTrigger() with .catch() — unhandled rejection is impossible.
  *
- * Configuration (AsyncPollingProxyConfig):
+ * Configuration (AsyncPollingProxyTransferConfig):
  * - interval: number — polling interval (ms)
  * - activated: boolean — initial polling state
  * - tickerFactory?: TickerFactory
@@ -2441,7 +2441,7 @@ export class AsyncPollingProxyTransfer<T> extends BaseStateTransfer<T> implement
   private _fetcher: AsyncDataFetcher<T> | undefined;
   private _polling: boolean = false;
 
-  constructor(config: AsyncPollingProxyConfig<T>) {
+  constructor(config: AsyncPollingProxyTransferConfig<T>) {
     super({ ...config, initialValue: undefined });
     this._subscription = new SubscriptionManager(this._state);
     this._gateState = new StateSubscriptionManager<GateInterface>(this);

@@ -115,7 +115,7 @@ export function linkTransfers<T, RTransfer extends InputTransfer<T>>(
     return subscribableLhs.subscribe((data) => {
       asyncPushableRhs.asyncPush(data).catch((e) => {
         if (onError !== undefined) {
-          // TODO сделать через handleError ?
+          // TODO сделать через handleError ? (возможно в дальнейшем развитии понадобится, так как не факт, что должно быть подавление)
           onError(e instanceof Error ? e : new Error(String(e)), rhs);
         }
       });
@@ -202,7 +202,7 @@ export function linkTransfers<T, RTransfer extends InputTransfer<T>>(
  * If onError is provided — calls it and suppresses the exception.
  * If onError is not provided — rethrows the exception.
  */
-export function handleError<TSource extends BaseTransferInterface>(error: unknown, source: TSource, onError?: ErrorHandler<TSource>): void {
+export function handleError<TSource>(error: unknown, source: TSource, onError?: ErrorHandler<TSource>): void {
   const err = error instanceof Error ? error : new Error(String(error));
   if (onError !== undefined) {
     onError(err, source);

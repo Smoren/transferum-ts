@@ -20,8 +20,8 @@ import type {
   GateTransferConfig,
   MergeTransferConfig,
   SplitTransferConfig,
-  PollingSourceConfig,
-  PollingProxyConfig,
+  PollingSourceTransferConfig,
+  PollingProxyTransferConfig,
   ChannelTransferConfig,
   StoredChannelTransferConfig,
   SinkTransferConfig,
@@ -31,8 +31,8 @@ import type {
   ConditionTransferConfig,
   PollingFlowTransferConfig,
   IdlePollingTransferConfig,
-  AsyncPollingSourceConfig,
-  AsyncPollingProxyConfig,
+  AsyncPollingSourceTransferConfig,
+  AsyncPollingProxyTransferConfig,
   AsyncPollingFlowTransferConfig,
   AsyncIdlePollingTransferConfig,
   AsyncSinkTransferConfig,
@@ -329,7 +329,7 @@ export function createSplitTransfer<T>(
  * polling.subscribe(x => console.log(x));
  */
 export function createPollingSourceTransfer<T>(
-  config: PollingSourceConfig<T>,
+  config: PollingSourceTransferConfig<T>,
 ): Transfer<T, [Pullable, Subscribable, Triggerable, Gate]> {
   return new PollingSourceTransfer<T>(config);
 }
@@ -348,7 +348,7 @@ export function createPollingSourceTransfer<T>(
  * // setFetcher is called via linkTransfers
  */
 export function createPollingProxyTransfer<T>(
-  config: PollingProxyConfig<T>,
+  config: PollingProxyTransferConfig<T>,
 ): Transfer<T, [PollingProxy, Pullable, Subscribable, Triggerable, Gate]> {
   return new PollingProxyTransfer<T>(config);
 }
@@ -848,7 +848,7 @@ export function createAsyncReadTransfer<T>(
  * @param config — configuration (fetcher, interval, activated, tickerFactory, onError)
  */
 export function createAsyncPollingSourceTransfer<T>(
-  config: AsyncPollingSourceConfig<T>
+  config: AsyncPollingSourceTransferConfig<T>
 ): Transfer<T, [AsyncPullable, Subscribable, AsyncTriggerable, Gate]> {
   return new AsyncPollingSourceTransfer<T>(config);
 }
@@ -861,7 +861,7 @@ export function createAsyncPollingSourceTransfer<T>(
  * @param config — configuration (interval, activated, tickerFactory, onError)
  */
 export function createAsyncPollingProxyTransfer<T>(
-  config: AsyncPollingProxyConfig<T>
+  config: AsyncPollingProxyTransferConfig<T>
 ): Transfer<T, [AsyncPollingProxy, AsyncPullable, Subscribable, AsyncTriggerable, Gate]> {
   return new AsyncPollingProxyTransfer<T>(config);
 }
