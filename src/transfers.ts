@@ -2151,8 +2151,8 @@ export class AsyncPollingSourceTransfer<T> extends BaseStateTransfer<T> implemen
   override readonly isOutput = true;
 
   override readonly isPollingSource = true;
-  override readonly isAsyncPullable = true;
   override readonly isSubscribable = true;
+  override readonly isAsyncPullable = true;
   override readonly isAsyncTriggerable = true;
   override readonly isGate = true;
 
@@ -2269,8 +2269,8 @@ export class AsyncPollingFlowTransfer<T> extends BaseStateTransfer<T> implements
   override readonly isOutput = true;
 
   override readonly isPollingSource = true;
-  override readonly isAsyncPullable = true;
   override readonly isSubscribable = true;
+  override readonly isAsyncPullable = true;
   override readonly isAsyncTriggerable = true;
   override readonly isGate = true;
 
@@ -2401,12 +2401,12 @@ export class AsyncPollingProxyTransfer<T> extends BaseStateTransfer<T> implement
   override readonly isOutput = true;
   override readonly isDuplex = true;
 
-  override readonly isAsyncPollingProxy = true;
   override readonly isPollingSource = true;
-  override readonly isAsyncPullable = true;
   override readonly isSubscribable = true;
-  override readonly isAsyncTriggerable = true;
   override readonly isGate = true;
+  override readonly isAsyncPollingProxy = true;
+  override readonly isAsyncPullable = true;
+  override readonly isAsyncTriggerable = true;
 
   private readonly _subscription: SubscriptionManager<T>;
   private readonly _gateState: StateSubscriptionManager<GateInterface>;
@@ -2757,8 +2757,8 @@ export class AsyncConvertTransfer<TInput, TOutput> extends BaseStateTransfer<TOu
   override readonly isOutput = true;
   override readonly isDuplex = true;
 
-  override readonly isAsyncPushable = true;
   override readonly isSubscribable = true;
+  override readonly isAsyncPushable = true;
 
   private readonly _subscription: SubscriptionManager<TOutput>;
   private readonly _operator: AsyncOperatorInterface<TInput, TOutput | undefined>;
@@ -2819,8 +2819,8 @@ export class AsyncConditionTransfer<T> extends BaseStateTransfer<T> implements A
   override readonly isOutput = true;
   override readonly isDuplex = true;
 
-  override readonly isAsyncPushable = true;
   override readonly isSubscribable = true;
+  override readonly isAsyncPushable = true;
 
   private readonly _subscription: SubscriptionManager<T>;
   private readonly _shouldAccept: (incomingData: T) => Promise<boolean> | boolean;
