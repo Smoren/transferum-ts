@@ -130,9 +130,6 @@ describe(
       transfer.subscribe(handler);
       await transfer.asyncTrigger();
 
-      // asyncTrigger calls _safePoll (fire-and-forget), waiting for microtask
-      await new Promise<void>((resolve) => setTimeout(resolve, 10));
-
       expect(handler).toHaveBeenCalledTimes(1);
       expect(handler).toHaveBeenCalledWith(42);
 
@@ -423,8 +420,6 @@ describe(
       transfer.subscribe(handler);
       await transfer.asyncTrigger();
 
-      await new Promise<void>((resolve) => setTimeout(resolve, 10));
-
       expect(onError).toHaveBeenCalledTimes(1);
       expect(onError).toHaveBeenCalledWith(error);
       expect(handler).not.toHaveBeenCalled();
@@ -610,12 +605,8 @@ describe(
       const handler = jest.fn();
       transfer.subscribe(handler);
 
-      // asyncTrigger() when active=true calls _safePoll and _startIdleTimer
+      // asyncTrigger() when active=true calls _doPoll and _startIdleTimer
       await transfer.asyncTrigger();
-
-      // Waiting for microtask for _doPoll
-      await Promise.resolve();
-      await Promise.resolve();
 
       expect(handler).toHaveBeenCalledWith(42);
 
@@ -645,14 +636,14 @@ describe(
         activated: false,
       });
 
-      // asyncTrigger() calls _safePoll() (fire-and-forget)
-      await transfer.asyncTrigger();
-      // The second asyncTrigger() — _doPoll sees _polling=true and skips
-      await transfer.asyncTrigger();
+      // Start first asyncTrigger (don't await — fetcher blocks on firstCall)
+      const p1 = transfer.asyncTrigger();
+      // The second asyncTrigger — _doPoll sees _polling=true and skips
+      const p2 = transfer.asyncTrigger();
 
       resolveFirst!();
-      await Promise.resolve();
-      await Promise.resolve();
+      await p1;
+      await p2;
 
       expect(callCount).toBe(1);
 

@@ -2557,10 +2557,10 @@ export class AsyncPollingProxyTransfer<T> extends BaseStateTransfer<T> implement
  *
  * Mechanics:
  * 1. push(data) — synchronously writes, notifies, clears, resets the idle timer
- * 2. asyncTrigger() — starts _safePoll() (fire-and-forget async), restarts the idle timer
+ * 2. asyncTrigger() — awaits _doPoll() (fetch + notify), then restarts the idle timer
  * 3. asyncPull() — calls await fetcher() directly (without writing to state)
  * 4. If no data arrived for longer than timeout ms — polling starts via Ticker
- * 5. The ticker calls _safePoll() — async fetcher in the background
+ * 5. The ticker calls _safePoll() — fire-and-forget wrapper over _doPoll()
  * 6. On push — polling stops, the idle timer resets
  * 7. The _polling flag prevents overlapping
  *
@@ -2570,7 +2570,8 @@ export class AsyncPollingProxyTransfer<T> extends BaseStateTransfer<T> implement
  * Error handling:
  * - If fetcher() throws an exception, onError is called.
  * - With onError provided, the exception is suppressed. Without onError — rethrown from _doPoll.
- * - _safePoll() calls _doPoll().catch() — unhandled rejection is impossible.
+ * - asyncTrigger() awaits _doPoll() — caller can catch rethrown errors via await.
+ * - _safePoll() (used by the ticker) wraps _doPoll().catch() — unhandled rejection is impossible.
  *
  * Configuration (AsyncIdlePollingTransferConfig):
  * - fetcher: AsyncDataFetcher<T> — async data retrieval function for idle polling
@@ -2651,7 +2652,7 @@ export class AsyncIdlePollingTransfer<T> extends BaseStateTransfer<T> implements
   }
 
   public async asyncTrigger(): Promise<void> {
-    this._safePoll();
+    await this._doPoll();
     if (this._active) {
       this._startIdleTimer();
     }

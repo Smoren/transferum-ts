@@ -1738,7 +1738,7 @@ polling.subscribe((data) => console.log(data));
 
 ### AsyncIdlePollingTransfer
 
-Reactive channel with async fallback polling on idle. `push()` is synchronous, but the fetcher is asynchronous — `asyncTrigger()` calls `_safePoll()` (fire-and-forget), `asyncPull()` awaits the fetcher directly. The `_polling` flag prevents overlapping.
+Reactive channel with async fallback polling on idle. `push()` is synchronous, but the fetcher is asynchronous — `asyncTrigger()` awaits `_doPoll()` (fetch + notify), `asyncPull()` awaits the fetcher directly. The `_polling` flag prevents overlapping. The ticker uses `_safePoll()` — a fire-and-forget wrapper.
 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`, `isPollingSource`, `isAsyncPullable`, `isAsyncTriggerable`, `isGate`
 
