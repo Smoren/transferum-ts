@@ -380,7 +380,7 @@ export function createPollingFlowTransfer<T>(
  * periodic polling of the fetcher starts with the given interval.
  * When new data arrives via push(), polling stops and the idle timer resets.
  *
- * Capabilities: Pushable, Subscribable, Triggerable, Gate
+ * Capabilities: Pushable, Pullable, Subscribable, Triggerable, Gate
  *
  * @param config — configuration (fetcher, timeout, interval, activated, onError)
  * @example
@@ -396,7 +396,7 @@ export function createPollingFlowTransfer<T>(
  */
 export function createIdlePollingTransfer<T>(
   config: IdlePollingTransferConfig<T>
-): Transfer<T, [Pushable, Subscribable, Triggerable, Gate]> {
+): Transfer<T, [Pushable, Pullable, Subscribable, Triggerable, Gate]> {
   return new IdlePollingTransfer<T>(config);
 }
 
@@ -882,13 +882,13 @@ export function createAsyncPollingFlowTransfer<T>(
 /**
  * Creates an AsyncIdlePollingTransfer — a reactive channel with async fallback polling on idle.
  *
- * Capabilities: Pushable, Subscribable, Triggerable, Gate
+ * Capabilities: Pushable, Subscribable, AsyncPullable, AsyncTriggerable, Gate
  *
  * @param config — configuration (fetcher, timeout, interval, activated, initialValue, tickerFactory, onError)
  */
 export function createAsyncIdlePollingTransfer<T>(
   config: AsyncIdlePollingTransferConfig<T>
-): Transfer<T, [Pushable, Subscribable, Triggerable, Gate]> {
+): Transfer<T, [Pushable, Subscribable, AsyncPullable, AsyncTriggerable, Gate]> {
   return new AsyncIdlePollingTransfer<T>(config);
 }
 

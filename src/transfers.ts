@@ -1797,7 +1797,7 @@ export class PollingFlowTransfer<T> extends BaseStateTransfer<T> implements Poll
 /**
  * Reactive channel with fallback polling on idle incoming data.
  *
- * Capabilities: isInput, isOutput, isPushable, isSubscribable, isPollingSource, isTriggerable, isGate
+ * Capabilities: isInput, isOutput, isDuplex, isPushable, isPullable, isSubscribable, isPollingSource, isTriggerable, isGate
  *
  * Mechanics:
  * 1. push(data) — writes the value, notifies subscribers, clears _state,
@@ -1805,9 +1805,10 @@ export class PollingFlowTransfer<T> extends BaseStateTransfer<T> implements Poll
  * 2. If no data arrived via push() for longer than timeout ms — an internal
  *    Ticker (via tickerFactory) starts, periodically polling the fetcher at interval
  * 3. trigger() — manually calls the fetcher and notifies subscribers, restarts the idle timer
- * 4. subscribe(handler) — subscribes to notifications
- * 5. activate()/deactivate()/toggle() — control idle monitoring
- * 6. destroy() — stops timers, unsubscribes subscribers, clears state
+ * 4. pull() — calls the fetcher directly (without writing to state or notifying subscribers)
+ * 5. subscribe(handler) — subscribes to notifications
+ * 6. activate()/deactivate()/toggle() — control idle monitoring
+ * 7. destroy() — stops timers, unsubscribes subscribers, clears state
  *
  * Error handling:
  * - If fetcher() throws an exception in trigger() or during polling, onError is called.
@@ -1828,12 +1829,13 @@ export class PollingFlowTransfer<T> extends BaseStateTransfer<T> implements Poll
  * - Heartbeat / keep-alive mechanism: polling on absence of incoming data
  * - Fallback data source when the main stream is idle
  */
-export class IdlePollingTransfer<T> extends BaseStateTransfer<T> implements PushableTransferInterface<T>, SubscribableTransferInterface<T>, TriggerableTransferInterface, PollingSourceTransferInterface, GateInterface {
+export class IdlePollingTransfer<T> extends BaseStateTransfer<T> implements PushableTransferInterface<T>, SubscribableTransferInterface<T>, PullableTransferInterface<T>, TriggerableTransferInterface, PollingSourceTransferInterface, GateInterface {
   override readonly isInput = true;
   override readonly isOutput = true;
   override readonly isDuplex = true;
 
   override readonly isPushable = true;
+  override readonly isPullable = true;
   override readonly isSubscribable = true;
   override readonly isPollingSource = true;
   override readonly isTriggerable = true;
@@ -1880,6 +1882,15 @@ export class IdlePollingTransfer<T> extends BaseStateTransfer<T> implements Push
 
   public subscribe(handler: DataHandler<T>): SubscriberInterface {
     return this._subscription.subscribe(handler);
+  }
+
+  public pull(): T | undefined {
+    try {
+      return this._fetcher();
+    } catch (e) {
+      handleError(e, this._onError);
+      return undefined;
+    }
   }
 
   public onStateChange(handler: DataHandler<GateInterface>): SubscriberInterface {
@@ -2542,18 +2553,19 @@ export class AsyncPollingProxyTransfer<T> extends BaseStateTransfer<T> implement
  * Reactive channel with asynchronous fallback polling on idle.
  *
  * Capabilities: isInput, isOutput, isDuplex, isPushable, isSubscribable,
- *              isPollingSource, isTriggerable, isGate
+ *              isPollingSource, isAsyncPullable, isAsyncTriggerable, isGate
  *
  * Mechanics:
  * 1. push(data) — synchronously writes, notifies, clears, resets the idle timer
- * 2. trigger() — synchronously starts _safePoll() (fire-and-forget async)
- * 3. If no data arrived for longer than timeout ms — polling starts via Ticker
- * 4. The ticker calls _safePoll() — async fetcher in the background
- * 5. On push — polling stops, the idle timer resets
- * 6. The _polling flag prevents overlapping
+ * 2. asyncTrigger() — starts _safePoll() (fire-and-forget async), restarts the idle timer
+ * 3. asyncPull() — calls await fetcher() directly (without writing to state)
+ * 4. If no data arrived for longer than timeout ms — polling starts via Ticker
+ * 5. The ticker calls _safePoll() — async fetcher in the background
+ * 6. On push — polling stops, the idle timer resets
+ * 7. The _polling flag prevents overlapping
  *
- * Note: push and trigger are synchronous (like in the sync version),
- * but the fetcher is asynchronous. Results arrive via sync subscription.
+ * Note: push is synchronous (like in the sync version), but the fetcher is asynchronous.
+ * Results arrive via sync subscription. asyncTrigger and asyncPull are async methods.
  *
  * Error handling:
  * - If fetcher() throws an exception, onError is called.
@@ -2569,7 +2581,7 @@ export class AsyncPollingProxyTransfer<T> extends BaseStateTransfer<T> implement
  * - tickerFactory?: TickerFactory
  * - onError?: ErrorHandler
  */
-export class AsyncIdlePollingTransfer<T> extends BaseStateTransfer<T> implements PushableTransferInterface<T>, SubscribableTransferInterface<T>, TriggerableTransferInterface, PollingSourceTransferInterface, GateInterface {
+export class AsyncIdlePollingTransfer<T> extends BaseStateTransfer<T> implements PushableTransferInterface<T>, SubscribableTransferInterface<T>, AsyncPullableTransferInterface<T>, AsyncTriggerableInterface, PollingSourceTransferInterface, GateInterface {
   override readonly isInput = true;
   override readonly isOutput = true;
   override readonly isDuplex = true;
@@ -2577,7 +2589,8 @@ export class AsyncIdlePollingTransfer<T> extends BaseStateTransfer<T> implements
   override readonly isPushable = true;
   override readonly isSubscribable = true;
   override readonly isPollingSource = true;
-  override readonly isTriggerable = true;
+  override readonly isAsyncPullable = true;
+  override readonly isAsyncTriggerable = true;
   override readonly isGate = true;
 
   private readonly _subscription: SubscriptionManager<T>;
@@ -2628,7 +2641,16 @@ export class AsyncIdlePollingTransfer<T> extends BaseStateTransfer<T> implements
     return this._gateState.subscribe(handler);
   }
 
-  public trigger(): void {
+  public async asyncPull(): Promise<T | undefined> {
+    try {
+      return await this._fetcher();
+    } catch (e) {
+      handleError(e, this._onError);
+      return undefined;
+    }
+  }
+
+  public async asyncTrigger(): Promise<void> {
     this._safePoll();
     if (this._active) {
       this._startIdleTimer();

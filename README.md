@@ -1054,7 +1054,7 @@ If the data type allows `null` (e.g., `string | null`), use it as an explicit em
 | PollingSourceTransfer      |  —   |  ✓   |  ✓  |  ✓   |  ✓   |   Src   | —  |  ✓  | Poll external `fetcher` on a timer                  |
 | PollingProxyTransfer       |  —   |  ✓   |  ✓  |  ✓   |  ✓   | Src+Prx | ✓  |  ✓  | Poll previous node on a timer                       |
 | PollingFlowTransfer        |  —   |  ✓   |  ✓  |  ✓   |  ✓   |   Src   | —  |  ✓  | Poll from `OutputFlowInterface` (Storage)           |
-| IdlePollingTransfer        |  ✓   |  —   |  ✓  |  ✓   |  ✓   |   Src   | ✓  |  ✓  | Fallback polling on idle incoming data              |
+| IdlePollingTransfer        |  ✓   |  ✓   |  ✓  |  ✓   |  ✓   |   Src   | ✓  |  ✓  | Fallback polling on idle incoming data              |
 | ChannelTransfer            |  —   |  —   |  ✓  |  —   |  —   |    —    | —  |  ✓  | External source via `setup`/`destroy`               |
 | StoredChannelTransfer      |  —   |  ✓   |  ✓  |  ✓   |  —   |    —    | —  |  ✓  | Channel with storage + external source              |
 | SinkTransfer               |  ✓   |  —   |  —  |  —   |  —   |    —    | ✓  |  —  | Terminal sink (callback)                            |
@@ -1079,10 +1079,10 @@ If the data type allows `null` (e.g., `string | null`), use it as an explicit em
 | AsyncPollingSourceTransfer |   —   |   ✓   |   ✓   |  ✓  |  ✓   |   Src    | —  |  ✓  | Async poll external `fetcher` on a timer                 |
 | AsyncPollingProxyTransfer  |   —   |   ✓   |   ✓   |  ✓  |  ✓   | Src+aPrx | ✓  |  ✓  | Async poll previous node on a timer                      |
 | AsyncPollingFlowTransfer   |   —   |   ✓   |   ✓   |  ✓  |  ✓   |   Src    | —  |  ✓  | Async poll from `AsyncOutputFlowInterface`               |
-| AsyncIdlePollingTransfer   |  ✓*   |   —   |  ✓*   |  ✓  |  ✓   |   Src    | ✓  |  ✓  | Fallback async polling on idle incoming data             |
+| AsyncIdlePollingTransfer   |  ✓*   |   ✓   |   ✓   |  ✓  |  ✓   |   Src    | ✓  |  ✓  | Fallback async polling on idle incoming data             |
 | AsyncStoredChannelTransfer |   —   |   ✓   |   ✓   |  ✓  |  —   |    —     | —  |  ✓  | Channel with storage + external source + async interface |
 
-> **Legend:** aPush = `isAsyncPushable`, aPull = `isAsyncPullable`, aTrig = `isAsyncTriggerable`, aPrx = `isAsyncPollingProxy`. `✓*` — method is synchronous (`push`/`trigger`), but fetcher is asynchronous.
+> **Legend:** aPush = `isAsyncPushable`, aPull = `isAsyncPullable`, aTrig = `isAsyncTriggerable`, aPrx = `isAsyncPollingProxy`. `✓*` — method is synchronous (`push`), but fetcher is asynchronous.
 >
 > **Subscription in all async transfers remains synchronous** — `subscribe()` notifies subscribers synchronously, even if data is obtained via `asyncPush`/`asyncPull`/`asyncTrigger`.
 
@@ -1401,7 +1401,7 @@ storage.write(42); // after interval → 42
 
 Reactive channel with fallback polling on idle. If no data arrived via `push()` for longer than `timeout` ms, periodic polling of `fetcher` starts with `interval` ms. When new data arrives, polling stops and the idle timer resets.
 
-**Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`, `isPollingSource`, `isTriggerable`, `isGate`
+**Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isPullable`, `isSubscribable`, `isPollingSource`, `isTriggerable`, `isGate`
 
 ```typescript
 import { createIdlePollingTransfer } from 'transferum';
@@ -1738,9 +1738,9 @@ polling.subscribe((data) => console.log(data));
 
 ### AsyncIdlePollingTransfer
 
-Reactive channel with async fallback polling on idle. `push()` and `trigger()` are synchronous, but the fetcher is asynchronous — `_safePoll()` calls `_doPoll().catch()` (fire-and-forget). The `_polling` flag prevents overlapping.
+Reactive channel with async fallback polling on idle. `push()` is synchronous, but the fetcher is asynchronous — `asyncTrigger()` calls `_safePoll()` (fire-and-forget), `asyncPull()` awaits the fetcher directly. The `_polling` flag prevents overlapping.
 
-**Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`, `isPollingSource`, `isTriggerable`, `isGate`
+**Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`, `isPollingSource`, `isAsyncPullable`, `isAsyncTriggerable`, `isGate`
 
 ```typescript
 import { createAsyncIdlePollingTransfer } from 'transferum';

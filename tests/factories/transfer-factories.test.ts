@@ -799,11 +799,11 @@ describe(
 
       expect(transfer).toBeDefined();
       expect(transfer.isPushable).toBe(true);
+      expect(transfer.isPullable).toBe(true);
       expect(transfer.isSubscribable).toBe(true);
       expect(transfer.isTriggerable).toBe(true);
       expect(transfer.isPollingSource).toBe(true);
       expect(transfer.isGate).toBe(true);
-      expect(transfer.isPullable).toBe(false);
 
       transfer.destroy();
     });

@@ -6,7 +6,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 // IdlePollingTransfer
 // ═══════════════════════════════════════════════════════════════
 // Reactive channel with fallback polling on idle incoming data.
-// Capabilities: isInput, isOutput, isPushable, isSubscribable, isPollingSource, isTriggerable, isGate
+// Capabilities: isInput, isOutput, isPushable, isPullable, isSubscribable, isPollingSource, isTriggerable, isGate
 
 // ═══════════════════════════════════════════════════════════════
 // IdlePollingTransfer Capability Flags
@@ -28,7 +28,7 @@ describe(
       expect(transfer.isDuplex).toBe(true);
       expect(transfer.isPushable).toBe(true);
       expect(transfer.isPollingSource).toBe(true);
-      expect(transfer.isPullable).toBe(false);
+      expect(transfer.isPullable).toBe(true);
       expect(transfer.isSubscribable).toBe(true);
       expect(transfer.isTriggerable).toBe(true);
       expect(transfer.isGate).toBe(true);
@@ -178,6 +178,89 @@ describe(
       expect(handler2).toHaveBeenCalledTimes(1);
       expect(handler1).toHaveBeenCalledWith(42);
       expect(handler2).toHaveBeenCalledWith(42);
+
+      transfer.destroy();
+    });
+  },
+);
+
+// ═══════════════════════════════════════════════════════════════
+// IdlePollingTransfer Pull
+// ═══════════════════════════════════════════════════════════════
+
+describe.each([
+  ...dataProviderForPull(),
+] as Array<[number]>)(
+  'IdlePollingTransfer pull calls fetcher and returns result test',
+  (value: number) => {
+    it('', () => {
+      const transfer = new IdlePollingTransfer<number>({
+        fetcher: () => value,
+        timeout: 100,
+        interval: 50,
+        activated: false,
+      });
+      const handler = jest.fn();
+
+      transfer.subscribe(handler);
+      const result = transfer.pull();
+
+      expect(result).toBe(value);
+      // pull() does not notify subscribers
+      expect(handler).not.toHaveBeenCalled();
+
+      transfer.destroy();
+    });
+  },
+);
+
+/**
+ * Data provider for testing pull().
+ */
+function dataProviderForPull(): Array<unknown> {
+  return [
+    [1],
+    [42],
+  ];
+}
+
+describe(
+  'IdlePollingTransfer pull with undefined fetcher result test',
+  () => {
+    it('', () => {
+      const transfer = new IdlePollingTransfer<number>({
+        fetcher: () => undefined,
+        timeout: 100,
+        interval: 50,
+        activated: false,
+      });
+
+      expect(transfer.pull()).toBeUndefined();
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'IdlePollingTransfer pull with onError suppresses error test',
+  () => {
+    it('', () => {
+      const error = new Error('fetcher error');
+      const onError = jest.fn();
+      const transfer = new IdlePollingTransfer<number>({
+        fetcher: () => { throw error; },
+        timeout: 100,
+        interval: 50,
+        activated: false,
+        onError,
+      });
+
+      const result = transfer.pull();
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith(error);
+      expect(result).toBeUndefined();
 
       transfer.destroy();
     });

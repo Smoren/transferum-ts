@@ -8,7 +8,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 // Reactive channel with async fallback polling on idle.
 // On idle (timeout), starts polling via fetcher.
 // Capabilities: isInput, isOutput, isDuplex, isPushable, isSubscribable,
-//               isTriggerable, isPollingSource, isGate
+//               isPollingSource, isAsyncPullable, isAsyncTriggerable, isGate
 
 // ═══════════════════════════════════════════════════════════════
 // AsyncIdlePollingTransfer Capability Flags
@@ -30,15 +30,15 @@ describe(
       expect(transfer.isDuplex).toBe(true);
       expect(transfer.isPushable).toBe(true);
       expect(transfer.isSubscribable).toBe(true);
-      expect(transfer.isTriggerable).toBe(true);
+      expect(transfer.isAsyncPullable).toBe(true);
       expect(transfer.isPollingSource).toBe(true);
+      expect(transfer.isAsyncTriggerable).toBe(true);
       expect(transfer.isGate).toBe(true);
       expect(transfer.isAsyncPushable).toBe(false);
       expect(transfer.isPullable).toBe(false);
-      expect(transfer.isAsyncPullable).toBe(false);
+      expect(transfer.isTriggerable).toBe(false);
       expect(transfer.isPollingProxy).toBe(false);
       expect(transfer.isAsyncPollingProxy).toBe(false);
-      expect(transfer.isAsyncTriggerable).toBe(false);
 
       transfer.destroy();
     });
@@ -112,11 +112,11 @@ describe(
 );
 
 // ═══════════════════════════════════════════════════════════════
-// AsyncIdlePollingTransfer trigger
+// AsyncIdlePollingTransfer asyncTrigger
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'AsyncIdlePollingTransfer trigger calls fetcher and notifies subscribers test',
+  'AsyncIdlePollingTransfer asyncTrigger calls fetcher and notifies subscribers test',
   () => {
     it('', async () => {
       const transfer = new AsyncIdlePollingTransfer<number>({
@@ -128,13 +128,96 @@ describe(
       const handler = jest.fn();
 
       transfer.subscribe(handler);
-      transfer.trigger();
+      await transfer.asyncTrigger();
 
-      // trigger calls _safePoll (fire-and-forget), waiting for microtask
+      // asyncTrigger calls _safePoll (fire-and-forget), waiting for microtask
       await new Promise<void>((resolve) => setTimeout(resolve, 10));
 
       expect(handler).toHaveBeenCalledTimes(1);
       expect(handler).toHaveBeenCalledWith(42);
+
+      transfer.destroy();
+    });
+  },
+);
+
+// ═══════════════════════════════════════════════════════════════
+// AsyncIdlePollingTransfer asyncPull
+// ═══════════════════════════════════════════════════════════════
+
+describe.each([
+  ...dataProviderForAsyncIdlePollingAsyncPull(),
+] as Array<[number]>)(
+  'AsyncIdlePollingTransfer asyncPull calls fetcher and returns result test',
+  (value: number) => {
+    it('', async () => {
+      const transfer = new AsyncIdlePollingTransfer<number>({
+        fetcher: async () => value,
+        timeout: 1000,
+        interval: 100,
+        activated: false,
+      });
+      const handler = jest.fn();
+
+      transfer.subscribe(handler);
+      const result = await transfer.asyncPull();
+
+      expect(result).toBe(value);
+      // asyncPull() does not notify subscribers
+      expect(handler).not.toHaveBeenCalled();
+
+      transfer.destroy();
+    });
+  },
+);
+
+/**
+ * Data provider for testing asyncPull().
+ */
+function dataProviderForAsyncIdlePollingAsyncPull(): Array<unknown> {
+  return [
+    [1],
+    [42],
+  ];
+}
+
+describe(
+  'AsyncIdlePollingTransfer asyncPull with undefined fetcher result test',
+  () => {
+    it('', async () => {
+      const transfer = new AsyncIdlePollingTransfer<number>({
+        fetcher: async () => undefined,
+        timeout: 1000,
+        interval: 100,
+        activated: false,
+      });
+
+      expect(await transfer.asyncPull()).toBeUndefined();
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncIdlePollingTransfer asyncPull with onError suppresses error test',
+  () => {
+    it('', async () => {
+      const error = new Error('fetcher error');
+      const onError = jest.fn();
+      const transfer = new AsyncIdlePollingTransfer<number>({
+        fetcher: async () => { throw error; },
+        timeout: 1000,
+        interval: 100,
+        activated: false,
+        onError,
+      });
+
+      const result = await transfer.asyncPull();
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith(error);
+      expect(result).toBeUndefined();
 
       transfer.destroy();
     });
@@ -323,7 +406,7 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'AsyncIdlePollingTransfer trigger with onError suppresses error test',
+  'AsyncIdlePollingTransfer asyncTrigger with onError suppresses error test',
   () => {
     it('', async () => {
       const error = new Error('fetcher error');
@@ -338,7 +421,7 @@ describe(
       const handler = jest.fn();
 
       transfer.subscribe(handler);
-      transfer.trigger();
+      await transfer.asyncTrigger();
 
       await new Promise<void>((resolve) => setTimeout(resolve, 10));
 
@@ -487,7 +570,7 @@ describe(
 );
 
 // ═══════════════════════════════════════════════════════════════
-// AsyncIdlePollingTransfer Toggle from Active & Trigger when Active
+// AsyncIdlePollingTransfer Toggle from Active & asyncTrigger when Active
 // ═══════════════════════════════════════════════════════════════
 
 describe(
@@ -513,7 +596,7 @@ describe(
 );
 
 describe(
-  'AsyncIdlePollingTransfer trigger when active starts idle timer test',
+  'AsyncIdlePollingTransfer asyncTrigger when active starts idle timer test',
   () => {
     it('', async () => {
       jest.useFakeTimers();
@@ -527,8 +610,8 @@ describe(
       const handler = jest.fn();
       transfer.subscribe(handler);
 
-      // trigger() when active=true calls _safePoll and _startIdleTimer
-      transfer.trigger();
+      // asyncTrigger() when active=true calls _safePoll and _startIdleTimer
+      await transfer.asyncTrigger();
 
       // Waiting for microtask for _doPoll
       await Promise.resolve();
@@ -562,10 +645,10 @@ describe(
         activated: false,
       });
 
-      // trigger() calls _safePoll() (fire-and-forget)
-      transfer.trigger();
-      // The second trigger() — _doPoll sees _polling=true and skips
-      transfer.trigger();
+      // asyncTrigger() calls _safePoll() (fire-and-forget)
+      await transfer.asyncTrigger();
+      // The second asyncTrigger() — _doPoll sees _polling=true and skips
+      await transfer.asyncTrigger();
 
       resolveFirst!();
       await Promise.resolve();
@@ -612,13 +695,13 @@ describe(
 
       // push() resets the idle timer (but does not stop polling)
       // because push calls _stopPolling + _startIdleTimer
-      // Need to call trigger() which starts _startIdleTimer without _stopPolling
+      // Need to call asyncTrigger() which starts _startIdleTimer without _stopPolling
       // Actually push calls _stopPolling, which nullifies the ticker
-      // trigger() does not call _stopPolling, only _startIdleTimer
-      transfer.trigger();
+      // asyncTrigger() does not call _stopPolling, only _startIdleTimer
+      await transfer.asyncTrigger();
 
       // Wait for second idle timeout — _startPolling is called, but ticker already exists
-      // (since trigger does not stop polling) → guard return
+      // (since asyncTrigger does not stop polling) → guard return
       jest.advanceTimersByTime(60);
 
       // tickerFactory should not be called a second time
