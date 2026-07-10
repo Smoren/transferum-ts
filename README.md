@@ -2348,11 +2348,11 @@ Links an output transfer (LHS) to an input transfer (RHS). Returns `SubscriberIn
 ### handleError
 
 ```typescript
-function handleError(error: unknown, onError?: ErrorHandler): void;
+function handleError<TSource>(error: unknown, source: TSource, onError?: ErrorHandler<TSource>): void;
 ```
 
 Universal error handler:
-- If `onError` is provided — invokes it and suppresses the exception.
+- If `onError` is provided — invokes it with `(error, source)` and suppresses the exception.
 - If `onError` is not provided — rethrows the exception.
 - Non-`Error` values are converted to `Error` (via `String(error)`).
 
@@ -2378,6 +2378,7 @@ Key types are defined in `types.ts`:
 | `InputTransferDataType<T>`                       | Extracts the data type from `InputTransfer`                                               |
 | `OutputTransferDataType<T>`                      | Extracts the data type from `OutputTransfer`                                              |
 | `AsyncDataHandler<T>`                            | Data handler: `(data: T) => Promise<void> \| void`                                        |
+| `ErrorHandler<TSource>`                          | Error handler: `(e: Error, source: TSource) => void`                                      |
 | `AsyncDataFetcher<T>`                            | Data fetcher function: `() => Promise<T \| undefined>`                                    |
 | `AsyncPushable<T>`                               | `AsyncPushableInterface<T> & { readonly isAsyncPushable: true }`                          |
 | `AsyncPullable<T>`                               | `AsyncPullableInterface<T> & { readonly isAsyncPullable: true }`                          |
@@ -2393,7 +2394,6 @@ Key types are defined in `types.ts`:
 
 ## Configurations
 
-[//]: # (TODO: add Async configs)
 Configs are defined in `configs.ts`. All configs are types (not classes), passed to transfer and bridge constructors.
 
 | Config                                | For                          | Required fields                                          |
@@ -2427,8 +2427,8 @@ Configs are defined in `configs.ts`. All configs are types (not classes), passed
 
 | Config                                  | For                                | Required fields                               |
 |-----------------------------------------|------------------------------------|-----------------------------------------------|
-| `AsyncPollingProxyConfig`               | Async polling transfers            | `interval`, `activated`                       |
-| `AsyncPollingSourceConfig<T>`           | `AsyncPollingSourceTransfer`       | `fetcher`, `interval`, `activated`            |
+| `AsyncPollingProxyTransferConfig<T>`    | Async polling transfers            | `interval`, `activated`                       |
+| `AsyncPollingSourceTransferConfig<T>`   | `AsyncPollingSourceTransfer`       | `fetcher`, `interval`, `activated`            |
 | `AsyncPollingFlowTransferConfig<T>`     | `AsyncPollingFlowTransfer`         | `flow`, `interval`, `activated`               |
 | `AsyncIdlePollingTransferConfig<T>`     | `AsyncIdlePollingTransfer`         | `fetcher`, `timeout`, `interval`, `activated` |
 | `AsyncSinkTransferConfig<T>`            | `AsyncSinkTransfer`                | `callback`, `onError?`                        |
@@ -2446,7 +2446,7 @@ All polling transfers support an optional `tickerFactory?: TickerFactory` to rep
 |----------------|-------------------------------|-------------------------|
 | `TickerConfig` | `RAFTicker`, `IntervalTicker` | `callback`, `interval?` |
 
-Many configs include optional error handlers (`onError`, `onSetupError`, `onEmitError`, `onDestroyError`).
+Many configs include optional error handlers (`onError`, `onSetupError`, `onEmitError`, `onDestroyError`). Each handler receives `(error: Error, source: TSource)` where `source` is the transfer instance that triggered the error.
 
 ---
 
