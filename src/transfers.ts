@@ -1999,8 +1999,13 @@ export class IdlePollingTransfer<T> extends BaseStateTransfer<T> implements Push
  * 2. asyncPush(data) — calls await callback(data)
  * 3. destroy() — inherited from BaseStateTransfer, clears _state
  *
+ * Error handling:
+ * - If callback() throws an exception, onError is called.
+ * - With onError provided, the exception is suppressed. Without onError — rethrown.
+ *
  * Configuration (AsyncSinkTransferConfig):
  * - callback: AsyncDataHandler<T> — incoming data handler (sync or async)
+ * - onError?: ErrorHandler — error handler
  *
  * Use cases:
  * - Asynchronous logging to file/database
@@ -2012,14 +2017,20 @@ export class AsyncSinkTransfer<T> extends BaseStateTransfer<T> implements AsyncP
   override readonly isAsyncPushable = true;
 
   private readonly _callback: AsyncDataHandler<T>;
+  private readonly _onError?: ErrorHandler;
 
   constructor(config: AsyncSinkTransferConfig<T>) {
     super({ ...config, initialValue: undefined });
     this._callback = config.callback;
+    this._onError = config.onError;
   }
 
   async asyncPush(data: T): Promise<void> {
-    await this._callback(data);
+    try {
+      await this._callback(data);
+    } catch (e) {
+      handleError(e, this._onError);
+    }
   }
 }
 

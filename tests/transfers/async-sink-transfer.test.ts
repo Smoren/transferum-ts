@@ -152,6 +152,52 @@ describe(
 );
 
 // ═══════════════════════════════════════════════════════════════
+// AsyncSinkTransfer Error Handling
+// ═══════════════════════════════════════════════════════════════
+
+describe(
+  'AsyncSinkTransfer asyncPush with onError suppresses Error test',
+  () => {
+    it('', async () => {
+      const onError = jest.fn();
+      const transfer = new AsyncSinkTransfer<number>({
+        callback: async () => { throw new Error('callback error'); },
+        onError,
+      });
+
+      await expect(transfer.asyncPush(42)).resolves.toBeUndefined();
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith(expect.any(Error));
+      expect((onError.mock.calls[0][0] as Error).message).toBe('callback error');
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncSinkTransfer asyncPush with onError wraps non-Error test',
+  () => {
+    it('', async () => {
+      const onError = jest.fn();
+      const transfer = new AsyncSinkTransfer<number>({
+        callback: async () => { throw 'string error'; },
+        onError,
+      });
+
+      await expect(transfer.asyncPush(42)).resolves.toBeUndefined();
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith(expect.any(Error));
+      expect((onError.mock.calls[0][0] as Error).message).toBe('string error');
+
+      transfer.destroy();
+    });
+  },
+);
+
+// ═══════════════════════════════════════════════════════════════
 // AsyncSinkTransfer Destroy
 // ═══════════════════════════════════════════════════════════════
 

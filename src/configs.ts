@@ -169,8 +169,8 @@ export type AsyncIdlePollingTransferConfig<T> = BaseStateTransferConfig<T> & Asy
   readonly timeout: number;
 }
 
-/** Configuration for AsyncSinkTransfer — sync or async callback invoked on each incoming data. */
-export type AsyncSinkTransferConfig<T> = {
+/** Configuration for AsyncSinkTransfer — sync or async callback invoked on each incoming data, with optional error handler. */
+export type AsyncSinkTransferConfig<T> = ErrorHandlingConfig & {
   readonly callback: AsyncDataHandler<T> | DataHandler<T>;
 }
 

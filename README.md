@@ -1606,11 +1606,14 @@ Async terminal sink — calls a callback on receiving data via `asyncPush`.
 
 **Capabilities:** `isInput`, `isAsyncPushable`
 
+**Error handling:** If `callback()` throws, `onError` is called. With `onError` provided, the exception is suppressed. Without `onError` — rethrown.
+
 ```typescript
 import { createAsyncSinkTransfer } from 'transferum';
 
 const sink = createAsyncSinkTransfer<number>({
   callback: async (n) => { await fetch('/api', { body: JSON.stringify(n) }); },
+  onError: (e) => console.error(e),
 });
 
 await sink.asyncPush(42); // → await callback(42)
@@ -2427,7 +2430,7 @@ Configs are defined in `configs.ts`. All configs are types (not classes), passed
 | `AsyncPollingSourceConfig<T>`           | `AsyncPollingSourceTransfer`       | `fetcher`, `interval`, `activated`            |
 | `AsyncPollingFlowTransferConfig<T>`     | `AsyncPollingFlowTransfer`         | `flow`, `interval`, `activated`               |
 | `AsyncIdlePollingTransferConfig<T>`     | `AsyncIdlePollingTransfer`         | `fetcher`, `timeout`, `interval`, `activated` |
-| `AsyncSinkTransferConfig<T>`            | `AsyncSinkTransfer`                | `callback`                                    |
+| `AsyncSinkTransferConfig<T>`            | `AsyncSinkTransfer`                | `callback`, `onError?`                        |
 | `AsyncWriteTransferConfig<T>`           | `AsyncWriteTransfer`               | `flow`                                        |
 | `AsyncReadTransferConfig<T>`            | `AsyncReadTransfer`                | `flow`                                        |
 | `AsyncConvertTransferConfig<TIn, TOut>` | `AsyncConvertTransfer`             | `operator` (AsyncOperatorInterface)           |
