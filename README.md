@@ -1,15 +1,5 @@
 # Transferum
 
-```
-________ _____           _   _  _________________________  _    _ __  __
-|__   __|  __ \    /\   | \ | |/ ____|  ____|  ____|  __ \| |  | |  \/  |
-   | |  | |__) |  /  \  |  \| | (___ | |__  | |__  | |__) | |  | | |\/| |
-   | |  |  _  /  / /\ \ | . ` |\___ \|  __| |  __| |  _  /| |  | | |  | |
-   | |  | | \ \ / ____ \| |\  |____) | |    | |____| | \ \| |__| | |  | |
-   |_|  |_|  \_/_/    \_\_| \_|_____/|_|    |______|_|  \_\_____/|_|  |_|
-   ○-→  ○-→   ○-→      ○--→  ○-----→ ○-→    ○--------→   ○-----→ ○-→  ○-→
-```
-
 [![npm](https://img.shields.io/npm/v/transferum.svg)](https://www.npmjs.com/package/transferum)
 [![jsr](https://jsr.io/badges/@smoren/transferum)](https://jsr.io/@smoren/transferum)
 [![npm](https://img.shields.io/npm/dm/transferum.svg?style=flat)](https://www.npmjs.com/package/transferum)
@@ -145,11 +135,11 @@ Transferum provides **composable, type-safe building blocks** with a uniform cap
 #### Real-time UI updates from API polling
 
 ```typescript
-import { OutputPipelineBuilder, createPollingSourceTransfer, createConvertTransfer, createMapOperator, createPushStoredChannelTransfer } from 'transferum';
+import { OutputPipelineBuilder, createAsyncPollingSourceTransfer, createConvertTransfer, createMapOperator, createPushStoredChannelTransfer } from 'transferum';
 
 // Poll an API every 5 seconds, transform the response, update subscribers
-const polling = createPollingSourceTransfer<ServerState>({
-  fetcher: () => fetch('/api/state').then(r => r.json()),
+const polling = createAsyncPollingSourceTransfer<ServerState>({
+  fetcher: async (): ServerState => await fetchApi('/api/state'),
   interval: 5000,
   activated: true,
 });
@@ -190,11 +180,11 @@ input.push('user@example.com'); // debounced → validated → saved
 #### Merging multiple data sources into a single view
 
 ```typescript
-import { createPollingSourceTransfer, createPushStoredChannelTransfer, createMergeTransfer } from 'transferum';
+import { createAsyncPollingSourceTransfer, createPushStoredChannelTransfer, createMergeTransfer } from 'transferum';
 
 // Merge multiple sensor streams into one (all sources must have the same type)
-const tempSensor = createPollingSourceTransfer<SensorData>({ fetcher: () => ({ temperature: 25, humidity: 50 }), interval: 1000, activated: true });
-const humiditySensor = createPollingSourceTransfer<SensorData>({ fetcher: () => ({ temperature: 26, humidity: 55 }), interval: 1000, activated: true });
+const tempSensor = createAsyncPollingSourceTransfer<SensorData>({ fetcher: () => Promise.resolve({ temperature: 25, humidity: 50 }), interval: 1000, activated: true });
+const humiditySensor = createAsyncPollingSourceTransfer<SensorData>({ fetcher: () => Promise.resolve({ temperature: 26, humidity: 55 }), interval: 1000, activated: true });
 
 const merge = createMergeTransfer<SensorData>({
   sources: [tempSensor, humiditySensor],
@@ -225,11 +215,11 @@ router.select('slow');
 #### Idle fallback polling
 
 ```typescript
-import { createIdlePollingTransfer } from 'transferum';
+import { createAsyncIdlePollingTransfer } from 'transferum';
 
 // When user stops interacting, fall back to polling for fresh data
-const channel = createIdlePollingTransfer<FeedItem>({
-  fetcher: () => fetchLatestFeed(),
+const channel = createAsyncIdlePollingTransfer<FeedItem>({
+  fetcher: async () => await fetchLatestFeed(),
   timeout: 10000,   // 10 s of inactivity → start polling
   interval: 2000,   // poll every 2 s
   activated: true,
@@ -237,24 +227,6 @@ const channel = createIdlePollingTransfer<FeedItem>({
 
 channel.subscribe((item) => appendToFeed(item));
 // User pushes items → real-time. User goes idle → automatic polling kicks in.
-```
-
-#### Game loop / animation frame data processing
-
-```typescript
-import { createPollingSourceTransfer, RAFTicker } from 'transferum';
-
-// Use RAFTicker for frame-aligned data processing
-const ticker = new RAFTicker({ callback: () => processFrame(), interval: 16 });
-ticker.start();
-
-// Or pass tickerFactory to a polling transfer for frame-aligned polling
-const framePolling = createPollingSourceTransfer<GameState>({
-  fetcher: () => getCurrentGameState(),
-  interval: 16,
-  activated: true,
-  tickerFactory: (config) => new RAFTicker(config),
-});
 ```
 
 #### Async data pipeline with storage
@@ -380,20 +352,20 @@ effects.check('shake');
 
 **Sensor Data Aggregation**
 
-Read data from multiple sensors (temperature, humidity, motion) via `PollingSourceTransfer` → filter (`ConditionTransfer`) → aggregate → send to cloud or local storage.
+Read data from multiple sensors (temperature, humidity, motion) via `AsyncPollingSourceTransfer` → filter (`ConditionTransfer`) → aggregate → send to cloud or local storage.
 
 ```typescript
-import { OutputPipelineBuilder, createPollingSourceTransfer, createMergeTransfer, createConditionTransfer, createAsyncWriteTransfer } from 'transferum';
+import { OutputPipelineBuilder, createAsyncPollingSourceTransfer, createMergeTransfer, createConditionTransfer, createAsyncWriteTransfer } from 'transferum';
 
-const tempSensor = createPollingSourceTransfer<number>({
-  fetcher: () => readTemperatureSensor(),
-  interval: 1000,
+const tempSensor = createAsyncPollingSourceTransfer<SensorData>({
+  fetcher: () => Promise.resolve({ temperature: 25, humidity: 50 }),
+  interval: 50,
   activated: true,
 });
 
-const humiditySensor = createPollingSourceTransfer<number>({
-  fetcher: () => readHumiditySensor(),
-  interval: 1000,
+const humiditySensor = createAsyncPollingSourceTransfer<SensorData>({
+  fetcher: () => Promise.resolve({ temperature: 26, humidity: 55 }),
+  interval: 50,
   activated: true,
 });
 
@@ -432,10 +404,10 @@ commandRouter.select('thermostat'); // switch to thermostat control
 
 **Monitoring & Alerts**
 
-Use `IntervalTicker` for periodic device status polling, `DebounceTransfer` for stable-change notifications (e.g., temperature stays above threshold for N seconds).
+Use `AsyncPollingSourceTransfer` for periodic device status polling, `DebounceTransfer` for stable-change notifications (e.g., temperature stays above threshold for N seconds).
 
 ```typescript
-import { createDebounceTransfer, createPollingSourceTransfer } from 'transferum';
+import { createDebounceTransfer, createAsyncPollingSourceTransfer } from 'transferum';
 
 const alertChannel = createDebounceTransfer<Alert>({ delay: 5000 }); // 5s stable alert
 
@@ -443,8 +415,8 @@ alertChannel.subscribe((alert) => {
   sendNotification(alert);
 });
 
-const tempMonitor = createPollingSourceTransfer<number>({
-  fetcher: () => readTemperature(),
+const tempMonitor = createAsyncPollingSourceTransfer<number>({
+  fetcher: async () => await readTemperature(),
   interval: 1000,
   activated: true,
 });

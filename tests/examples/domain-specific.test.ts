@@ -9,32 +9,34 @@ import {
   createGateTransfer,
   linkTransfers,
   createBridgeMultiSelector,
-  createPollingSourceTransfer,
   createMergeTransfer,
   createConditionTransfer,
   createSinkTransfer,
   createPushChannelTransfer,
   createSplitTransfer,
+  createAsyncPollingSourceTransfer,
   OutputPipelineBuilder,
   DuplexPipelineBuilder,
   RAFTicker,
 } from '../../src';
+import type {
+  InputEvent,
+  GameCommand,
+  GameState,
+  PhysicsEvent,
+  SensorData,
+  Alert,
+  ComponentState,
+  UIEvent,
+  Metric,
+  LogEntry,
+  Quote,
+  TechnicalIndicator,
+  // @ts-ignore
+} from './fixtures';
 import { describe, expect, it } from '@jest/globals';
 import {
   wait,
-  type InputEvent,
-  type GameCommand,
-  type GameState,
-  type PhysicsEvent,
-  type SensorData,
-  type Alert,
-  type ComponentState,
-  type UIEvent,
-  type Metric,
-  type LogEntry,
-  type Quote,
-  type TechnicalIndicator,
-  type TradingSignal,
   eventToCommand,
   detectAnomaly,
   // @ts-ignore
@@ -149,14 +151,14 @@ describe('README Domain-Specific: Game Development - Particle & Sound Effects', 
 
 describe('README Domain-Specific: IoT - Sensor Data Aggregation', () => {
   it('aggregates sensor data with filtering', async () => {
-    const tempSensor = createPollingSourceTransfer<SensorData>({
-      fetcher: () => ({ temperature: 25, humidity: 50 }),
+    const tempSensor = createAsyncPollingSourceTransfer<SensorData>({
+      fetcher: () => Promise.resolve({ temperature: 25, humidity: 50 }),
       interval: 50,
       activated: true,
     });
 
-    const humiditySensor = createPollingSourceTransfer<SensorData>({
-      fetcher: () => ({ temperature: 26, humidity: 55 }),
+    const humiditySensor = createAsyncPollingSourceTransfer<SensorData>({
+      fetcher: () => Promise.resolve({ temperature: 26, humidity: 55 }),
       interval: 50,
       activated: true,
     });
@@ -226,8 +228,8 @@ describe('README Domain-Specific: IoT - Monitoring & Alerts', () => {
       alerts.push(alert);
     });
 
-    const tempMonitor = createPollingSourceTransfer<number>({
-      fetcher: () => 30,
+    const tempMonitor = createAsyncPollingSourceTransfer<number>({
+      fetcher: () => Promise.resolve(30),
       interval: 20,
       activated: true,
     });

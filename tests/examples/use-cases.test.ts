@@ -5,7 +5,6 @@ import {
   AsyncDuplexPipelineBuilder,
   linkTransfers,
   createPassBridge,
-  createPollingSourceTransfer,
   createConvertTransfer,
   createMapOperator,
   createPushStoredChannelTransfer,
@@ -17,23 +16,26 @@ import {
   createMergeTransfer,
   createSinkTransfer,
   createBridgeSelector,
-  createIdlePollingTransfer,
   createSplitTransfer,
   createWriteTransfer,
   createLatestStorage,
+  createAsyncPollingSourceTransfer,
+  createAsyncIdlePollingTransfer,
 } from '../../src';
 import { describe, expect, it, jest } from '@jest/globals';
+import type {
+  ServerState,
+  ViewModel,
+  SensorData,
+  FeedItem,
+  ValidationResult,
+  RawData,
+  ProcessedData,
+  Telemetry,
+  // @ts-ignore
+} from './fixtures';
 import {
   wait,
-  type ServerState,
-  type ViewModel,
-  type SensorData,
-  type FeedItem,
-  type GameState,
-  type ValidationResult,
-  type RawData,
-  type ProcessedData,
-  type Telemetry,
   toViewModel,
   validate,
   // @ts-ignore
@@ -45,9 +47,9 @@ import {
 
 describe('README Use Cases: Real-time UI updates from API polling', () => {
   it('polls API, transforms response, updates subscribers', async () => {
-    const fetcher = jest.fn<() => ServerState>(() => ({ id: 1, status: 'ok' }));
+    const fetcher = jest.fn<() => Promise<ServerState>>(() => Promise.resolve({ id: 1, status: 'ok' }));
 
-    const polling = createPollingSourceTransfer<ServerState>({
+    const polling = createAsyncPollingSourceTransfer<ServerState>({
       fetcher,
       interval: 50,
       activated: true,
@@ -112,23 +114,27 @@ describe('README Use Cases: Debounced user input with async validation', () => {
 // ═══════════════════════════════════════════════════════════════
 
 describe('README Use Cases: Merging multiple data sources into a single view', () => {
-  it('merges multiple sensor streams into one', () => {
-    const tempSensor = createPushStoredChannelTransfer<SensorData>({ initialValue: { temperature: 25, humidity: 50 } });
-    const humiditySensor = createPushStoredChannelTransfer<SensorData>({ initialValue: { temperature: 26, humidity: 55 } });
+  it('merges multiple sensor streams into one', async () => {
+    const tempSensor = createAsyncPollingSourceTransfer<SensorData>({ fetcher: () => Promise.resolve({ temperature: 25, humidity: 50 }), interval: 1000, activated: true });
+    const humiditySensor = createAsyncPollingSourceTransfer<SensorData>({ fetcher: () => Promise.resolve({ temperature: 26, humidity: 55 }), interval: 1000, activated: true });
 
     const merge = createMergeTransfer<SensorData>({
       sources: [tempSensor, humiditySensor],
     });
 
     const received: SensorData[] = [];
-    merge.subscribe((data) => received.push(data));
+    merge.subscribe((data) => {
+      received.push(data);
+    });
 
-    tempSensor.push({ temperature: 30, humidity: 55 });
-    humiditySensor.push({ temperature: 26, humidity: 60 });
+    await wait(0);
 
     expect(received.length).toBe(2);
-    expect(received[0]).toEqual({ temperature: 30, humidity: 55 });
-    expect(received[1]).toEqual({ temperature: 26, humidity: 60 });
+    expect(received[0]).toEqual({ temperature: 25, humidity: 50 });
+    expect(received[1]).toEqual({ temperature: 26, humidity: 55 });
+
+    tempSensor.destroy();
+    humiditySensor.destroy();
 
     merge.destroy();
   });
@@ -183,9 +189,9 @@ describe('README Use Cases: Conditional routing with bridges', () => {
 describe('README Use Cases: Idle fallback polling', () => {
   it('falls back to polling on idle', async () => {
     let counter = 0;
-    const fetcher = jest.fn<() => FeedItem>(() => ({ id: ++counter, content: `item-${counter}` }));
+    const fetcher = jest.fn<() => Promise<FeedItem>>(() => Promise.resolve({ id: ++counter, content: `item-${counter}` }));
 
-    const channel = createIdlePollingTransfer<FeedItem>({
+    const channel = createAsyncIdlePollingTransfer<FeedItem>({
       fetcher,
       timeout: 50,
       interval: 20,
@@ -223,27 +229,6 @@ describe('README Use Cases: Game loop / animation frame data processing', () => 
     expect(ticker.active).toBe(true);
     ticker.stop();
     expect(ticker.active).toBe(false);
-  });
-
-  it('uses tickerFactory with PollingSourceTransfer', async () => {
-    const fetcher = jest.fn<() => GameState>(() => ({ score: 100, level: 1 }));
-
-    const framePolling = createPollingSourceTransfer<GameState>({
-      fetcher,
-      interval: 16,
-      activated: true,
-      tickerFactory: (config) => new RAFTicker(config),
-    });
-
-    const received: GameState[] = [];
-    framePolling.subscribe((state) => received.push(state));
-
-    await wait(50);
-    framePolling.deactivate();
-    framePolling.destroy();
-
-    expect(received.length).toBeGreaterThan(0);
-    expect(received[0]).toEqual({ score: 100, level: 1 });
   });
 });
 

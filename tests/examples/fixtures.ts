@@ -31,7 +31,6 @@ export type Metric = { name: string; value: number };
 export type LogEntry = { level: 'INFO' | 'WARN' | 'ERROR'; message: string; timestamp: number };
 export type Quote = { symbol: string; price: number; timestamp: number };
 export type TechnicalIndicator = { value: number; threshold: number };
-export type TradingSignal = { action: 'BUY' | 'SELL'; symbol: string; price: number };
 export type ValidationResult = { valid: boolean; message?: string };
 export type RawData = { raw: string };
 export type ProcessedData = { processed: string };
