@@ -379,6 +379,72 @@ describe(
   },
 );
 
+describe(
+  'AsyncPollingProxyTransfer asyncTrigger without onError rethrows error and stops ticker test',
+  () => {
+    it('', async () => {
+      jest.useFakeTimers();
+      const error = new Error('fetcher error');
+      const customTicker = {
+        start: jest.fn(),
+        stop: jest.fn(),
+        restart: jest.fn(),
+        toggle: jest.fn().mockReturnValue(true),
+        updateInterval: jest.fn(),
+        active: true,
+        interval: 100,
+      };
+      const tickerFactory = jest.fn(() => customTicker) as TickerFactory;
+
+      const transfer = new AsyncPollingProxyTransfer<number>({
+        interval: 100,
+        activated: true,
+        tickerFactory,
+      });
+      const handler = jest.fn();
+
+      transfer.setAsyncFetcher(async () => { throw error; });
+      transfer.subscribe(handler);
+      await expect(transfer.asyncTrigger()).rejects.toThrow('fetcher error');
+
+      expect(customTicker.stop).toHaveBeenCalledTimes(1);
+      expect(handler).not.toHaveBeenCalled();
+
+      transfer.destroy();
+      jest.useRealTimers();
+    });
+  },
+);
+
+describe(
+  'AsyncPollingProxyTransfer asyncTrigger without onError rethrows error when ticker cleared test',
+  () => {
+    it('', async () => {
+      let resolveFetcher: () => void;
+      const fetcherPromise = new Promise<void>((resolve) => { resolveFetcher = resolve; });
+      const transfer = new AsyncPollingProxyTransfer<number>({
+        interval: 100,
+        activated: true,
+      });
+
+      transfer.setAsyncFetcher(async () => {
+        await fetcherPromise;
+        throw new Error('fetcher error');
+      });
+
+      const triggerPromise = transfer.asyncTrigger();
+
+      // Clear fetcher while asyncTrigger is pending — _ticker becomes undefined
+      transfer.clearAsyncFetcher();
+
+      resolveFetcher!();
+      await expect(triggerPromise).rejects.toThrow('fetcher error');
+
+      transfer.destroy();
+    });
+  },
+);
+
 // ═══════════════════════════════════════════════════════════════
 // AsyncPollingProxyTransfer onStateChange
 // ═══════════════════════════════════════════════════════════════

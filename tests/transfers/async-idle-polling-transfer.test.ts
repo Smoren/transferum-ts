@@ -429,6 +429,29 @@ describe(
   },
 );
 
+describe(
+  'AsyncIdlePollingTransfer asyncTrigger without onError rethrows error and stops polling test',
+  () => {
+    it('', async () => {
+      const error = new Error('fetcher error');
+      const transfer = new AsyncIdlePollingTransfer<number>({
+        fetcher: async () => { throw error; },
+        timeout: 1000,
+        interval: 100,
+        activated: false,
+      });
+      const handler = jest.fn();
+
+      transfer.subscribe(handler);
+      await expect(transfer.asyncTrigger()).rejects.toThrow('fetcher error');
+
+      expect(handler).not.toHaveBeenCalled();
+
+      transfer.destroy();
+    });
+  },
+);
+
 // ═══════════════════════════════════════════════════════════════
 // AsyncIdlePollingTransfer onStateChange
 // ═══════════════════════════════════════════════════════════════
