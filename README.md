@@ -2353,6 +2353,8 @@ Async builders are analogous to sync builders, but:
 - `finish()` accepts `asyncTriggerable` in addition to `triggerable`
 - `asyncTriggerable` is passed to `UniversalCompositeTransfer`
 
+> **Sync builders and async targets:** Sync builders (`InputPipelineBuilder`, `OutputPipelineBuilder`, `DuplexPipelineBuilder`) do not pass `linkOnError` to `linkTransfers`. If the final transfer is async-only (`AsyncSinkTransfer`, `AsyncConvertTransfer`, `AsyncConditionTransfer`, etc.) and the preceding transfer is `Subscribable`, the link uses the async `subscribable → asyncPushable` strategy — and without `linkOnError`, rejections from `asyncPush()` become **unhandled promise rejections** (see [Error Handling](#error-handling)). To handle them, use an async builder (which supports `linkOnError` in `finish()`), or link the final transfer manually via `linkTransfers()` with `onError`.
+
 | Builder                        | Sync analog               | Difference                                                                  |
 |--------------------------------|---------------------------|-----------------------------------------------------------------------------|
 | `AsyncInputPipelineBuilder`    | `InputPipelineBuilder`    | `linkOnError` + `asyncTriggerable` in `finish()`                            |
