@@ -761,7 +761,10 @@ routes.check('elk');
 routes.uncheck('elk');
 ```
 
-RxJS handles routing via manual subscription management — a `Map` to track active subscriptions and explicit `activateRoute`/`deactivateRoute` functions. Transferum's `BridgeMultiSelector` is a first-class routing object: declarative bridge list, built-in subscription management (`owned: true`), and `select()` / `check()` / `uncheck()` to switch routes at runtime.
+RxJS handles routing via manual subscription management — a `Map` to track active subscriptions and explicit
+`activateRoute`/`deactivateRoute` functions. Transferum's `BridgeMultiSelector` is a first-class routing object:
+declarative bridge list, built-in subscription management (`owned: true`), and `select()` / `check()` / `uncheck()`
+to switch routes at runtime.
 
 **Code comparison — Debounced search with error handling and empty-result suppression:**
 
