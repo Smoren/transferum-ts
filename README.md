@@ -756,7 +756,7 @@ const routes = createBridgeMultiSelector({
 // Runtime: leave only Sentry and Prometheus
 routes.select(['sentry', 'prometheus']);
 
-// Check / uncheck single item
+// Activate / deactivate single route
 routes.check('elk');
 routes.uncheck('elk');
 ```
