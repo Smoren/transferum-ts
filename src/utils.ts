@@ -7,7 +7,6 @@ import type {
   AsyncPushableTransferInterface,
   AsyncPullableTransferInterface,
   AsyncPollingProxyTransferInterface,
-  BaseTransferInterface,
 } from "./interfaces";
 import type { ErrorHandler, InputTransfer, OutputTransfer } from "./types";
 import type { LinkConfig } from "./configs";

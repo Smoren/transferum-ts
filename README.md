@@ -39,6 +39,7 @@ The library provides type-safe primitives for building data flows: **transfers**
   - [Transfers](#transfers)
   - [Linking Transfers](#linking-transfers)
   - [Undefined Behavior in Data Flows](#undefined-behavior-in-data-flows)
+  - [Error Handling](#error-handling)
 - [Transfers](#transfers-1)
   - [Transfer Comparison Table](#transfer-comparison-table)
   - [PushChannelTransfer](#pushchanneltransfer)
@@ -986,7 +987,7 @@ The `linkTransfers(lhs, rhs)` function connects an output transfer (LHS) to an i
 
 > **Sync priority:** If both transfers support sync linking, it is used. Async strategies are applied only when sync is not applicable.
 >
-> **Rejection handling** for `subscribable → asyncPushable`: `.catch()` is always called. If `options.onError` is provided — it is invoked. Without `onError` — the error is suppressed to protect the reactive stream.
+> **Rejection handling** for `subscribable → asyncPushable`: `.catch()` is always called. If `options.onError` is provided — it is invoked with `(error, target)`. Without `onError` — the rejection is silently swallowed to protect the reactive stream (the source continues operating). This differs from per-transfer `onError` (which rethrows) because the source's reactive stream must not be disrupted by a downstream async-push failure.
 >
 > **Ordering** for `subscribable → asyncPushable`: No ordering guarantee — fast sync notifications from LHS can overtake pending `asyncPush` calls. A serializer is a separate task.
 
@@ -1031,6 +1032,66 @@ channel.push(undefined); // → nothing happens (subscribers NOT notified)
 ```
 
 If the data type allows `null` (e.g., `string | null`), use it as an explicit empty marker. For strings, this could be `''` (empty string), for numbers — `0`, for objects — `{}` or `null`.
+
+### Error Handling
+
+Transferum uses a **uniform error handling model** across all transfers. Every transfer that can encounter a runtime error (fetcher failure, callback throw, flow read/write error, predicate throw) accepts an optional `onError` handler in its config.
+
+#### `handleError()` and `ErrorHandler<TSource>`
+
+```typescript
+type ErrorHandler<TSource> = (e: Error, source: TSource) => void;
+
+function handleError<TSource>(error: unknown, source: TSource, onError?: ErrorHandler<TSource>): void;
+```
+
+- Non-`Error` values are converted to `Error` (via `String(error)`).
+- If `onError` is provided — invokes it with `(error, source)` and suppresses the exception.
+- If `onError` is **not** provided — rethrows the exception.
+- If `onError` is provided but **itself throws** — that exception is rethrown (the handler is considered broken).
+
+The `source` parameter is the transfer instance where the error occurred, allowing handlers to distinguish sources and access transfer state.
+
+#### Three scenarios
+
+| Scenario | `onError` provided | `onError` behavior | Result |
+|---|---|---|---|
+| Handler suppresses | ✓ | Returns normally | Exception suppressed, operation continues |
+| No handler | ✗ | — | Exception rethrown |
+| Handler throws | ✓ | Throws | Handler's exception rethrown |
+
+#### Per-transfer error handlers
+
+Most transfers use a single `onError` handler. Exceptions:
+
+- **`ConditionTransfer` / `AsyncConditionTransfer`** — separate `onAcceptError` (for `shouldAccept` failures) and `onEmitError` (for `shouldEmit` failures), since the two stages are independent.
+- **`ChannelTransfer` / `StoredChannelTransfer` / `AsyncStoredChannelTransfer`** — `onError` covers `emit()` failures; `onDestroyError` covers `destroy()` failures. `setup()` errors are **always rethrown** — a failed setup means the transfer is unusable, and suppressing would create a zombie object.
+
+#### Polling transfers — error behavior
+
+When a fetcher or flow read fails inside `trigger()` / `asyncTrigger()`, the error is passed to `handleError()`. The behavior differs depending on whether the error was suppressed:
+
+**Sync polling** (`PollingSourceTransfer`, `PollingProxyTransfer`, `PollingFlowTransfer`, `IdlePollingTransfer`):
+
+| Method | `onError` suppresses | `onError` absent or throws |
+|---|---|---|
+| `trigger()` | Error suppressed, polling continues | Exception rethrown, **ticker stops** — polling ceases. Results in an **uncaught exception** (the ticker calls `trigger()` synchronously). |
+| `pull()` | Error suppressed, returns `undefined` | Exception rethrown to caller. **Ticker is not affected.** |
+
+**Async polling** (`AsyncPollingSourceTransfer`, `AsyncPollingProxyTransfer`, `AsyncPollingFlowTransfer`, `AsyncIdlePollingTransfer`):
+
+| Method | `onError` suppresses | `onError` absent or throws |
+|---|---|---|
+| `asyncTrigger()` | Error suppressed, polling continues | Rejection rethrown, **ticker stops** — polling ceases. Results in an **unhandled promise rejection** (the ticker calls `asyncTrigger()` fire-and-forget). |
+| `asyncPull()` | Error suppressed, returns `undefined` | Rejection rethrown to caller. **Ticker is not affected.** |
+
+> **Why the difference?** `trigger()` / `asyncTrigger()` are called by the ticker (fire-and-forget), so an unhandled error surfaces as an uncaught exception (sync) or unhandled rejection (async). `pull()` / `asyncPull()` are called directly by the user, so the error propagates to the caller's `try/catch` or `await` expression.
+>
+> **Recommendation:** always provide `onError` for polling transfers in production to prevent uncaught exceptions and unhandled rejections from stopping your application.
+
+#### `linkTransfers` — async-push rejection
+
+When linking a `Subscribable` source to an `AsyncPushable` target, `asyncPush()` rejections are caught. If `options.onError` is provided — it is invoked with `(error, target)`. Without `onError` — the rejection is silently swallowed to protect the reactive stream (the source continues operating). See [Linking Transfers](#linking-transfers).
 
 ---
 
@@ -1355,6 +1416,17 @@ polling.subscribe((data) => console.log(data));
 polling.deactivate(); // stop polling
 ```
 
+**Error handling:** If `fetcher()` throws in `trigger()`, `onError` is called. With `onError` — suppressed, polling continues. Without `onError` (or if `onError` itself throws) — exception rethrown, ticker stops. If `fetcher()` throws in `pull()` — same logic, but the ticker is not affected (error propagates to caller).
+
+```typescript
+const polling = createPollingSourceTransfer<number>({
+  fetcher: () => { throw new Error('fail'); },
+  interval: 1000,
+  activated: true,
+  onError: (e, source) => console.error(e, source.active),
+});
+```
+
 All polling transfers (`PollingSourceTransfer`, `PollingProxyTransfer`, `PollingFlowTransfer`, `IdlePollingTransfer`) also support `onStateChange()` for subscribing to `active` state changes.
 
 ### PollingProxyTransfer
@@ -1377,6 +1449,8 @@ poller.setFetcher(() => someValue);
 poller.activate(); // start polling
 ```
 
+**Error handling:** Same as `PollingSourceTransfer` — `onError` suppresses fetcher errors in `trigger()` and `pull()`. Without `onError` (or if it throws) — `trigger()` rethrows and ticker stops; `pull()` rethrows to caller without affecting the ticker.
+
 ### PollingFlowTransfer
 
 Output transfer with polling from `OutputFlowInterface` (e.g., Storage).
@@ -1396,6 +1470,8 @@ const polling = createPollingFlowTransfer<number>({
 polling.subscribe((data) => console.log(data));
 storage.write(42); // after interval → 42
 ```
+
+**Error handling:** If `flow.read()` throws in `trigger()`, `onError` is called. With `onError` — suppressed, polling continues. Without `onError` (or if it throws) — `trigger()` rethrows, ticker stops. `pull()` rethrows to caller without affecting the ticker.
 
 ### IdlePollingTransfer
 
@@ -1418,11 +1494,15 @@ channel.push(42);  // → subscribers notified, idle timer reset
 // after 5 seconds without push → polling fetcher every 1 second
 ```
 
+**Error handling:** If `fetcher()` throws during polling, `onError` is called. With `onError` — suppressed, polling continues. Without `onError` (or if it throws) — exception rethrown, polling stops. `pull()` rethrows to caller without affecting polling.
+
 ### ChannelTransfer
 
 Output channel with external management via `setup`/`destroy` callbacks. Used for integration with external event sources.
 
 **Capabilities:** `isOutput`, `isSubscribable`
+
+**Error handling:** `setup()` errors are **always rethrown** (no `onSetupError`) — a failed setup means the transfer is unusable. `onError` covers `emit()` failures. `onDestroyError` covers `destroy()` failures. Without the corresponding handler — rethrown.
 
 ```typescript
 import { createChannelTransfer } from 'transferum';
@@ -1445,6 +1525,8 @@ channel.subscribe((data) => console.log(data));
 Channel with last-value retention and external management. The value is available for `pull()` and `trigger()`.
 
 **Capabilities:** `isOutput`, `isPullable`, `isTriggerable`, `isSubscribable`
+
+**Error handling:** Same as `ChannelTransfer` — `setup()` errors always rethrown. `onError` covers `emit()` / `trigger()` failures. `onDestroyError` covers `destroy()` failures.
 
 ```typescript
 import { createStoredChannelTransfer } from 'transferum';
@@ -1701,6 +1783,17 @@ polling.subscribe((data) => console.log(data));
 // Every second: async-fetch → subscriber notification
 ```
 
+**Error handling:** If `fetcher()` throws in `asyncTrigger()`, `onError` is called. With `onError` — suppressed, polling continues. Without `onError` (or if it throws) — rejection rethrown, ticker stops, resulting in an **unhandled promise rejection** (ticker calls `asyncTrigger()` fire-and-forget). `asyncPull()` rethrows to caller without affecting the ticker.
+
+```typescript
+const polling = createAsyncPollingSourceTransfer<number>({
+  fetcher: async () => { throw new Error('fail'); },
+  interval: 1000,
+  activated: true,
+  onError: (e, source) => console.error(e, source.active),
+});
+```
+
 ### AsyncPollingProxyTransfer
 
 Duplex transfer with async polling that receives its fetcher from the previous node. `setAsyncFetcher()` is set via `linkTransfers` (async strategies 5–7).
@@ -1721,6 +1814,8 @@ poller.setAsyncFetcher(async () => await asyncSource.asyncPull());
 poller.activate(); // start polling
 ```
 
+**Error handling:** Same as `AsyncPollingSourceTransfer` — `onError` suppresses fetcher errors in `asyncTrigger()` and `asyncPull()`. Without `onError` (or if it throws) — `asyncTrigger()` rethrows, ticker stops, **unhandled promise rejection**. `asyncPull()` rethrows to caller without affecting the ticker.
+
 ### AsyncPollingFlowTransfer
 
 Output transfer with async polling from `AsyncOutputFlowInterface`. Similar to `AsyncPollingSourceTransfer`, but the source is an interface with async `read()` instead of `AsyncDataFetcher`.
@@ -1738,6 +1833,8 @@ const polling = createAsyncPollingFlowTransfer<number>({
 
 polling.subscribe((data) => console.log(data));
 ```
+
+**Error handling:** If `flow.read()` throws in `asyncTrigger()`, `onError` is called. With `onError` — suppressed, polling continues. Without `onError` (or if it throws) — rejection rethrown, ticker stops, **unhandled promise rejection**. `asyncPull()` rethrows to caller without affecting the ticker.
 
 ### AsyncIdlePollingTransfer
 
@@ -1760,11 +1857,15 @@ channel.push(42);  // → subscribers notified synchronously, idle timer reset
 // after 5 seconds without push → async-polling every 1 second
 ```
 
+**Error handling:** If `fetcher()` throws during polling, `onError` is called. With `onError` — suppressed, polling continues. Without `onError` (or if it throws) — rejection rethrown, polling stops, **unhandled promise rejection** (ticker calls `_doPoll()` fire-and-forget). `asyncPull()` rethrows to caller without affecting polling.
+
 ### AsyncStoredChannelTransfer
 
 Channel with value retention, external management, and async interface. `setup`/`emit`/`subscribe` are synchronous (like in `StoredChannelTransfer`), but `asyncPull()`/`asyncTrigger()` are async for integration with async pipelines.
 
 **Capabilities:** `isOutput`, `isSubscribable`, `isAsyncPullable`, `isAsyncTriggerable`
+
+**Error handling:** Same as `ChannelTransfer` — `setup()` errors always rethrown. `onError` covers `emit()` failures (via `asyncTrigger()`). `onDestroyError` covers `destroy()` failures.
 
 ```typescript
 import { createAsyncStoredChannelTransfer } from 'transferum';
@@ -2343,7 +2444,7 @@ function linkTransfers<T, RTransfer extends InputTransfer<T>>(
 ): SubscriberInterface
 ```
 
-Links an output transfer (LHS) to an input transfer (RHS). Returns `SubscriberInterface` for breaking the link. The strategy is determined by capability flags (see [Linking Transfers](#linking-transfers)). `options.onError` is used to intercept rejections in the async `subscribable → asyncPushable` strategy.
+Links an output transfer (LHS) to an input transfer (RHS). Returns `SubscriberInterface` for breaking the link. The strategy is determined by capability flags (see [Linking Transfers](#linking-transfers)). `options.onError` is used to intercept rejections in the async `subscribable → asyncPushable` strategy — invoked as `onError(error, target)`. Without `onError`, rejections are silently swallowed to protect the source's reactive stream.
 
 ### handleError
 

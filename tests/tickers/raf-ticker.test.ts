@@ -422,6 +422,7 @@ describe('Ticker uses native requestAnimationFrame when available test', () => {
     (globalThis as any).cancelAnimationFrame = cafMock;
 
     jest.isolateModules(() => {
+      // @ts-ignore
       const mod = require('../../src');
       const callback = jest.fn();
       const ticker = new mod.RAFTicker({ callback, interval: 16 });
