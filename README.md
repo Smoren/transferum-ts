@@ -121,15 +121,16 @@ Transferum provides **composable, type-safe building blocks** with a uniform cap
 
 ### Key Benefits
 
-| Benefit                                   | How                                                                                                                                                                                           |
-|-------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Type-safe pipelines**                   | Each transfer and operator carries its input/output types. Builders enforce type compatibility at compile time — a mismatch is a compile error, not a runtime crash.                          |
-| **Uniform capability model**              | Every transfer declares its capabilities via flags (`isPushable`, `isSubscribable`, `isGate`, …). `linkTransfers` automatically selects the correct wiring strategy — no manual glue code.    |
-| **Sync + async in one system**            | Sync and async transfers coexist. `linkTransfers` prefers sync when possible and falls back to async strategies when needed. No separate "async world."                                       |
-| **Composable architecture**               | Transfers link into chains, bridges connect chains with gate control, builders assemble chains fluently, operators transform data — all orthogonal and reusable.                              |
-| **Explicit lifecycle**                    | Every resource (transfer, bridge, subscription, ticker) supports `destroy()`. Builders track `owned` resources and clean them up in one call. No leaked timers or subscriptions.              |
-| **Reactive by default, pull when needed** | Most transfers are subscribable (push-based reactivity). Polling transfers add pull-based data acquisition on the same foundation. Use the right model per stage without switching libraries. |
-| **Undefined suppression**                 | `undefined` never propagates through the chain — it means "no data," not "empty value." This eliminates an entire class of null-check bugs in downstream consumers.                           |
+| Benefit                                   | How                                                                                                                                                                                                                                                                                                                                                                          |
+|-------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Type-safe pipelines**                   | Each transfer and operator carries its input/output types. Builders enforce type compatibility at compile time — a mismatch is a compile error, not a runtime crash.                                                                                                                                                                                                         |
+| **Uniform capability model**              | Every transfer declares its capabilities via flags (`isPushable`, `isSubscribable`, `isGate`, …). `linkTransfers` automatically selects the correct wiring strategy — no manual glue code.                                                                                                                                                                                   |
+| **Sync + async in one system**            | Sync and async transfers coexist. `linkTransfers` prefers sync when possible and falls back to async strategies when needed. No separate "async world."                                                                                                                                                                                                                      |
+| **Composable architecture**               | Transfers link into chains, bridges connect chains with gate control, builders assemble chains fluently, operators transform data — all orthogonal and reusable.                                                                                                                                                                                                             |
+| **Explicit lifecycle**                    | Every resource (transfer, bridge, subscription, ticker) supports `destroy()`. Builders track `owned` resources and clean them up in one call. No leaked timers or subscriptions.                                                                                                                                                                                             |
+| **Reactive by default, pull when needed** | Most transfers are subscribable (push-based reactivity). Polling transfers add pull-based data acquisition on the same foundation. Use the right model per stage without switching libraries.                                                                                                                                                                                |
+| **Local, fail-safe error handling**       | Errors are local to each transfer — one stage's failure doesn't kill the pipeline. With `onError` — suppressed, stream continues. Without — visible (exception/rejection), and polling stops (no zombie tickers). Per-stage granularity (`onAcceptError`/`onEmitError`, `onDestroyError`). Typed `ErrorHandler<TSource>` passes the transfer instance. No silent swallowing. |
+| **Undefined suppression**                 | `undefined` never propagates through the chain — it means "no data," not "empty value." This eliminates an entire class of null-check bugs in downstream consumers.                                                                                                                                                                                                          |
 
 ### Use Cases
 
@@ -623,27 +624,28 @@ Transferum exists in a rich ecosystem of reactive and stream-processing librarie
 
 **RxJS** is the most widely adopted reactive programming library for JavaScript/TypeScript.
 
-| Aspect                           | Transferum                                  | RxJS                                                                       |
-|----------------------------------|---------------------------------------------|----------------------------------------------------------------------------|
-| **Bundle size**                  | ~15 KB minified                             | ~35 KB minified (full), <5 KB (selective imports)                          |
-| **Dependencies**                 | Zero                                        | Zero (v7+)                                                                 |
-| **Learning curve**               | Moderate — explicit primitives              | Steep — 100+ operators, complex concepts                                   |
-| **Type inference**               | Strong — tuple-based pipeline types         | Strong — but complex generic chains                                        |
-| **Sync/Async unify**             | Built-in — `linkTransfers` handles both     | Manual — `from()`, `toPromise()`, `firstValueFrom()`                       |
-| **Pull-based**                   | Native — `Pullable`, `PollingProxy`         | Limited — mostly push-based                                                |
-| **Gate/Flow control**            | Built-in — `GateTransfer`, `BridgeSelector` | Manual — `takeUntil()`, `switchMap()`, subjects                            |
-| **Resource cleanup**             | Explicit — `destroy()` on every transfer    | Subscription-based — `subscription.unsubscribe()`                          |
-| **Undefined handling**           | Suppressed — `undefined` never propagates   | Propagated — `undefined` is a valid value                                  |
-| **Operators**                    | ~10 core operators                          | 100+ operators (creation, transformation, filtering, combination, utility) |
-| **Flow control / Rate limiting** | Built-in — buffers, throttles, debounces    | Built-in — `throttle()`, `buffer()`, `sample()`                            |
-| **Testing**                      | Simple — fake timers, direct method calls   | Complex — `TestScheduler`, marble diagrams                                 |
-| **Community**                    | Small — single maintainer                   | Large — Google, widespread adoption                                        |
+| Aspect                           | Transferum                                                                 | RxJS                                                                       |
+|----------------------------------|----------------------------------------------------------------------------|----------------------------------------------------------------------------|
+| **Bundle size**                  | ~15 KB minified                                                            | ~35 KB minified (full), <5 KB (selective imports)                          |
+| **Dependencies**                 | Zero                                                                       | Zero (v7+)                                                                 |
+| **Learning curve**               | Moderate — explicit primitives                                             | Steep — 100+ operators, complex concepts                                   |
+| **Type inference**               | Strong — tuple-based pipeline types                                        | Strong — but complex generic chains                                        |
+| **Sync/Async unify**             | Built-in — `linkTransfers` handles both                                    | Manual — `from()`, `toPromise()`, `firstValueFrom()`                       |
+| **Pull-based**                   | Native — `Pullable`, `PollingProxy`                                        | Limited — mostly push-based                                                |
+| **Gate/Flow control**            | Built-in — `GateTransfer`, `BridgeSelector`                                | Manual — `takeUntil()`, `switchMap()`, subjects                            |
+| **Resource cleanup**             | Explicit — `destroy()` on every transfer                                   | Subscription-based — `subscription.unsubscribe()`                          |
+| **Error handling**               | Local, non-fatal — `onError` per transfer, fail-safe polling, typed source | Stream-level — `catchError()`, `retry()`, errors terminate stream          |
+| **Undefined handling**           | Suppressed — `undefined` never propagates                                  | Propagated — `undefined` is a valid value                                  |
+| **Operators**                    | ~10 core operators                                                         | 100+ operators (creation, transformation, filtering, combination, utility) |
+| **Flow control / Rate limiting** | Built-in — buffers, throttles, debounces                                   | Built-in — `throttle()`, `buffer()`, `sample()`                            |
+| **Testing**                      | Simple — fake timers, direct method calls                                  | Complex — `TestScheduler`, marble diagrams                                 |
+| **Community**                    | Small — single maintainer                                                  | Large — Google, widespread adoption                                        |
 
 **Key differences:**
 
 - **Architecture:** RxJS uses `Observable` + `Operator` + `Subscription` model. Transferum uses `Transfer` + `Bridge` + `Builder` with capability flags.
 - **Composability:** RxJS operators are functions that transform observables. Transferum transfers are objects that can be linked via `linkTransfers()` automatically.
-- **Error handling:** RxJS errors terminate the stream unless caught with `catchError()`. Transferum errors are suppressed with optional `onError` handlers, keeping the stream alive.
+- **Error handling:** RxJS errors propagate through the stream and terminate it unless caught with `catchError()` / `retry()`. Transferum errors are **local to each transfer** — with `onError`, suppressed and the stream continues; without, the error is visible (exception/rejection) and polling stops (fail-safe). One stage's failure doesn't kill the pipeline. See [Error Handling](#error-handling).
 - **Scheduling:** RxJS has `Scheduler` abstraction (async, asyncSchedule, animationFrame). Transferum has `Ticker` (RAFTicker, IntervalTicker) for polling.
 
 **Code comparison — Debounced search:**
@@ -712,14 +714,14 @@ Most.js excels in raw performance for push-based streams but lacks Transferum's 
 
 **Bacon.js** and **Kefir** are Functional Reactive Programming (FRP) libraries with `Property` (stateful) and `EventStream` (stateless) abstractions.
 
-| Aspect             | Transferum                                        | Bacon.js / Kefir                     |
-|--------------------|---------------------------------------------------|--------------------------------------|
-| **State model**    | Explicit — `ProxyReference<T>` per transfer       | Implicit — `Property` holds state    |
-| **Stream types**   | Capability flags (`isSubscribable`, `isPullable`) | Two types: `EventStream`, `Property` |
-| **Error handling** | Suppressed with `onError`                         | Error events terminate stream        |
-| **Async**          | First-class async transfers                       | Via `fromPromise()`                  |
-| **Bundle size**    | ~15 KB                                            | ~12 KB (Bacon), ~8 KB (Kefir)        |
-| **Status**         | Active                                            | Bacon: maintenance, Kefir: archived  |
+| Aspect             | Transferum                                           | Bacon.js / Kefir                     |
+|--------------------|------------------------------------------------------|--------------------------------------|
+| **State model**    | Explicit — `ProxyReference<T>` per transfer          | Implicit — `Property` holds state    |
+| **Stream types**   | Capability flags (`isSubscribable`, `isPullable`)    | Two types: `EventStream`, `Property` |
+| **Error handling** | Local, non-fatal — `onError` per transfer, fail-safe | Error events terminate stream        |
+| **Async**          | First-class async transfers                          | Via `fromPromise()`                  |
+| **Bundle size**    | ~15 KB                                               | ~12 KB (Bacon), ~8 KB (Kefir)        |
+| **Status**         | Active                                               | Bacon: maintenance, Kefir: archived  |
 
 Transferum's capability flags provide more granularity than the two-type model, allowing fine-grained control over data flow mechanics.
 
@@ -727,19 +729,20 @@ Transferum's capability flags provide more granularity than the two-type model, 
 
 ### Quick Comparison Table
 
-| Feature                    | Transferum               | RxJS       | Most.js     | Bacon.js    | Kefir    |
-|----------------------------|--------------------------|------------|-------------|-------------|----------|
-| **Bundle size (minified)** | ~15 KB                   | ~35 KB     | ~7 KB       | ~12 KB      | ~8 KB    |
-| **Dependencies**           | 0                        | 0          | 0           | 0           | 0        |
-| **Pull-based**             | ✓                        | ✗          | ✗           | ✗           | ✗        |
-| **Sync/Async unify**       | ✓                        | Partial    | Partial     | Partial     | Partial  |
-| **Built-in polling**       | ✓ (Ticker)               | ✗ (manual) | ✗           | ✗           | ✗        |
-| **Gate/Flow control**      | ✓ (GateTransfer, Bridge) | Manual     | Manual      | Manual      | Manual   |
-| **Undefined suppression**  | ✓                        | ✗          | ✗           | ✗           | ✗        |
-| **Operators count**        | ~10                      | 100+       | ~40         | ~60         | ~50      |
-| **TypeScript support**     | Excellent                | Excellent  | Good        | Fair        | Fair     |
-| **Community size**         | Small                    | Very large | Medium      | Small       | Small    |
-| **Maintenance status**     | Active                   | Active     | Maintenance | Maintenance | Archived |
+| Feature                    | Transferum                  | RxJS                                 | Most.js           | Bacon.js          | Kefir             |
+|----------------------------|-----------------------------|--------------------------------------|-------------------|-------------------|-------------------|
+| **Bundle size (minified)** | ~15 KB                      | ~35 KB                               | ~7 KB             | ~12 KB            | ~8 KB             |
+| **Dependencies**           | 0                           | 0                                    | 0                 | 0                 | 0                 |
+| **Pull-based**             | ✓                           | ✗                                    | ✗                 | ✗                 | ✗                 |
+| **Sync/Async unify**       | ✓                           | Partial                              | Partial           | Partial           | Partial           |
+| **Built-in polling**       | ✓ (Ticker)                  | ✗ (manual)                           | ✗                 | ✗                 | ✗                 |
+| **Gate/Flow control**      | ✓ (GateTransfer, Bridge)    | Manual                               | Manual            | Manual            | Manual            |
+| **Error handling**         | Local, non-fatal, fail-safe | Stream-level (`catchError`, `retry`) | Stream terminates | Stream terminates | Stream terminates |
+| **Undefined suppression**  | ✓                           | ✗                                    | ✗                 | ✗                 | ✗                 |
+| **Operators count**        | ~10                         | 100+                                 | ~40               | ~60               | ~50               |
+| **TypeScript support**     | Excellent                   | Excellent                            | Good              | Fair              | Fair              |
+| **Community size**         | Small                       | Very large                           | Medium            | Small             | Small             |
+| **Maintenance status**     | Active                      | Active                               | Maintenance       | Maintenance       | Archived          |
 
 ---
 
@@ -752,8 +755,9 @@ Transferum's capability flags provide more granularity than the two-type model, 
 3. **Pull-based data acquisition** — Polling APIs, sensors, or storage with `PollingProxy`.
 4. **Explicit flow control** — Gates, bridges, and selectors for runtime routing.
 5. **Resource-conscious environments** — Smaller bundle than RxJS, zero dependencies.
-6. **Undefined-free data flow** — `undefined` never propagates through the chain — it means "no data," not "empty value," eliminating null-check defects in consumers.
-7. **Game development / IoT** — Frame-aligned tickers, idle polling, sensor aggregation.
+6. **Resilient error handling** — Local, non-fatal error handling: one stage's failure doesn't kill the pipeline, broken pollers stop (fail-safe), no silent swallowing. Per-stage granularity with typed `ErrorHandler<TSource>`.
+7. **Undefined-free data flow** — `undefined` never propagates through the chain — it means "no data," not "empty value," eliminating null-check defects in consumers.
+8. **Game development / IoT** — Frame-aligned tickers, idle polling, sensor aggregation.
 
 **Example fit:** Real-time dashboard with API polling, debounced user input, conditional routing to multiple visualizations, and unified sync/async data flows.
 
@@ -1073,17 +1077,17 @@ When a fetcher or flow read fails inside `trigger()` / `asyncTrigger()`, the err
 
 **Sync polling** (`PollingSourceTransfer`, `PollingProxyTransfer`, `PollingFlowTransfer`, `IdlePollingTransfer`):
 
-| Method | `onError` suppresses | `onError` absent or throws |
-|---|---|---|
-| `trigger()` | Error suppressed, polling continues | Exception rethrown, **ticker stops** — polling ceases. Results in an **uncaught exception** (the ticker calls `trigger()` synchronously). |
-| `pull()` | Error suppressed, returns `undefined` | Exception rethrown to caller. **Ticker is not affected.** |
+| Method      | `onError` suppresses                  | `onError` absent or throws                                                                                                                |
+|-------------|---------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
+| `trigger()` | Error suppressed, polling continues   | Exception rethrown, **ticker stops** — polling ceases. Results in an **uncaught exception** (the ticker calls `trigger()` synchronously). |
+| `pull()`    | Error suppressed, returns `undefined` | Exception rethrown to caller. **Ticker is not affected.**                                                                                 |
 
 **Async polling** (`AsyncPollingSourceTransfer`, `AsyncPollingProxyTransfer`, `AsyncPollingFlowTransfer`, `AsyncIdlePollingTransfer`):
 
-| Method | `onError` suppresses | `onError` absent or throws |
-|---|---|---|
-| `asyncTrigger()` | Error suppressed, polling continues | Rejection rethrown, **ticker stops** — polling ceases. Results in an **unhandled promise rejection** (the ticker calls `asyncTrigger()` fire-and-forget). |
-| `asyncPull()` | Error suppressed, returns `undefined` | Rejection rethrown to caller. **Ticker is not affected.** |
+| Method           | `onError` suppresses                  | `onError` absent or throws                                                                                                                                |
+|------------------|---------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `asyncTrigger()` | Error suppressed, polling continues   | Rejection rethrown, **ticker stops** — polling ceases. Results in an **unhandled promise rejection** (the ticker calls `asyncTrigger()` fire-and-forget). |
+| `asyncPull()`    | Error suppressed, returns `undefined` | Rejection rethrown to caller. **Ticker is not affected.**                                                                                                 |
 
 > **Why the difference?** `trigger()` / `asyncTrigger()` are called by the ticker (fire-and-forget), so an unhandled error surfaces as an uncaught exception (sync) or unhandled rejection (async). `pull()` / `asyncPull()` are called directly by the user, so the error propagates to the caller's `try/catch` or `await` expression.
 >
@@ -2526,20 +2530,20 @@ Configs are defined in `configs.ts`. All configs are types (not classes), passed
 
 **Async configs:**
 
-| Config                                  | For                                | Required fields                               |
-|-----------------------------------------|------------------------------------|-----------------------------------------------|
-| `AsyncPollingProxyTransferConfig<T>`    | Async polling transfers            | `interval`, `activated`                       |
-| `AsyncPollingSourceTransferConfig<T>`   | `AsyncPollingSourceTransfer`       | `fetcher`, `interval`, `activated`            |
-| `AsyncPollingFlowTransferConfig<T>`     | `AsyncPollingFlowTransfer`         | `flow`, `interval`, `activated`               |
-| `AsyncIdlePollingTransferConfig<T>`     | `AsyncIdlePollingTransfer`         | `fetcher`, `timeout`, `interval`, `activated` |
-| `AsyncSinkTransferConfig<T>`            | `AsyncSinkTransfer`                | `callback`, `onError?`                        |
-| `AsyncWriteTransferConfig<T>`           | `AsyncWriteTransfer`               | `flow`                                        |
-| `AsyncReadTransferConfig<T>`            | `AsyncReadTransfer`                | `flow`                                        |
-| `AsyncConvertTransferConfig<TIn, TOut>` | `AsyncConvertTransfer`             | `operator` (AsyncOperatorInterface)           |
+| Config                                  | For                                | Required fields                                                              |
+|-----------------------------------------|------------------------------------|------------------------------------------------------------------------------|
+| `AsyncPollingProxyTransferConfig<T>`    | Async polling transfers            | `interval`, `activated`                                                      |
+| `AsyncPollingSourceTransferConfig<T>`   | `AsyncPollingSourceTransfer`       | `fetcher`, `interval`, `activated`                                           |
+| `AsyncPollingFlowTransferConfig<T>`     | `AsyncPollingFlowTransfer`         | `flow`, `interval`, `activated`                                              |
+| `AsyncIdlePollingTransferConfig<T>`     | `AsyncIdlePollingTransfer`         | `fetcher`, `timeout`, `interval`, `activated`                                |
+| `AsyncSinkTransferConfig<T>`            | `AsyncSinkTransfer`                | `callback`, `onError?`                                                       |
+| `AsyncWriteTransferConfig<T>`           | `AsyncWriteTransfer`               | `flow`                                                                       |
+| `AsyncReadTransferConfig<T>`            | `AsyncReadTransfer`                | `flow`                                                                       |
+| `AsyncConvertTransferConfig<TIn, TOut>` | `AsyncConvertTransfer`             | `operator` (AsyncOperatorInterface)                                          |
 | `AsyncConditionTransferConfig<T>`       | `AsyncConditionTransfer`           | — (predicates are optional, sync or async), `onAcceptError?`, `onEmitError?` |
-| `AsyncStoredChannelTransferConfig<T>`   | `AsyncStoredChannelTransfer`       | `setup`, `destroy`, `onError?`, `onDestroyError?`           |
-| `AsyncTransformBridgeConfig<TIn, TOut>` | `AsyncTransformBridge`             | `source`, `target`, `operator`, `activated`   |
-| `LinkConfig<TTargetTransfer>`           | `linkTransfers` (async strategies) | `onError?`                                    |
+| `AsyncStoredChannelTransferConfig<T>`   | `AsyncStoredChannelTransfer`       | `setup`, `destroy`, `onError?`, `onDestroyError?`                            |
+| `AsyncTransformBridgeConfig<TIn, TOut>` | `AsyncTransformBridge`             | `source`, `target`, `operator`, `activated`                                  |
+| `LinkConfig<TTargetTransfer>`           | `linkTransfers` (async strategies) | `onError?`                                                                   |
 
 All polling transfers support an optional `tickerFactory?: TickerFactory` to replace the default ticker (`RAFTicker.factory`).
 
