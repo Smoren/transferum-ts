@@ -35,8 +35,10 @@ import { Subscriber } from "./helpers";
  * - pullable/asyncPullable → pushable/asyncPushable: needs a Bridge/Triggerable
  *
  * Rejection handling for subscribable → asyncPushable:
- * .catch() is always called. If options.onError is provided, it is invoked.
- * Without onError, the error is suppressed to protect the reactive stream.
+ * .catch() is always called. If options.onError is provided, it is invoked
+ * via handleError() and the rejection is suppressed.
+ * Without onError, handleError() rethrows — resulting in an unhandled promise
+ * rejection (the source's subscription remains active).
  *
  * Ordering for subscribable → asyncPushable:
  * No ordering guarantees — fast sync notifications from LHS can overtake
@@ -113,10 +115,7 @@ export function linkTransfers<T, RTransfer extends InputTransfer<T>>(
 
     return subscribableLhs.subscribe((data) => {
       asyncPushableRhs.asyncPush(data).catch((e) => {
-        if (onError !== undefined) {
-          // TODO сделать через handleError ? (возможно в дальнейшем развитии понадобится, так как не факт, что должно быть подавление)
-          onError(e instanceof Error ? e : new Error(String(e)), rhs);
-        }
+        handleError(e, rhs, onError);
       });
     });
   }

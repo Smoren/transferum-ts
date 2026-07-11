@@ -115,24 +115,32 @@ describe(
 );
 
 describe(
-  'linkTransfers Subscribable to AsyncPushable rejection suppressed without onError test',
+  'linkTransfers Subscribable to AsyncPushable source not disrupted by target rejection test',
   () => {
     it('', async () => {
       const source = new PushChannelTransfer<number>();
+      // AsyncSinkTransfer with onError suppresses at the target level,
+      // so asyncPush resolves and .catch() in linkTransfers never fires.
+      // The test verifies that the source subscription remains active
+      // even when the target's callback throws.
+      //
+      // Without link onError: handleError rethrows inside .catch(),
+      // producing an unhandled promise rejection (tested in handle-error.test.ts).
+      // Jest 30 intercepts unhandled rejections via V8 promise hooks,
+      // not process.on('unhandledRejection'), so it cannot be captured here.
       const target = new AsyncSinkTransfer<number>({
         callback: async () => { throw new Error('push error'); },
+        onError: () => {},
       });
 
-      // Without onError — rejection is suppressed by .catch()
       const subscriber = linkTransfers(source, target);
       expect(subscriber.active).toBe(true);
 
-      // Should not cause an unhandled rejection
       source.push(42);
 
       await new Promise<void>((resolve) => setTimeout(resolve, 10));
 
-      // Subscription remains active
+      // Subscription remains active — source not disrupted by downstream rejection
       expect(subscriber.active).toBe(true);
 
       subscriber.unsubscribe();

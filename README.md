@@ -987,7 +987,7 @@ The `linkTransfers(lhs, rhs)` function connects an output transfer (LHS) to an i
 
 > **Sync priority:** If both transfers support sync linking, it is used. Async strategies are applied only when sync is not applicable.
 >
-> **Rejection handling** for `subscribable → asyncPushable`: `.catch()` is always called. If `options.onError` is provided — it is invoked with `(error, target)`. Without `onError` — the rejection is silently swallowed to protect the reactive stream (the source continues operating). This differs from per-transfer `onError` (which rethrows) because the source's reactive stream must not be disrupted by a downstream async-push failure.
+> **Rejection handling** for `subscribable → asyncPushable`: `.catch()` is always called. If `options.onError` is provided — it is invoked with `(error, target)` via `handleError()` and the rejection is suppressed. Without `onError` — `handleError()` rethrows, resulting in an **unhandled promise rejection** (the source's subscription remains active). This is consistent with per-transfer error handling: without `onError`, errors are visible, not silently swallowed.
 >
 > **Ordering** for `subscribable → asyncPushable`: No ordering guarantee — fast sync notifications from LHS can overtake pending `asyncPush` calls. A serializer is a separate task.
 
@@ -1091,7 +1091,7 @@ When a fetcher or flow read fails inside `trigger()` / `asyncTrigger()`, the err
 
 #### `linkTransfers` — async-push rejection
 
-When linking a `Subscribable` source to an `AsyncPushable` target, `asyncPush()` rejections are caught. If `options.onError` is provided — it is invoked with `(error, target)`. Without `onError` — the rejection is silently swallowed to protect the reactive stream (the source continues operating). See [Linking Transfers](#linking-transfers).
+When linking a `Subscribable` source to an `AsyncPushable` target, `asyncPush()` rejections are caught and passed to `handleError()`. If `options.onError` is provided — it is invoked with `(error, target)` and the rejection is suppressed. Without `onError` — `handleError()` rethrows, resulting in an **unhandled promise rejection**. The source's subscription remains active in both cases — the error does not disrupt the reactive stream. See [Linking Transfers](#linking-transfers).
 
 ---
 
@@ -2444,7 +2444,7 @@ function linkTransfers<T, RTransfer extends InputTransfer<T>>(
 ): SubscriberInterface
 ```
 
-Links an output transfer (LHS) to an input transfer (RHS). Returns `SubscriberInterface` for breaking the link. The strategy is determined by capability flags (see [Linking Transfers](#linking-transfers)). `options.onError` is used to intercept rejections in the async `subscribable → asyncPushable` strategy — invoked as `onError(error, target)`. Without `onError`, rejections are silently swallowed to protect the source's reactive stream.
+Links an output transfer (LHS) to an input transfer (RHS). Returns `SubscriberInterface` for breaking the link. The strategy is determined by capability flags (see [Linking Transfers](#linking-transfers)). `options.onError` is used to intercept rejections in the async `subscribable → asyncPushable` strategy — invoked as `onError(error, target)` via `handleError()`. Without `onError`, rejections are rethrown by `handleError()` (unhandled promise rejection); the source's subscription remains active.
 
 ### handleError
 
