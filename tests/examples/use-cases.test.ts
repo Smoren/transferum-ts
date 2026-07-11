@@ -16,6 +16,8 @@ import {
   createMergeTransfer,
   createSinkTransfer,
   createBridgeSelector,
+  createBridgeMultiSelector,
+  createConditionTransfer,
   createSplitTransfer,
   createWriteTransfer,
   createLatestStorage,
@@ -32,6 +34,7 @@ import type {
   RawData,
   ProcessedData,
   Telemetry,
+  LogEntry,
   // @ts-ignore
 } from './fixtures';
 import {
@@ -293,3 +296,92 @@ describe('README Use Cases: Broadcast to multiple consumers', () => {
     split.destroy();
   });
 });
+
+// ═══════════════════════════════════════════════════════════════
+// Use Cases — Multi-route conditional routing with BridgeMultiSelector
+// ═══════════════════════════════════════════════════════════════
+
+describe('README Use Cases: Multi-route conditional routing with BridgeMultiSelector', () => {
+  it('routes log entries to multiple backends with runtime selection', async () => {
+    const source = createPushStoredChannelTransfer<LogEntry>();
+
+    const sentryTarget: LogEntry[] = [];
+    const elkTarget: LogEntry[] = [];
+    const prometheusTarget: LogEntry[] = [];
+
+    const sentryFilter = createConditionTransfer<LogEntry>({ shouldAccept: (l) => l.level === 'ERROR' });
+    const elkFilter = createConditionTransfer<LogEntry>({ shouldAccept: (l) => l.level === 'WARN' });
+    const prometheusFilter = createConditionTransfer<LogEntry>({ shouldAccept: (l) => l.level === 'INFO' });
+
+    linkTransfers(source, createSplitTransfer<LogEntry>({ targets: [sentryFilter, elkFilter, prometheusFilter] }));
+
+    const routes = createBridgeMultiSelector({
+      bridges: {
+        sentry: createPassBridge({
+          source: sentryFilter,
+          target: createAsyncSinkTransfer<LogEntry>({ callback: async (l) => sentryTarget.push(l), onError: (e) => console.error(e) }),
+          activated: false,
+        }),
+        elk: createPassBridge({
+          source: elkFilter,
+          target: createAsyncSinkTransfer<LogEntry>({ callback: async (l) => elkTarget.push(l), onError: (e) => console.error(e) }),
+          activated: false,
+        }),
+        prometheus: createPassBridge({
+          source: prometheusFilter,
+          target: createAsyncSinkTransfer<LogEntry>({ callback: async (l) => prometheusTarget.push(l), onError: (e) => console.error(e) }),
+          activated: false,
+        }),
+      },
+      initialKeys: ['sentry', 'elk', 'prometheus'],
+      activated: true,
+      owned: true,
+    });
+
+    const errorLog: LogEntry = { level: 'ERROR', message: 'fail', timestamp: 1 };
+    const warnLog: LogEntry = { level: 'WARN', message: 'slow', timestamp: 2 };
+    const infoLog: LogEntry = { level: 'INFO', message: 'ok', timestamp: 3 };
+
+    // All routes active — each receives its level
+    source.push(errorLog);
+    source.push(warnLog);
+    source.push(infoLog);
+    await wait(10);
+
+    expect(sentryTarget).toEqual([errorLog]);
+    expect(elkTarget).toEqual([warnLog]);
+    expect(prometheusTarget).toEqual([infoLog]);
+
+    // Leave only Sentry and Prometheus
+    routes.select(['sentry', 'prometheus']);
+
+    source.push(errorLog);
+    source.push(warnLog);
+    source.push(infoLog);
+    await wait(10);
+
+    expect(sentryTarget).toEqual([errorLog, errorLog]);
+    expect(elkTarget).toEqual([warnLog]); // unchanged — elk route inactive
+    expect(prometheusTarget).toEqual([infoLog, infoLog]);
+
+    // Check single route back
+    routes.check('elk');
+
+    source.push(warnLog);
+    await wait(10);
+
+    expect(elkTarget).toEqual([warnLog, warnLog]);
+
+    // Uncheck single route
+    routes.uncheck('elk');
+
+    source.push(warnLog);
+    await wait(10);
+
+    expect(elkTarget).toEqual([warnLog, warnLog]); // unchanged — elk route inactive again
+
+    routes.destroy();
+    source.destroy();
+  });
+});
+

@@ -651,25 +651,34 @@ Transferum exists in a rich ecosystem of reactive and stream-processing librarie
 **Code comparison — Conditional routing with runtime switching:**
 
 ```typescript
-import { createBridgeMultiSelector, createPassBridge, createPushStoredChannelTransfer, createConditionTransfer } from 'transferum';
+import {
+  createBridgeMultiSelector, createPassBridge, createPushStoredChannelTransfer,
+  createConditionTransfer, createAsyncSinkTransfer, createSplitTransfer, linkTransfers,
+} from 'transferum';
 
 const source = createPushStoredChannelTransfer<LogEntry>();
+
+const sentryFilter = createConditionTransfer<LogEntry>({ shouldAccept: (l) => l.level === 'ERROR' });
+const elkFilter = createConditionTransfer<LogEntry>({ shouldAccept: (l) => l.level === 'WARN' });
+const prometheusFilter = createConditionTransfer<LogEntry>({ shouldAccept: (l) => l.level === 'INFO' });
+
+linkTransfers(source, createSplitTransfer<LogEntry>({ targets: [sentryFilter, elkFilter, prometheusFilter] }));
 
 const routes = createBridgeMultiSelector({
   bridges: {
     sentry: createPassBridge({
-      source: createConditionTransfer<LogEntry>({ shouldAccept: (l) => l.level === 'ERROR' }),
-      target: sentryWriter,
+      source: sentryFilter,
+      target: createAsyncSinkTransfer<LogEntry>({ callback: async (l) => sentryAPI.send(l), onError: (e) => console.error(e) }),
       activated: false,
     }),
     elk: createPassBridge({
-      source: createConditionTransfer<LogEntry>({ shouldAccept: (l) => l.level === 'WARN' }),
-      target: elkWriter,
+      source: elkFilter,
+      target: createAsyncSinkTransfer<LogEntry>({ callback: async (l) => elkAPI.send(l), onError: (e) => console.error(e) }),
       activated: false,
     }),
     prometheus: createPassBridge({
-      source: createConditionTransfer<LogEntry>({ shouldAccept: (l) => l.level === 'INFO' }),
-      target: prometheusWriter,
+      source: prometheusFilter,
+      target: createAsyncSinkTransfer<LogEntry>({ callback: async (l) => prometheusAPI.send(l), onError: (e) => console.error(e) }),
       activated: false,
     }),
   },
@@ -687,24 +696,46 @@ routes.uncheck('elk');
 ```
 
 ```typescript
-import { Subject, filter, tap, Subscription } from 'rxjs';
+import { Subject, filter, mergeMap, from, catchError, EMPTY, Subscription } from 'rxjs';
 
+const transports = {
+  sentry: {
+    level: 'ERROR',
+    send: (l) => sentryAPI.send(l),
+  },
+  elk: {
+    level: 'WARN',
+    send: (l) => elkAPI.send(l),
+  },
+  prometheus: {
+    level: 'INFO',
+    send: (l) => prometheusAPI.send(l),
+  },
+};
+
+// Subscription infrastructure
 const source$ = new Subject<LogEntry>();
-
 const subscriptions = new Map<string, Subscription>();
 
 function activateRoute(key: string) {
   if (subscriptions.has(key)) return;
 
+  const config = transports[key];
+  if (!config) return; // Guard against unknown keys
+
   const sub = source$.pipe(
-    filter((l) => l.level === key.toUpperCase()),
-    tap((l) => {
-      switch (key) {
-        case 'sentry': sentryWriter(l); break;
-        case 'elk': elkWriter(l); break;
-        case 'prometheus': prometheusWriter(l); break;
-      }
-    })
+    // Filter logs by level from config
+    filter((l) => l.level === config.level),
+
+    // Wrap async send in Observable, swallow errors to keep source$ alive
+    mergeMap((l) =>
+      from(config.send(l)).pipe(
+        catchError((e) => {
+          console.error(`Error in ${key}:`, e);
+          return EMPTY;
+        })
+      )
+    )
   ).subscribe();
 
   subscriptions.set(key, sub);
