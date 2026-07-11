@@ -411,6 +411,30 @@ describe(
   },
 );
 
+describe(
+  'PollingProxyTransfer trigger without onError rethrows when ticker undefined test',
+  () => {
+    it('', () => {
+      jest.useFakeTimers();
+      const error = new Error('fetcher error');
+      const transfer = new PollingProxyTransfer<number>({
+        interval: 100,
+        activated: true,
+      });
+
+      transfer.setFetcher(() => { throw error; });
+      // Simulate ticker being cleared while fetcher still set
+      // (defensive branch: _ticker?.stop() when _ticker is undefined)
+      (transfer as any)._ticker = undefined;
+
+      expect(() => transfer.trigger()).toThrow('fetcher error');
+
+      transfer.destroy();
+      jest.useRealTimers();
+    });
+  },
+);
+
 // ═══════════════════════════════════════════════════════════════
 // PollingProxyTransfer Custom Ticker
 // ═══════════════════════════════════════════════════════════════

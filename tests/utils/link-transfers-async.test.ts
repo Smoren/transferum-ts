@@ -196,6 +196,49 @@ describe(
   },
 );
 
+describe(
+  'linkTransfers Subscribable to AsyncPushable non-Error rejection from raw asyncPush test',
+  () => {
+    it('', async () => {
+      const source = new PushChannelTransfer<number>();
+      // Mock async pushable that rejects with a non-Error value directly,
+      // bypassing handleError wrapping in AsyncSinkTransfer.
+      const target = {
+        isInput: true,
+        isOutput: false,
+        isDuplex: false,
+        isPushable: false,
+        isPullable: false,
+        isSubscribable: false,
+        isPollingSource: false,
+        isPollingProxy: false,
+        isTriggerable: false,
+        isGate: false,
+        isAsyncPushable: true,
+        isAsyncPullable: false,
+        isAsyncTriggerable: false,
+        isAsyncPollingProxy: false,
+        asyncPush: async (_data: number) => { throw 'raw string error'; },
+        destroy: () => {},
+      } as any;
+
+      const onError = jest.fn();
+      const subscriber = linkTransfers(source, target, { onError });
+
+      source.push(42);
+
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith(expect.any(Error), target);
+      expect((onError.mock.calls[0][0] as Error).message).toBe('raw string error');
+
+      subscriber.unsubscribe();
+      source.destroy();
+    });
+  },
+);
+
 // ═══════════════════════════════════════════════════════════════
 // Case 5: AsyncPullable → AsyncPollingProxy (Active async-polling)
 // ═══════════════════════════════════════════════════════════════
