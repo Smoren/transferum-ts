@@ -648,6 +648,88 @@ Transferum exists in a rich ecosystem of reactive and stream-processing librarie
 - **Error handling:** RxJS errors propagate through the stream and terminate it unless caught with `catchError()` / `retry()`. Transferum errors are **local to each transfer** — with `onError`, suppressed and the stream continues; without, the error is visible (exception/rejection) and polling stops (fail-safe). One stage's failure doesn't kill the pipeline. See [Error Handling](#error-handling).
 - **Scheduling:** RxJS has `Scheduler` abstraction (async, asyncSchedule, animationFrame). Transferum has `Ticker` (RAFTicker, IntervalTicker) for polling.
 
+**Code comparison — Conditional routing with runtime switching:**
+
+```typescript
+import { createBridgeMultiSelector, createPassBridge, createPushStoredChannelTransfer, createConditionTransfer } from 'transferum';
+
+const source = createPushStoredChannelTransfer<LogEntry>();
+
+const routes = createBridgeMultiSelector({
+  bridges: {
+    sentry: createPassBridge({
+      source: createConditionTransfer<LogEntry>({ shouldAccept: (l) => l.level === 'ERROR' }),
+      target: sentryWriter,
+      activated: false,
+    }),
+    elk: createPassBridge({
+      source: createConditionTransfer<LogEntry>({ shouldAccept: (l) => l.level === 'WARN' }),
+      target: elkWriter,
+      activated: false,
+    }),
+    prometheus: createPassBridge({
+      source: createConditionTransfer<LogEntry>({ shouldAccept: (l) => l.level === 'INFO' }),
+      target: prometheusWriter,
+      activated: false,
+    }),
+  },
+  initialKeys: ['sentry', 'elk', 'prometheus'],
+  activated: true,
+  owned: true,
+});
+
+// Runtime: leave only Sentry and Prometheus
+routes.select(['sentry', 'prometheus']);
+
+// Check / uncheck single item
+routes.check('elk');
+routes.uncheck('elk');
+```
+
+```typescript
+import { Subject, filter, tap, Subscription } from 'rxjs';
+
+const source$ = new Subject<LogEntry>();
+
+const subscriptions = new Map<string, Subscription>();
+
+function activateRoute(key: string) {
+  if (subscriptions.has(key)) return;
+
+  const sub = source$.pipe(
+    filter((l) => l.level === key.toUpperCase()),
+    tap((l) => {
+      switch (key) {
+        case 'sentry': sentryWriter(l); break;
+        case 'elk': elkWriter(l); break;
+        case 'prometheus': prometheusWriter(l); break;
+      }
+    })
+  ).subscribe();
+
+  subscriptions.set(key, sub);
+}
+
+function deactivateRoute(key: string) {
+  subscriptions.get(key)?.unsubscribe();
+  subscriptions.delete(key);
+}
+
+// Initial routes
+activateRoute('sentry');
+activateRoute('elk');
+activateRoute('prometheus');
+
+// Runtime: leave only Sentry and Prometheus
+deactivateRoute('elk');
+
+// Activate / deactivate single route
+activateRoute('elk');
+deactivateRoute('elk');
+```
+
+RxJS handles routing via manual subscription management — a `Map` to track active subscriptions and explicit `activateRoute`/`deactivateRoute` functions. Transferum's `BridgeMultiSelector` is a first-class routing object: declarative bridge list, built-in subscription management (`owned: true`), and `select()` / `check()` / `uncheck()` to switch routes at runtime.
+
 **Code comparison — Debounced search:**
 
 ```typescript
