@@ -651,51 +651,7 @@ Transferum exists in a rich ecosystem of reactive and stream-processing librarie
 **Code comparison — Conditional routing with runtime switching:**
 
 ```typescript
-import {
-  createBridgeMultiSelector, createPassBridge, createPushStoredChannelTransfer,
-  createConditionTransfer, createAsyncSinkTransfer, createSplitTransfer, linkTransfers,
-} from 'transferum';
-
-const source = createPushStoredChannelTransfer<LogEntry>();
-
-const sentryFilter = createConditionTransfer<LogEntry>({ shouldAccept: (l) => l.level === 'ERROR' });
-const elkFilter = createConditionTransfer<LogEntry>({ shouldAccept: (l) => l.level === 'WARN' });
-const prometheusFilter = createConditionTransfer<LogEntry>({ shouldAccept: (l) => l.level === 'INFO' });
-
-linkTransfers(source, createSplitTransfer<LogEntry>({ targets: [sentryFilter, elkFilter, prometheusFilter] }));
-
-const routes = createBridgeMultiSelector({
-  bridges: {
-    sentry: createPassBridge({
-      source: sentryFilter,
-      target: createAsyncSinkTransfer<LogEntry>({ callback: async (l) => sentryAPI.send(l), onError: (e) => console.error(e) }),
-      activated: false,
-    }),
-    elk: createPassBridge({
-      source: elkFilter,
-      target: createAsyncSinkTransfer<LogEntry>({ callback: async (l) => elkAPI.send(l), onError: (e) => console.error(e) }),
-      activated: false,
-    }),
-    prometheus: createPassBridge({
-      source: prometheusFilter,
-      target: createAsyncSinkTransfer<LogEntry>({ callback: async (l) => prometheusAPI.send(l), onError: (e) => console.error(e) }),
-      activated: false,
-    }),
-  },
-  initialKeys: ['sentry', 'elk', 'prometheus'],
-  activated: true,
-  owned: true,
-});
-
-// Runtime: leave only Sentry and Prometheus
-routes.select(['sentry', 'prometheus']);
-
-// Check / uncheck single item
-routes.check('elk');
-routes.uncheck('elk');
-```
-
-```typescript
+// RxJS
 import { Subject, filter, mergeMap, from, catchError, EMPTY, Subscription } from 'rxjs';
 
 const transports = {
@@ -757,6 +713,52 @@ deactivateRoute('elk');
 // Activate / deactivate single route
 activateRoute('elk');
 deactivateRoute('elk');
+```
+
+```typescript
+// Transferum
+import {
+  createBridgeMultiSelector, createPassBridge, createPushStoredChannelTransfer,
+  createConditionTransfer, createAsyncSinkTransfer, createSplitTransfer, linkTransfers,
+} from 'transferum';
+
+const source = createPushStoredChannelTransfer<LogEntry>();
+
+const sentryFilter = createConditionTransfer<LogEntry>({ shouldAccept: (l) => l.level === 'ERROR' });
+const elkFilter = createConditionTransfer<LogEntry>({ shouldAccept: (l) => l.level === 'WARN' });
+const prometheusFilter = createConditionTransfer<LogEntry>({ shouldAccept: (l) => l.level === 'INFO' });
+
+linkTransfers(source, createSplitTransfer<LogEntry>({ targets: [sentryFilter, elkFilter, prometheusFilter] }));
+
+const routes = createBridgeMultiSelector({
+  bridges: {
+    sentry: createPassBridge({
+      source: sentryFilter,
+      target: createAsyncSinkTransfer<LogEntry>({ callback: async (l) => sentryAPI.send(l), onError: (e) => console.error(e) }),
+      activated: false,
+    }),
+    elk: createPassBridge({
+      source: elkFilter,
+      target: createAsyncSinkTransfer<LogEntry>({ callback: async (l) => elkAPI.send(l), onError: (e) => console.error(e) }),
+      activated: false,
+    }),
+    prometheus: createPassBridge({
+      source: prometheusFilter,
+      target: createAsyncSinkTransfer<LogEntry>({ callback: async (l) => prometheusAPI.send(l), onError: (e) => console.error(e) }),
+      activated: false,
+    }),
+  },
+  initialKeys: ['sentry', 'elk', 'prometheus'],
+  activated: true,
+  owned: true,
+});
+
+// Runtime: leave only Sentry and Prometheus
+routes.select(['sentry', 'prometheus']);
+
+// Check / uncheck single item
+routes.check('elk');
+routes.uncheck('elk');
 ```
 
 RxJS handles routing via manual subscription management — a `Map` to track active subscriptions and explicit `activateRoute`/`deactivateRoute` functions. Transferum's `BridgeMultiSelector` is a first-class routing object: declarative bridge list, built-in subscription management (`owned: true`), and `select()` / `check()` / `uncheck()` to switch routes at runtime.
