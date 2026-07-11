@@ -1,5 +1,5 @@
 import type { TickerFactory } from '../../src';
-import { AsyncPollingSourceTransfer, RAFTicker, IntervalTicker } from '../../src';
+import { AsyncPollingSourceTransfer } from '../../src';
 import { describe, expect, it, jest } from '@jest/globals';
 
 // ═══════════════════════════════════════════════════════════════
@@ -535,7 +535,7 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'AsyncPollingSourceTransfer ticker fires calls _safeTrigger test',
+  'AsyncPollingSourceTransfer ticker fires calls asyncTrigger test',
   () => {
     it('', async () => {
       jest.useFakeTimers();
@@ -548,7 +548,7 @@ describe(
       const handler = jest.fn();
       transfer.subscribe(handler);
 
-      // Advance time — ticker fires, calls _safeTrigger → asyncTrigger
+      // Advance time — ticker fires, calls asyncTrigger
       jest.advanceTimersByTime(50);
       await Promise.resolve(); // flush microtasks
       jest.advanceTimersByTime(50);
@@ -564,23 +564,59 @@ describe(
 );
 
 describe(
-  'AsyncPollingSourceTransfer ticker fires without onError catches rejection test',
+  'AsyncPollingSourceTransfer ticker error with onError suppresses and continues polling test',
   () => {
     it('', async () => {
       jest.useFakeTimers();
+      let callCount = 0;
+      const onError = jest.fn();
       const transfer = new AsyncPollingSourceTransfer<number>({
-        fetcher: async () => { throw new Error('ticker error'); },
+        fetcher: async () => {
+          callCount++;
+          if (callCount === 1) throw new Error('ticker error');
+          return 42;
+        },
+        interval: 50,
+        activated: true,
+        onError,
+      });
+      const handler = jest.fn();
+      transfer.subscribe(handler);
+
+      // First tick — error, suppressed by onError
+      jest.advanceTimersByTime(50);
+      await Promise.resolve();
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(transfer.active).toBe(true); // ticker still running
+
+      // Second tick — success
+      jest.advanceTimersByTime(50);
+      await Promise.resolve();
+
+      expect(handler).toHaveBeenCalledWith(42);
+
+      transfer.destroy();
+      jest.useRealTimers();
+    });
+  },
+);
+
+describe(
+  'AsyncPollingSourceTransfer asyncTrigger without onError rethrows and stops ticker test',
+  () => {
+    it('', async () => {
+      const transfer = new AsyncPollingSourceTransfer<number>({
+        fetcher: async () => { throw new Error('trigger error'); },
         interval: 50,
         activated: true,
       });
 
-      // Ticker fires, _safeTrigger catches rejection
-      jest.advanceTimersByTime(50);
-      await Promise.resolve();
+      expect(transfer.active).toBe(true);
+      await expect(transfer.asyncTrigger()).rejects.toThrow('trigger error');
+      expect(transfer.active).toBe(false); // ticker stopped
 
-      // Should not cause an unhandled rejection
       transfer.destroy();
-      jest.useRealTimers();
     });
   },
 );

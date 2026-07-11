@@ -462,11 +462,11 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'AsyncPollingFlowTransfer ticker fires calls _safeTrigger test',
+  'AsyncPollingFlowTransfer ticker fires calls asyncTrigger test',
   () => {
     it('', async () => {
       jest.useFakeTimers();
-      const flow = { read: jest.fn(async () => 42) };
+      const flow = {read: jest.fn(async () => 42)};
       const transfer = new AsyncPollingFlowTransfer<number>({
         flow,
         interval: 50,
@@ -488,22 +488,67 @@ describe(
 );
 
 describe(
-  'AsyncPollingFlowTransfer ticker fires without onError catches rejection test',
+  'AsyncPollingFlowTransfer ticker error with onError suppresses and continues polling test',
   () => {
     it('', async () => {
       jest.useFakeTimers();
-      const flow = { read: async () => { throw new Error('ticker error'); } };
+      let callCount = 0;
+      const onError = jest.fn();
+      const flow = {
+        read: async () => {
+          callCount++;
+          if (callCount === 1) throw new Error('ticker error');
+          return 42;
+        },
+      };
+      const transfer = new AsyncPollingFlowTransfer<number>({
+        flow,
+        interval: 50,
+        activated: true,
+        onError,
+      });
+      const handler = jest.fn();
+      transfer.subscribe(handler);
+
+      // First tick — error, suppressed by onError
+      jest.advanceTimersByTime(50);
+      await Promise.resolve();
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(transfer.active).toBe(true); // ticker still running
+
+      // Second tick — success
+      jest.advanceTimersByTime(50);
+      await Promise.resolve();
+
+      expect(handler).toHaveBeenCalledWith(42);
+
+      transfer.destroy();
+      jest.useRealTimers();
+    });
+  },
+);
+
+describe(
+  'AsyncPollingFlowTransfer asyncTrigger without onError rethrows and stops ticker test',
+  () => {
+    it('', async () => {
+      const flow = {
+        read: async () => {
+          throw new Error('trigger error');
+        }
+      };
       const transfer = new AsyncPollingFlowTransfer<number>({
         flow,
         interval: 50,
         activated: true,
       });
 
-      jest.advanceTimersByTime(50);
-      await Promise.resolve();
+      expect(transfer.active).toBe(true);
+      await expect(transfer.asyncTrigger()).rejects.toThrow('trigger error');
+      expect(transfer.active).toBe(false); // ticker stopped
 
       transfer.destroy();
-      jest.useRealTimers();
     });
   },
 );

@@ -1684,7 +1684,7 @@ await condition.asyncPush(42); // → passes both filters → 42
 
 ### AsyncPollingSourceTransfer
 
-Output transfer with asynchronous internal polling. The ticker calls `_safeTrigger()` — a fire-and-forget wrapper over `asyncTrigger()`. The `_polling` flag prevents overlapping calls with a slow fetcher.
+Output transfer with asynchronous internal polling. The ticker calls `asyncTrigger()` (fire-and-forget). The `_polling` flag prevents overlapping calls with a slow fetcher.
 
 **Capabilities:** `isOutput`, `isPollingSource`, `isAsyncPullable`, `isSubscribable`, `isAsyncTriggerable`, `isGate`
 
@@ -1741,7 +1741,7 @@ polling.subscribe((data) => console.log(data));
 
 ### AsyncIdlePollingTransfer
 
-Reactive channel with async fallback polling on idle. `push()` is synchronous, but the fetcher is asynchronous — `asyncTrigger()` awaits `_doPoll()` (fetch + notify), `asyncPull()` awaits the fetcher directly. The `_polling` flag prevents overlapping. The ticker uses `_safePoll()` — a fire-and-forget wrapper.
+Reactive channel with async fallback polling on idle. `push()` is synchronous, but the fetcher is asynchronous — `asyncTrigger()` awaits `_doPoll()` (fetch + notify), `asyncPull()` awaits the fetcher directly. The `_polling` flag prevents overlapping. The ticker uses `_doPoll()` — fire-and-forget.
 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`, `isPollingSource`, `isAsyncPullable`, `isAsyncTriggerable`, `isGate`
 

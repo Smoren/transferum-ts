@@ -2172,7 +2172,7 @@ export class AsyncReadTransfer<T> extends BaseTransfer implements AsyncPullableT
  *
  * Mechanics:
  * 1. The constructor accepts config.fetcher: AsyncDataFetcher<T>
- * 2. An internal Ticker calls _safeTrigger() — a fire-and-forget wrapper over asyncTrigger()
+ * 2. An internal Ticker calls asyncTrigger() (fire-and-forget)
  * 3. asyncTrigger() — calls await fetcher(), writes the result, notifies subscribers
  * 4. asyncPull() — calls await fetcher() directly (without writing to state)
  * 5. The _polling flag prevents overlapping calls with a slow fetcher
@@ -2182,7 +2182,8 @@ export class AsyncReadTransfer<T> extends BaseTransfer implements AsyncPullableT
  * - If fetcher() throws an exception in asyncTrigger() or asyncPull(), onError is called.
  * - With onError provided, the exception is suppressed (polling continues).
  * - Without onError, the exception is rethrown from asyncPull()/asyncTrigger().
- * - The ticker calls _safeTrigger() with .catch() — unhandled rejection is impossible.
+ * - When the ticker fires asyncTrigger() without onError, the rejection is unhandled
+ *   (visible in logs as unhandled promise rejection). To suppress — provide onError.
  *
  * Configuration (AsyncPollingSourceTransferConfig):
  * - fetcher: AsyncDataFetcher<T> — async data retrieval function
@@ -2216,7 +2217,7 @@ export class AsyncPollingSourceTransfer<T> extends BaseStateTransfer<T> implemen
     this._onError = config.onError;
 
     this._ticker = (config.tickerFactory ?? RAFTicker.factory)({
-      callback: () => this._safeTrigger(),
+      callback: () => this.asyncTrigger(),
       interval: config.interval,
     });
 
@@ -2261,15 +2262,6 @@ export class AsyncPollingSourceTransfer<T> extends BaseStateTransfer<T> implemen
     } finally {
       this._polling = false;
     }
-  }
-
-  private _safeTrigger(): void {
-    this.asyncTrigger().catch(() => {
-      // Error already handled in asyncTrigger via handleError.
-      // If onError is not set (or handler threw), handleError rethrew,
-      // ticker was stopped, and the error is caught here to prevent
-      // unhandled promise rejection from the fire-and-forget ticker call.
-    });
   }
 
   public get active(): boolean {
@@ -2340,7 +2332,7 @@ export class AsyncPollingFlowTransfer<T> extends BaseStateTransfer<T> implements
     this._onError = config.onError;
 
     this._ticker = (config.tickerFactory ?? RAFTicker.factory)({
-      callback: () => this._safeTrigger(),
+      callback: () => this.asyncTrigger(),
       interval: config.interval,
     });
 
@@ -2385,13 +2377,6 @@ export class AsyncPollingFlowTransfer<T> extends BaseStateTransfer<T> implements
     } finally {
       this._polling = false;
     }
-  }
-
-  private _safeTrigger(): void {
-    this.asyncTrigger().catch(() => {
-      // Error already handled in asyncTrigger via handleError.
-      // Ticker stopped on rethrow, caught here to prevent unhandled rejection.
-    });
   }
 
   public get active(): boolean {
@@ -2444,7 +2429,8 @@ export class AsyncPollingFlowTransfer<T> extends BaseStateTransfer<T> implements
  * - If fetcher() throws an exception, onError is called.
  * - With onError provided, the exception is suppressed. Without onError — rethrown.
  * - The 'Async fetcher is not defined' error is always rethrown.
- * - The ticker calls _safeTrigger() with .catch() — unhandled rejection is impossible.
+ * - When the ticker fires asyncTrigger() without onError, the rejection is unhandled
+ *   (visible in logs as unhandled promise rejection). To suppress — provide onError.
  *
  * Configuration (AsyncPollingProxyTransferConfig):
  * - interval: number — polling interval (ms)
@@ -2535,19 +2521,12 @@ export class AsyncPollingProxyTransfer<T> extends BaseStateTransfer<T> implement
     }
   }
 
-  private _safeTrigger(): void {
-    this.asyncTrigger().catch(() => {
-      // Error already handled in asyncTrigger via handleError.
-      // Ticker stopped on rethrow, caught here to prevent unhandled rejection.
-    });
-  }
-
   public setAsyncFetcher(fetcher: AsyncDataFetcher<T>): void {
     this.clearAsyncFetcher();
     this._fetcher = fetcher;
 
     this._ticker = this._tickerFactory({
-      callback: () => this._safeTrigger(),
+      callback: () => this.asyncTrigger(),
       interval: this._interval,
     });
 
@@ -2611,7 +2590,7 @@ export class AsyncPollingProxyTransfer<T> extends BaseStateTransfer<T> implement
  * 2. asyncTrigger() — awaits _doPoll() (fetch + notify), then restarts the idle timer
  * 3. asyncPull() — calls await fetcher() directly (without writing to state)
  * 4. If no data arrived for longer than timeout ms — polling starts via Ticker
- * 5. The ticker calls _safePoll() — fire-and-forget wrapper over _doPoll()
+ * 5. The ticker calls _doPoll() (fire-and-forget)
  * 6. On push — polling stops, the idle timer resets
  * 7. The _polling flag prevents overlapping
  *
@@ -2622,7 +2601,8 @@ export class AsyncPollingProxyTransfer<T> extends BaseStateTransfer<T> implement
  * - If fetcher() throws an exception, onError is called.
  * - With onError provided, the exception is suppressed. Without onError — rethrown from _doPoll.
  * - asyncTrigger() awaits _doPoll() — caller can catch rethrown errors via await.
- * - _safePoll() (used by the ticker) wraps _doPoll().catch() — unhandled rejection is impossible.
+ * - When the ticker fires _doPoll() without onError, the rejection is unhandled
+ *   (visible in logs as unhandled promise rejection). To suppress — provide onError.
  *
  * Configuration (AsyncIdlePollingTransferConfig):
  * - fetcher: AsyncDataFetcher<T> — async data retrieval function for idle polling
@@ -2767,7 +2747,7 @@ export class AsyncIdlePollingTransfer<T> extends BaseStateTransfer<T> implements
       return;
     }
     this._ticker = this._tickerFactory({
-      callback: () => this._safePoll(),
+      callback: () => this._doPoll(),
       interval: this._interval,
     });
     this._ticker.start();
@@ -2778,13 +2758,6 @@ export class AsyncIdlePollingTransfer<T> extends BaseStateTransfer<T> implements
       this._ticker.stop();
       this._ticker = null;
     }
-  }
-
-  private _safePoll(): void {
-    this._doPoll().catch(() => {
-      // Error already handled in _doPoll via handleError.
-      // Ticker stopped on rethrow, caught here to prevent unhandled rejection.
-    });
   }
 
   private async _doPoll(): Promise<void> {
@@ -3000,7 +2973,7 @@ export class AsyncStoredChannelTransfer<T> extends BaseStateTransfer<T> implemen
     this._destroy = config.destroy;
     this._emit = (data: T) => {
       this._state.value = data;
-      this._safeTrigger();
+      this.asyncTrigger();
     };
 
     config.setup(this._emit);
@@ -3020,12 +2993,6 @@ export class AsyncStoredChannelTransfer<T> extends BaseStateTransfer<T> implemen
     } catch (e) {
       handleError(e, this, this._onError);
     }
-  }
-
-  private _safeTrigger(): void {
-    this.asyncTrigger().catch(() => {
-      // Error already handled in asyncTrigger via handleError.
-    });
   }
 
   public override destroy() {
