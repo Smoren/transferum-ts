@@ -13,11 +13,11 @@ import {
   createAsyncConvertTransfer,
   createAsyncMapOperator,
   createAsyncSinkTransfer,
+  createConditionTransfer,
   createMergeTransfer,
   createSinkTransfer,
   createBridgeSelector,
   createBridgeMultiSelector,
-  createConditionTransfer,
   createSplitTransfer,
   createWriteTransfer,
   createLatestStorage,
@@ -35,6 +35,7 @@ import type {
   ProcessedData,
   Telemetry,
   LogEntry,
+  SearchResult,
   // @ts-ignore
 } from './fixtures';
 import {
@@ -78,37 +79,64 @@ describe('README Use Cases: Real-time UI updates from API polling', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════
-// Use Cases — Debounced user input with async validation
+// Use Cases — Debounced search with error handling and empty-result suppression
 // ═══════════════════════════════════════════════════════════════
 
-describe('README Use Cases: Debounced user input with async validation', () => {
-  it('debounces input, validates, transforms, sends to async sink', async () => {
+describe('README Use Cases: Debounced search with error handling and empty-result suppression', () => {
+  it('debounces, filters, async-converts with onError, suppresses empty results', async () => {
     const input = createDebounceTransfer<string>({ delay: 50 });
 
-    const sinkResults: ValidationResult[] = [];
-    const saveResult = jest.fn(async (result: ValidationResult) => {
-      sinkResults.push(result);
+    const rendered: SearchResult[][] = [];
+    const errors: Error[] = [];
+
+    let shouldFail = false;
+    let returnEmpty = false;
+
+    const searchAPI = jest.fn(async (q: string): Promise<SearchResult[]> => {
+      if (shouldFail) throw new Error('API down');
+      if (returnEmpty) return [];
+      return [{ id: 1, title: q }];
     });
 
     const pipeline = AsyncInputPipelineBuilder
       .start(input)
-      .to(createAsyncConditionTransfer<string>({
-        shouldAccept: async (s) => s.length > 0,
+      .to(createConditionTransfer<string>({ shouldAccept: q => q.length >= 3 }))
+      .to(createAsyncConvertTransfer<string, SearchResult[]>({
+        operator: createAsyncMapOperator(async q => await searchAPI(q)),
+        onError: (e) => errors.push(e),
       }))
-      .to(createAsyncConvertTransfer<string, ValidationResult>({
-        operator: createAsyncMapOperator(async (s) => await validate(s)),
-      }))
-      .finish(createAsyncSinkTransfer<ValidationResult>({
-        callback: async (result) => await saveResult(result),
-      }), { owned: true, linkOnError: (e) => console.error(e) });
+      .to(createConditionTransfer<SearchResult[]>({ shouldAccept: results => results.length > 0 }))
+      .finish(createSinkTransfer<SearchResult[]>({
+        callback: results => rendered.push(results),
+      }), { owned: true });
 
-    input.push('user@example.com');
+    // Short query — rejected by shouldAccept
+    input.push('ab');
+    await wait(100);
+    expect(rendered).toEqual([]);
+    expect(searchAPI).not.toHaveBeenCalled();
 
-    await wait(200);
+    // Valid query — results rendered
+    input.push('hello');
+    await wait(100);
+    expect(rendered).toEqual([[{ id: 1, title: 'hello' }]]);
+    expect(errors).toEqual([]);
+
+    // API fails — onError catches, stream survives
+    shouldFail = true;
+    input.push('world');
+    await wait(100);
+    expect(errors.length).toBe(1);
+    expect(rendered).toEqual([[{ id: 1, title: 'hello' }]]); // no new render
+
+    // API returns empty — suppressed by shouldEmit
+    shouldFail = false;
+    returnEmpty = true;
+    input.push('test');
+    await wait(100);
+    expect(rendered).toEqual([[{ id: 1, title: 'hello' }]]); // still no new render
+
     pipeline.destroy();
-
-    expect(saveResult).toHaveBeenCalled();
-    expect(sinkResults[0]).toEqual({ valid: true });
   });
 });
 

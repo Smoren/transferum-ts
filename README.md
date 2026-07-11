@@ -763,19 +763,29 @@ routes.uncheck('elk');
 
 RxJS handles routing via manual subscription management — a `Map` to track active subscriptions and explicit `activateRoute`/`deactivateRoute` functions. Transferum's `BridgeMultiSelector` is a first-class routing object: declarative bridge list, built-in subscription management (`owned: true`), and `select()` / `check()` / `uncheck()` to switch routes at runtime.
 
-**Code comparison — Debounced search:**
+**Code comparison — Debounced search with error handling and empty-result suppression:**
+
+The API call can fail — errors must be logged without killing the stream. Empty result sets must not reach the renderer.
 
 ```typescript
 // RxJS
-import { fromEvent } from 'rxjs';
-import { debounceTime, switchMap, filter, map } from 'rxjs/operators';
+import { fromEvent, from, EMPTY } from 'rxjs';
+import { debounceTime, switchMap, filter, map, catchError } from 'rxjs/operators';
 
 fromEvent(searchInput, 'input')
   .pipe(
     debounceTime(300),
     map((e: Event) => (e.target as HTMLInputElement).value),
     filter(query => query.length >= 3),
-    switchMap(query => fetch(`/api/search?q=${query}`))
+    switchMap(query =>
+      from(searchAPI(query)).pipe(
+        catchError(e => {
+          console.error(e);
+          return EMPTY;
+        })
+      )
+    ),
+    filter(results => results.length > 0)
   )
   .subscribe(results => render(results));
 ```
@@ -783,23 +793,21 @@ fromEvent(searchInput, 'input')
 ```typescript
 // Transferum
 import {
-  AsyncInputPipelineBuilder,
-  createDebounceTransfer,
-  createAsyncConditionTransfer,
-  createAsyncConvertTransfer,
-  createAsyncSinkTransfer,
-  createAsyncMapOperator,
+  AsyncInputPipelineBuilder, createDebounceTransfer, createConditionTransfer,
+  createAsyncConvertTransfer, createSinkTransfer, createAsyncMapOperator,
 } from 'transferum';
 
 const input = createDebounceTransfer<string>({ delay: 300 });
 
 const pipeline = AsyncInputPipelineBuilder
   .start(input)
-  .to(createAsyncConditionTransfer<string>({ shouldAccept: q => q.length >= 3 }))
+  .to(createConditionTransfer<string>({ shouldAccept: q => q.length >= 3 }))
   .to(createAsyncConvertTransfer<string, SearchResult[]>({
     operator: createAsyncMapOperator(async q => await searchAPI(q)),
+    onError: (e) => console.error(e),
   }))
-  .finish(createAsyncSinkTransfer<SearchResult[]>({
+  .to(createConditionTransfer<SearchResult[]>({ shouldAccept: results => results.length > 0 }))
+  .finish(createSinkTransfer<SearchResult[]>({
     callback: results => render(results),
   }), { owned: true });
 

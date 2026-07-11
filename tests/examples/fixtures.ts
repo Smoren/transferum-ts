@@ -35,6 +35,7 @@ export type ValidationResult = { valid: boolean; message?: string };
 export type RawData = { raw: string };
 export type ProcessedData = { processed: string };
 export type Telemetry = { name: string; value: number };
+export type SearchResult = { id: number; title: string };
 
 // ═══════════════════════════════════════════════════════════════
 // Helper Functions for Examples
