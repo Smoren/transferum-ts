@@ -165,28 +165,7 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'ChannelTransfer setup error with onSetupError suppresses test',
-  () => {
-    it('', () => {
-      const error = new Error('setup error');
-      const onSetupError = jest.fn();
-
-      const transfer = new ChannelTransfer<number>({
-        setup: () => { throw error; },
-        destroy: () => {},
-        onSetupError,
-      });
-
-      expect(onSetupError).toHaveBeenCalledTimes(1);
-      expect(onSetupError).toHaveBeenCalledWith(error, transfer);
-
-      transfer.destroy();
-    });
-  },
-);
-
-describe(
-  'ChannelTransfer setup error without onSetupError rethrows test',
+  'ChannelTransfer setup error always rethrows test',
   () => {
     it('', () => {
       expect(() => new ChannelTransfer<number>({
@@ -202,24 +181,24 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'ChannelTransfer emit error with onEmitError suppresses test',
+  'ChannelTransfer emit error with onError suppresses test',
   () => {
     it('', () => {
       const error = new Error('handler error');
-      const onEmitError = jest.fn();
+      const onError = jest.fn();
       let emit!: (data: number) => void;
 
       const transfer = new ChannelTransfer<number>({
         setup: (e) => { emit = e; },
         destroy: () => {},
-        onEmitError,
+        onError,
       });
 
       transfer.subscribe(() => { throw error; });
       emit(42);
 
-      expect(onEmitError).toHaveBeenCalledTimes(1);
-      expect(onEmitError).toHaveBeenCalledWith(error, transfer);
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith(error, transfer);
 
       transfer.destroy();
     });
@@ -227,7 +206,7 @@ describe(
 );
 
 describe(
-  'ChannelTransfer emit error without onEmitError rethrows test',
+  'ChannelTransfer emit error without onError rethrows test',
   () => {
     it('', () => {
       let emit!: (data: number) => void;

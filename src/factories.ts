@@ -409,7 +409,7 @@ export function createIdlePollingTransfer<T>(
  *
  * Capabilities: Subscribable
  *
- * @param config — configuration (setup, destroy, onSetupError, onEmitError, onDestroyError)
+ * @param config — configuration (setup, destroy, onError, onDestroyError)
  * @example
  * const channel = createChannelTransfer<number>({
  *   setup: (emit) => {
@@ -535,7 +535,7 @@ export function createConvertTransfer<TInput, TOutput>(
  *
  * Capabilities: Pushable, Subscribable
  *
- * @param config — configuration (shouldAccept, shouldEmit, onError)
+ * @param config — configuration (shouldAccept?, shouldEmit?, onAcceptError, onEmitError)
  * @example
  * const condition = createConditionTransfer<number>({
  *   shouldAccept: x => x > 0,
@@ -910,7 +910,7 @@ export function createAsyncConvertTransfer<TInput, TOutput>(
  *
  * Capabilities: AsyncPushable, Subscribable
  *
- * @param config — configuration (shouldAccept?, shouldEmit?, onError)
+ * @param config — configuration (shouldAccept?, shouldEmit?, onAcceptError, onEmitError)
  */
 export function createAsyncConditionTransfer<T>(
   config: AsyncConditionTransferConfig<T>

@@ -1296,23 +1296,15 @@ describe(
 );
 
 describe(
-  'createChannelTransfer handles setup error test',
+  'createChannelTransfer setup error always rethrows test',
   () => {
     it('', () => {
-      const onError = jest.fn();
-
-      const channel = createChannelTransfer<number>({
+      expect(() => createChannelTransfer<number>({
         setup: () => {
           throw new Error('Setup error');
         },
         destroy: () => {},
-        onSetupError: onError,
-      });
-
-      expect(onError).toHaveBeenCalledTimes(1);
-      expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'Setup error' }), channel);
-
-      channel.destroy();
+      })).toThrow('Setup error');
     });
   },
 );

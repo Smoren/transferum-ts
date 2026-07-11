@@ -120,18 +120,16 @@ export type SinkTransferConfig<T> = ErrorHandlingConfig<SinkTransfer<T>> & {
 }
 
 /** Configuration for ChannelTransfer — external setup/destroy callbacks with per-stage error handlers. */
-export type ChannelTransferConfig<T> = {
+export type ChannelTransferConfig<T> = ErrorHandlingConfig<ChannelTransfer<T>> & {
   readonly setup: (emit: DataHandler<T>) => void;
   readonly destroy: () => void;
-  readonly onEmitError?: ErrorHandler<ChannelTransfer<T>>;
   readonly onDestroyError?: ErrorHandler<ChannelTransfer<T>>;
 }
 
 /** Configuration for StoredChannelTransfer — channel config plus optional initial value. */
-export type StoredChannelTransferConfig<T> = BaseStateTransferConfig<T> & {
+export type StoredChannelTransferConfig<T> = BaseStateTransferConfig<T> & ErrorHandlingConfig<StoredChannelTransfer<T>> & {
   readonly setup: (emit: DataHandler<T>) => void;
   readonly destroy: () => void;
-  readonly onEmitError?: ErrorHandler<StoredChannelTransfer<T>>;
   readonly onDestroyError?: ErrorHandler<StoredChannelTransfer<T>>;
 }
 
@@ -234,10 +232,9 @@ export type AsyncConditionTransferConfig<T> = {
 }
 
 /** Configuration for AsyncStoredChannelTransfer — channel config with async pull/trigger interface plus optional initial value. */
-export type AsyncStoredChannelTransferConfig<T> = BaseStateTransferConfig<T> & {
+export type AsyncStoredChannelTransferConfig<T> = BaseStateTransferConfig<T> & ErrorHandlingConfig<AsyncStoredChannelTransfer<T>> & {
   readonly setup: (emit: DataHandler<T>) => void;
   readonly destroy: () => void;
-  readonly onEmitError?: ErrorHandler<AsyncStoredChannelTransfer<T>>;
   readonly onDestroyError?: ErrorHandler<AsyncStoredChannelTransfer<T>>;
 }
 

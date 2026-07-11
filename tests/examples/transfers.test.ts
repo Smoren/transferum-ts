@@ -346,7 +346,7 @@ describe('README Transfers: ChannelTransfer', () => {
           clearInterval(intervalId);
         }
       },
-      onEmitError: (e) => console.error(e),
+      onError: (e) => console.error(e),
     });
 
     const received: number[] = [];

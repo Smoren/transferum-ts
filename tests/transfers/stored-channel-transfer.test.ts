@@ -227,28 +227,7 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'StoredChannelTransfer setup error with onSetupError suppresses test',
-  () => {
-    it('', () => {
-      const error = new Error('setup error');
-      const onSetupError = jest.fn();
-
-      const transfer = new StoredChannelTransfer<number>({
-        setup: () => { throw error; },
-        destroy: () => {},
-        onSetupError,
-      });
-
-      expect(onSetupError).toHaveBeenCalledTimes(1);
-      expect(onSetupError).toHaveBeenCalledWith(error, transfer);
-
-      transfer.destroy();
-    });
-  },
-);
-
-describe(
-  'StoredChannelTransfer setup error without onSetupError rethrows test',
+  'StoredChannelTransfer setup error always rethrows test',
   () => {
     it('', () => {
       expect(() => new StoredChannelTransfer<number>({
@@ -264,23 +243,23 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'StoredChannelTransfer trigger error with onEmitError suppresses test',
+  'StoredChannelTransfer trigger error with onError suppresses test',
   () => {
     it('', () => {
       const error = new Error('handler error');
-      const onEmitError = jest.fn();
+      const onError = jest.fn();
       const transfer = new StoredChannelTransfer<number>({
         setup: () => {},
         destroy: () => {},
-        onEmitError,
+        onError,
         initialValue: 42,
       });
 
       transfer.subscribe(() => { throw error; });
       transfer.trigger();
 
-      expect(onEmitError).toHaveBeenCalledTimes(1);
-      expect(onEmitError).toHaveBeenCalledWith(error, transfer);
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith(error, transfer);
 
       transfer.destroy();
     });
@@ -288,7 +267,7 @@ describe(
 );
 
 describe(
-  'StoredChannelTransfer trigger error without onEmitError rethrows test',
+  'StoredChannelTransfer trigger error without onError rethrows test',
   () => {
     it('', () => {
       const transfer = new StoredChannelTransfer<number>({
@@ -331,14 +310,3 @@ describe(
   },
 );
 
-describe(
-  'StoredChannelTransfer setup error without onSetupError rethrows test',
-  () => {
-    it('', () => {
-      expect(() => new StoredChannelTransfer<number>({
-        setup: () => { throw new Error('setup error'); },
-        destroy: () => {},
-      })).toThrow('setup error');
-    });
-  },
-);

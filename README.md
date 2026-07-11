@@ -1434,7 +1434,7 @@ const channel = createChannelTransfer<number>({
   destroy: () => {
     // resource cleanup
   },
-  onEmitError: (e) => console.error(e),
+  onError: (e) => console.error(e),
 });
 
 channel.subscribe((data) => console.log(data));
@@ -2396,32 +2396,32 @@ Key types are defined in `types.ts`:
 
 Configs are defined in `configs.ts`. All configs are types (not classes), passed to transfer and bridge constructors.
 
-| Config                                | For                          | Required fields                                          |
-|---------------------------------------|------------------------------|----------------------------------------------------------|
-| `GateTransferConfig`                  | `GateTransfer`               | `activated`                                              |
-| `DelayedPushChannelTransferConfig<T>` | `DelayedPushChannelTransfer` | `delay`                                                  |
-| `DebounceTransferConfig`              | `DebounceTransfer`           | `delay`                                                  |
-| `ThrottleTransferConfig`              | `ThrottleTransfer`           | `interval`                                               |
-| `MergeTransferConfig<T>`              | `MergeTransfer`              | `sources`                                                |
-| `SplitTransferConfig<T>`              | `SplitTransfer`              | `targets`                                                |
-| `PollingSourceTransferConfig<T>`      | `PollingSourceTransfer`      | `fetcher`, `interval`, `activated`                       |
-| `PollingProxyTransferConfig`          | `PollingProxyTransfer`       | `interval`, `activated`                                  |
-| `PollingFlowTransferConfig<T>`        | `PollingFlowTransfer`        | `flow`, `interval`, `activated`                          |
-| `IdlePollingTransferConfig<T>`        | `IdlePollingTransfer`        | `fetcher`, `timeout`, `interval`, `activated`            |
-| `ChannelTransferConfig<T>`            | `ChannelTransfer`            | `setup`, `destroy`                                       |
-| `StoredChannelTransferConfig<T>`      | `StoredChannelTransfer`      | `setup`, `destroy`                                       |
-| `SinkTransferConfig<T>`               | `SinkTransfer`               | `callback`, `onError?`                                   |
-| `WriteTransferConfig<T>`              | `WriteTransfer`              | `flow`                                                   |
-| `ReadTransferConfig<T>`               | `ReadTransfer`               | `flow`                                                   |
-| `ConvertTransferConfig<TIn, TOut>`    | `ConvertTransfer`            | `operator`                                               |
+| Config                                | For                          | Required fields                                               |
+|---------------------------------------|------------------------------|---------------------------------------------------------------|
+| `GateTransferConfig`                  | `GateTransfer`               | `activated`                                                   |
+| `DelayedPushChannelTransferConfig<T>` | `DelayedPushChannelTransfer` | `delay`                                                       |
+| `DebounceTransferConfig`              | `DebounceTransfer`           | `delay`                                                       |
+| `ThrottleTransferConfig`              | `ThrottleTransfer`           | `interval`                                                    |
+| `MergeTransferConfig<T>`              | `MergeTransfer`              | `sources`                                                     |
+| `SplitTransferConfig<T>`              | `SplitTransfer`              | `targets`                                                     |
+| `PollingSourceTransferConfig<T>`      | `PollingSourceTransfer`      | `fetcher`, `interval`, `activated`                            |
+| `PollingProxyTransferConfig`          | `PollingProxyTransfer`       | `interval`, `activated`                                       |
+| `PollingFlowTransferConfig<T>`        | `PollingFlowTransfer`        | `flow`, `interval`, `activated`                               |
+| `IdlePollingTransferConfig<T>`        | `IdlePollingTransfer`        | `fetcher`, `timeout`, `interval`, `activated`                 |
+| `ChannelTransferConfig<T>`            | `ChannelTransfer`            | `setup`, `destroy`, `onError?`, `onDestroyError?`             |
+| `StoredChannelTransferConfig<T>`      | `StoredChannelTransfer`      | `setup`, `destroy`, `onError?`, `onDestroyError?`             |
+| `SinkTransferConfig<T>`               | `SinkTransfer`               | `callback`, `onError?`                                        |
+| `WriteTransferConfig<T>`              | `WriteTransfer`              | `flow`                                                        |
+| `ReadTransferConfig<T>`               | `ReadTransfer`               | `flow`                                                        |
+| `ConvertTransferConfig<TIn, TOut>`    | `ConvertTransfer`            | `operator`                                                    |
 | `ConditionTransferConfig<T>`          | `ConditionTransfer`          | — (predicates are optional), `onAcceptError?`, `onEmitError?` |
-| `CompositeTransferConfig<TIn, TOut>`  | `UniversalCompositeTransfer` | `input`, `output`                                        |
-| `PassBridgeConfig<T>`                 | `PassBridge`                 | `source`, `target`, `activated`                          |
-| `TransformBridgeConfig<TIn, TOut>`    | `TransformBridge`            | `source`, `target`, `operator`, `activated`              |
-| `TransferBridgeConfig<TIn, TOut>`     | `TransferBridge`             | `source`, `target`, `middle`, `middleOwned`, `activated` |
-| `BridgeAggregatorConfig`              | `BridgeAggregator`           | `bridges`, `activated`, `owned`                          |
-| `BridgeSelectorConfig<TMap>`          | `BridgeSelector`             | `bridges`, `initialKey`, `activated`, `owned`            |
-| `BridgeMultiSelectorConfig<TMap>`     | `BridgeMultiSelector`        | `bridges`, `initialKeys`, `activated`, `owned`           |
+| `CompositeTransferConfig<TIn, TOut>`  | `UniversalCompositeTransfer` | `input`, `output`                                             |
+| `PassBridgeConfig<T>`                 | `PassBridge`                 | `source`, `target`, `activated`                               |
+| `TransformBridgeConfig<TIn, TOut>`    | `TransformBridge`            | `source`, `target`, `operator`, `activated`                   |
+| `TransferBridgeConfig<TIn, TOut>`     | `TransferBridge`             | `source`, `target`, `middle`, `middleOwned`, `activated`      |
+| `BridgeAggregatorConfig`              | `BridgeAggregator`           | `bridges`, `activated`, `owned`                               |
+| `BridgeSelectorConfig<TMap>`          | `BridgeSelector`             | `bridges`, `initialKey`, `activated`, `owned`                 |
+| `BridgeMultiSelectorConfig<TMap>`     | `BridgeMultiSelector`        | `bridges`, `initialKeys`, `activated`, `owned`                |
 
 **Async configs:**
 
@@ -2436,7 +2436,7 @@ Configs are defined in `configs.ts`. All configs are types (not classes), passed
 | `AsyncReadTransferConfig<T>`            | `AsyncReadTransfer`                | `flow`                                        |
 | `AsyncConvertTransferConfig<TIn, TOut>` | `AsyncConvertTransfer`             | `operator` (AsyncOperatorInterface)           |
 | `AsyncConditionTransferConfig<T>`       | `AsyncConditionTransfer`           | — (predicates are optional, sync or async), `onAcceptError?`, `onEmitError?` |
-| `AsyncStoredChannelTransferConfig<T>`   | `AsyncStoredChannelTransfer`       | `setup`, `destroy`                            |
+| `AsyncStoredChannelTransferConfig<T>`   | `AsyncStoredChannelTransfer`       | `setup`, `destroy`, `onError?`, `onDestroyError?`           |
 | `AsyncTransformBridgeConfig<TIn, TOut>` | `AsyncTransformBridge`             | `source`, `target`, `operator`, `activated`   |
 | `LinkConfig<TTargetTransfer>`           | `linkTransfers` (async strategies) | `onError?`                                    |
 
@@ -2446,7 +2446,7 @@ All polling transfers support an optional `tickerFactory?: TickerFactory` to rep
 |----------------|-------------------------------|-------------------------|
 | `TickerConfig` | `RAFTicker`, `IntervalTicker` | `callback`, `interval?` |
 
-Many configs include optional error handlers (`onError`, `onSetupError`, `onEmitError`, `onDestroyError`). Each handler receives `(error: Error, source: TSource)` where `source` is the transfer instance that triggered the error.
+Many configs include optional error handlers (`onError`, `onAcceptError`, `onEmitError`, `onDestroyError`). Each handler receives `(error: Error, source: TSource)` where `source` is the transfer instance that triggered the error.
 
 ---
 

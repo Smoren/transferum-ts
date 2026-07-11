@@ -278,26 +278,7 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'AsyncStoredChannelTransfer setup error with onSetupError suppresses test',
-  () => {
-    it('', () => {
-      const onSetupError = jest.fn();
-      const transfer = new AsyncStoredChannelTransfer<number>({
-        setup: () => { throw new Error('setup error'); },
-        destroy: () => {},
-        onSetupError,
-      });
-
-      expect(onSetupError).toHaveBeenCalledTimes(1);
-      expect(onSetupError).toHaveBeenCalledWith(expect.any(Error), transfer);
-
-      transfer.destroy();
-    });
-  },
-);
-
-describe(
-  'AsyncStoredChannelTransfer setup error without onSetupError rethrows test',
+  'AsyncStoredChannelTransfer setup error always rethrows test',
   () => {
     it('', () => {
       expect(() => new AsyncStoredChannelTransfer<number>({
@@ -375,15 +356,15 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'AsyncStoredChannelTransfer asyncTrigger error with onEmitError suppresses test',
+  'AsyncStoredChannelTransfer asyncTrigger error with onError suppresses test',
   () => {
     it('', async () => {
-      const onEmitError = jest.fn();
+      const onError = jest.fn();
       let emitFn: ((data: number) => void) | null = null;
       const transfer = new AsyncStoredChannelTransfer<number>({
         setup: (emit) => { emitFn = emit; },
         destroy: () => {},
-        onEmitError,
+        onError,
       });
 
       // Subscribe a handler that throws an error
@@ -392,8 +373,8 @@ describe(
       emitFn!(42);
       await new Promise<void>((resolve) => setTimeout(resolve, 10));
 
-      expect(onEmitError).toHaveBeenCalledTimes(1);
-      expect(onEmitError).toHaveBeenCalledWith(expect.any(Error), transfer);
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith(expect.any(Error), transfer);
 
       transfer.destroy();
     });

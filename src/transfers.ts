@@ -1173,7 +1173,7 @@ export class PollingProxyTransfer<T> extends BaseStateTransfer<T> implements Pol
  * 4. destroy() — calls config.destroy(), unsubscribes subscribers
  *
  * Error handling:
- * - onEmitError — for errors in emit() (when sending data to subscribers)
+ * - onError — for errors in emit() (when sending data to subscribers)
  * - onDestroyError — for errors in destroy()
  * - With the corresponding handler provided, the exception is suppressed.
  * - Without a handler, the exception is rethrown.
@@ -1183,7 +1183,7 @@ export class PollingProxyTransfer<T> extends BaseStateTransfer<T> implements Pol
  * Configuration (ChannelTransferConfig):
  * - setup: (emit: DataHandler<T>) => void — channel initialization
  * - destroy: () => void — channel cleanup
- * - onEmitError?: ErrorHandler — emit() error handler
+ * - onError?: ErrorHandler — emit() error handler
  * - onDestroyError?: ErrorHandler — destroy() error handler
  *
  * Difference from StoredChannelTransfer:
@@ -1203,8 +1203,7 @@ export class ChannelTransfer<T> extends BaseStateTransfer<T> implements Subscrib
 
   protected readonly _emit: DataHandler<T>;
   protected readonly _destroy: () => void;
-  protected readonly _onSetupError?: ErrorHandler<ChannelTransfer<T>>;
-  protected readonly _onEmitError?: ErrorHandler<ChannelTransfer<T>>;
+  protected readonly _onError?: ErrorHandler<ChannelTransfer<T>>;
   protected readonly _onDestroyError?: ErrorHandler<ChannelTransfer<T>>;
 
   private readonly _subscription: SubscriptionManager<T>;
@@ -1212,8 +1211,7 @@ export class ChannelTransfer<T> extends BaseStateTransfer<T> implements Subscrib
   constructor(config: ChannelTransferConfig<T>) {
     super({ ...config, initialValue: undefined });
     this._subscription = new SubscriptionManager(this._state);
-    this._onSetupError = config.onSetupError;
-    this._onEmitError = config.onEmitError;
+    this._onError = config.onError;
     this._onDestroyError = config.onDestroyError;
 
     this._destroy = config.destroy;
@@ -1222,16 +1220,12 @@ export class ChannelTransfer<T> extends BaseStateTransfer<T> implements Subscrib
       try {
         this._subscription.sendState();
       } catch (e) {
-        handleError(e, this, this._onEmitError);
+        handleError(e, this, this._onError);
       }
       this._state.clear();
     };
 
-    try {
-      config.setup(this._emit);
-    } catch (e) {
-      handleError(e, this, this._onSetupError);
-    }
+    config.setup(this._emit);
   }
 
   public subscribe(handler: DataHandler<T>): SubscriberInterface {
@@ -1266,18 +1260,17 @@ export class ChannelTransfer<T> extends BaseStateTransfer<T> implements Subscrib
  * 6. destroy() — calls config.destroy(), unsubscribes subscribers
  *
  * Error handling:
- * - onSetupError — for errors in setup() (constructor)
- * - onEmitError — for errors in emit() (when sending data to subscribers)
+ * - onError — for errors in emit() (when sending data to subscribers)
  * - onDestroyError — for errors in destroy()
  * - With the corresponding handler provided, the exception is suppressed.
  * - Without a handler, the exception is rethrown.
+ * - setup() errors are always rethrown (no onSetupError).
  *
  * Configuration (StoredChannelTransferConfig):
  * - setup: (emit: DataHandler<T>) => void — channel initialization
  * - destroy: () => void — channel cleanup
  * - initialValue?: T — initial value in _state
- * - onSetupError?: ErrorHandler — setup() error handler
- * - onEmitError?: ErrorHandler — emit() error handler
+ * - onError?: ErrorHandler — emit() error handler
  * - onDestroyError?: ErrorHandler — destroy() error handler
  *
  * Difference from ChannelTransfer:
@@ -1299,8 +1292,7 @@ export class StoredChannelTransfer<T> extends BaseStateTransfer<T> implements Su
 
   protected readonly _emit: DataHandler<T>;
   protected readonly _destroy: () => void;
-  protected readonly _onSetupError?: ErrorHandler<StoredChannelTransfer<T>>;
-  protected readonly _onEmitError?: ErrorHandler<StoredChannelTransfer<T>>;
+  protected readonly _onError?: ErrorHandler<StoredChannelTransfer<T>>;
   protected readonly _onDestroyError?: ErrorHandler<StoredChannelTransfer<T>>;
 
   private readonly _subscription: SubscriptionManager<T>;
@@ -1308,8 +1300,7 @@ export class StoredChannelTransfer<T> extends BaseStateTransfer<T> implements Su
   constructor(config: StoredChannelTransferConfig<T>) {
     super(config);
     this._subscription = new SubscriptionManager(this._state);
-    this._onSetupError = config.onSetupError;
-    this._onEmitError = config.onEmitError;
+    this._onError = config.onError;
     this._onDestroyError = config.onDestroyError;
     this._destroy = config.destroy;
     this._emit = (data: T) => {
@@ -1317,11 +1308,7 @@ export class StoredChannelTransfer<T> extends BaseStateTransfer<T> implements Su
       this.trigger();
     };
 
-    try {
-      config.setup(this._emit);
-    } catch (e) {
-      handleError(e, this, this._onSetupError);
-    }
+    config.setup(this._emit);
   }
 
   public pull(): T | undefined {
@@ -1336,7 +1323,7 @@ export class StoredChannelTransfer<T> extends BaseStateTransfer<T> implements Su
     try {
       this._subscription.sendState();
     } catch (e) {
-      handleError(e, this, this._onEmitError);
+      handleError(e, this, this._onError);
     }
   }
 
@@ -2989,7 +2976,7 @@ export class AsyncConditionTransfer<T> extends BaseStateTransfer<T> implements A
  * - setup: (emit: DataHandler<T>) => void
  * - destroy: () => void
  * - initialValue?: T
- * - onSetupError?, onEmitError?, onDestroyError?: ErrorHandler
+ * - onError?, onDestroyError?: ErrorHandler
  */
 export class AsyncStoredChannelTransfer<T> extends BaseStateTransfer<T> implements SubscribableTransferInterface<T>, AsyncPullableTransferInterface<T>, AsyncTriggerableInterface {
   override readonly isOutput = true;
@@ -3000,8 +2987,7 @@ export class AsyncStoredChannelTransfer<T> extends BaseStateTransfer<T> implemen
 
   protected readonly _emit: DataHandler<T>;
   protected readonly _destroy: () => void;
-  protected readonly _onSetupError?: ErrorHandler<AsyncStoredChannelTransfer<T>>;
-  protected readonly _onEmitError?: ErrorHandler<AsyncStoredChannelTransfer<T>>;
+  protected readonly _onError?: ErrorHandler<AsyncStoredChannelTransfer<T>>;
   protected readonly _onDestroyError?: ErrorHandler<AsyncStoredChannelTransfer<T>>;
 
   private readonly _subscription: SubscriptionManager<T>;
@@ -3009,8 +2995,7 @@ export class AsyncStoredChannelTransfer<T> extends BaseStateTransfer<T> implemen
   constructor(config: AsyncStoredChannelTransferConfig<T>) {
     super(config);
     this._subscription = new SubscriptionManager(this._state);
-    this._onSetupError = config.onSetupError;
-    this._onEmitError = config.onEmitError;
+    this._onError = config.onError;
     this._onDestroyError = config.onDestroyError;
     this._destroy = config.destroy;
     this._emit = (data: T) => {
@@ -3018,11 +3003,7 @@ export class AsyncStoredChannelTransfer<T> extends BaseStateTransfer<T> implemen
       this._safeTrigger();
     };
 
-    try {
-      config.setup(this._emit);
-    } catch (e) {
-      handleError(e, this, this._onSetupError);
-    }
+    config.setup(this._emit);
   }
 
   public async asyncPull(): Promise<T | undefined> {
@@ -3037,7 +3018,7 @@ export class AsyncStoredChannelTransfer<T> extends BaseStateTransfer<T> implemen
     try {
       this._subscription.sendState();
     } catch (e) {
-      handleError(e, this, this._onEmitError);
+      handleError(e, this, this._onError);
     }
   }
 
