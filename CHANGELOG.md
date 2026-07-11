@@ -3,7 +3,7 @@
 ## v0.3.1 - 2026-07-11
 
 ### Documentation
-* REAMDE and keywords updated.
+* README and keywords updated.
 
 ## v0.3.0 - 2026-07-11
 
