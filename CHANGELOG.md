@@ -1,5 +1,27 @@
 # Transferum Change Log
 
+## v1.0.0 - 2026-07-11
+
+### Stable release
+First stable release. The public API is now frozen — no breaking changes are planned within the v1.x line.
+
+* **Codebase Stability:** `v1.0.0` (as well as `v0.3.1`) contains absolutely no changes to the `src/` directory. The API surface is officially confirmed as stable.
+* **API Stability Marker:** `v0.3.0` finalized the error handling model (`ErrorHandler<TSource>`, `handleError()`, per-stage handlers, fail-safe polling).
+
+### Documentation
+* **Comparison Tables:** Clarified operator counts by distinguishing pure operators (~10, stateless transforms) from flow-control transfers with explicit lifecycle.
+* **API Mapping:** Added an "Operator-equivalent coverage" row mapping RxJS operators to Transferum transfers (`debounceTime` → `DebounceTransfer`, `filter` → `ConditionTransfer`, `merge` → `MergeTransfer`, `share` → `SplitTransfer`, `takeUntil` → `GateTransfer`, `delay` → `DelayedPushChannelTransfer`).
+* **Architecture Highlights:** Updated the "Quick Comparison Table" with a "Flow-control as nodes" row, highlighting Transferum's transfer-based architecture versus operator-only alternatives.
+* **Alternative Recommendations:** The "When to Consider Alternatives" section for RxJS now lists specific uncovered operators (`combineLatest`, `zip`, `withLatestFrom`, `bufferCount`, `windowTime`, `retryWhen`) instead of using a generic operator-count argument.
+* **Code Examples:**
+  * Expanded the "Debounced search" code comparison to include realistic error handling (`catchError` / `onError`) and empty-result suppression (second `ConditionTransfer` / `filter`).
+  * Added a new code comparison: "Conditional routing with runtime switching" showcasing `BridgeMultiSelector` versus manual RxJS subscription management.
+
+### Tests
+* **Test Suite Alignment:** Replaced the "Debounced user input with async validation" test with "Debounced search with error handling and empty-result suppression" to perfectly match the updated README examples, covering API failure recovery and empty-result filtering.
+* **Fixtures:** Added the `SearchResult` type to test fixtures.
+* **Coverage:** Maintained **100% test coverage** (statements, branches, functions, lines) across all 11 source files with a total of **1,927 tests**.
+
 ## v0.3.1 - 2026-07-11
 
 ### Documentation
