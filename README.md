@@ -624,22 +624,23 @@ Transferum exists in a rich ecosystem of reactive and stream-processing librarie
 
 **RxJS** is the most widely adopted reactive programming library for JavaScript/TypeScript.
 
-| Aspect                           | Transferum                                                                 | RxJS                                                                       |
-|----------------------------------|----------------------------------------------------------------------------|----------------------------------------------------------------------------|
-| **Bundle size**                  | ~15 KB minified                                                            | ~35 KB minified (full), <5 KB (selective imports)                          |
-| **Dependencies**                 | Zero                                                                       | Zero (v7+)                                                                 |
-| **Learning curve**               | Moderate — explicit primitives                                             | Steep — 100+ operators, complex concepts                                   |
-| **Type inference**               | Strong — tuple-based pipeline types                                        | Strong — but complex generic chains                                        |
-| **Sync/Async unify**             | Built-in — `linkTransfers` handles both                                    | Manual — `from()`, `toPromise()`, `firstValueFrom()`                       |
-| **Pull-based**                   | Native — `Pullable`, `PollingProxy`                                        | Limited — mostly push-based                                                |
-| **Gate/Flow control**            | Built-in — `GateTransfer`, `BridgeSelector`                                | Manual — `takeUntil()`, `switchMap()`, subjects                            |
-| **Resource cleanup**             | Explicit — `destroy()` on every transfer                                   | Subscription-based — `subscription.unsubscribe()`                          |
-| **Error handling**               | Local, non-fatal — `onError` per transfer, fail-safe polling, typed source | Stream-level — `catchError()`, `retry()`, errors terminate stream          |
-| **Undefined handling**           | Suppressed — `undefined` never propagates                                  | Propagated — `undefined` is a valid value                                  |
-| **Operators**                    | ~10 core operators                                                         | 100+ operators (creation, transformation, filtering, combination, utility) |
-| **Flow control / Rate limiting** | Built-in — buffers, throttles, debounces                                   | Built-in — `throttle()`, `buffer()`, `sample()`                            |
-| **Testing**                      | Simple — fake timers, direct method calls                                  | Complex — `TestScheduler`, marble diagrams                                 |
-| **Community**                    | Small — single maintainer                                                  | Large — Google, widespread adoption                                        |
+| Aspect                           | Transferum                                                                                                                                                                                                             | RxJS                                                                                    |
+|----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|
+| **Bundle size**                  | ~15 KB minified                                                                                                                                                                                                        | ~35 KB minified (full), <5 KB (selective imports)                                       |
+| **Dependencies**                 | Zero                                                                                                                                                                                                                   | Zero (v7+)                                                                              |
+| **Learning curve**               | Moderate — explicit primitives                                                                                                                                                                                         | Steep — 100+ operators, complex concepts                                                |
+| **Type inference**               | Strong — tuple-based pipeline types                                                                                                                                                                                    | Strong — but complex generic chains                                                     |
+| **Sync/Async unify**             | Built-in — `linkTransfers` handles both                                                                                                                                                                                | Manual — `from()`, `toPromise()`, `firstValueFrom()`                                    |
+| **Pull-based**                   | Native — `Pullable`, `PollingProxy`                                                                                                                                                                                    | Limited — mostly push-based                                                             |
+| **Gate/Flow control**            | Built-in — `GateTransfer`, `BridgeSelector`                                                                                                                                                                            | Manual — `takeUntil()`, `switchMap()`, subjects                                         |
+| **Resource cleanup**             | Explicit — `destroy()` on every transfer                                                                                                                                                                               | Subscription-based — `subscription.unsubscribe()`                                       |
+| **Error handling**               | Local, non-fatal — `onError` per transfer, fail-safe polling, typed source                                                                                                                                             | Stream-level — `catchError()`, `retry()`, errors terminate stream                       |
+| **Undefined handling**           | Suppressed — `undefined` never propagates                                                                                                                                                                              | Propagated — `undefined` is a valid value                                               |
+| **Operators**                    | ~10 pure operators (stateless transforms only)                                                                                                                                                                         | 100+ operators (creation, transformation, filtering, combination, utility)              |
+| **Flow control / Rate limiting** | Built-in transfers — `DebounceTransfer`, `ThrottleTransfer`, `BufferTransfer`, `GateTransfer` (with explicit lifecycle)                                                                                                | Built-in operators — `throttle()`, `buffer()`, `sample()` (state lives in subscription) |
+| **Operator-equivalent coverage** | Many RxJS operators are transfers: `debounceTime`→`DebounceTransfer`, `filter`→`ConditionTransfer`, `merge`→`MergeTransfer`, `share`→`SplitTransfer`, `takeUntil`→`GateTransfer`, `delay`→`DelayedPushChannelTransfer` | All flow control is operator-based — no separate node lifecycle                         |
+| **Testing**                      | Simple — fake timers, direct method calls                                                                                                                                                                              | Complex — `TestScheduler`, marble diagrams                                              |
+| **Community**                    | Small — single maintainer                                                                                                                                                                                              | Large — Google, widespread adoption                                                     |
 
 **Key differences:**
 
@@ -823,14 +824,14 @@ input.push(query); // manually push, or integrate with DOM event
 
 **Most.js** is a lightweight, high-performance FRP library.
 
-| Aspect            | Transferum                       | Most.js                  |
-|-------------------|----------------------------------|--------------------------|
-| **Bundle size**   | ~15 KB                           | ~7 KB                    |
-| **Status**        | Active (2026)                    | Maintenance mode (2020+) |
-| **Async support** | Built-in async transfers         | Native async event loop  |
-| **Pull-based**    | Yes — `Pullable`, `PollingProxy` | No — push-only           |
-| **TypeScript**    | First-class, strict types        | Community typings        |
-| **Operators**     | ~10                              | ~40                      |
+| Aspect            | Transferum                                        | Most.js                  |
+|-------------------|---------------------------------------------------|--------------------------|
+| **Bundle size**   | ~15 KB                                            | ~7 KB                    |
+| **Status**        | Active (2026)                                     | Maintenance mode (2020+) |
+| **Async support** | Built-in async transfers                          | Native async event loop  |
+| **Pull-based**    | Yes — `Pullable`, `PollingProxy`                  | No — push-only           |
+| **TypeScript**    | First-class, strict types                         | Community typings        |
+| **Operators**     | ~10 (pure transforms; flow control via transfers) | ~40                      |
 
 Most.js excels in raw performance for push-based streams but lacks Transferum's pull-based primitives and unified sync/async model.
 
@@ -855,20 +856,21 @@ Transferum's capability flags provide more granularity than the two-type model, 
 
 ### Quick Comparison Table
 
-| Feature                    | Transferum                  | RxJS                                 | Most.js           | Bacon.js          | Kefir             |
-|----------------------------|-----------------------------|--------------------------------------|-------------------|-------------------|-------------------|
-| **Bundle size (minified)** | ~15 KB                      | ~35 KB                               | ~7 KB             | ~12 KB            | ~8 KB             |
-| **Dependencies**           | 0                           | 0                                    | 0                 | 0                 | 0                 |
-| **Pull-based**             | ✓                           | ✗                                    | ✗                 | ✗                 | ✗                 |
-| **Sync/Async unify**       | ✓                           | Partial                              | Partial           | Partial           | Partial           |
-| **Built-in polling**       | ✓ (Ticker)                  | ✗ (manual)                           | ✗                 | ✗                 | ✗                 |
-| **Gate/Flow control**      | ✓ (GateTransfer, Bridge)    | Manual                               | Manual            | Manual            | Manual            |
-| **Error handling**         | Local, non-fatal, fail-safe | Stream-level (`catchError`, `retry`) | Stream terminates | Stream terminates | Stream terminates |
-| **Undefined suppression**  | ✓                           | ✗                                    | ✗                 | ✗                 | ✗                 |
-| **Operators count**        | ~10                         | 100+                                 | ~40               | ~60               | ~50               |
-| **TypeScript support**     | Excellent                   | Excellent                            | Good              | Fair              | Fair              |
-| **Community size**         | Small                       | Very large                           | Medium            | Small             | Small             |
-| **Maintenance status**     | Active                      | Active                               | Maintenance       | Maintenance       | Archived          |
+| Feature                    | Transferum                   | RxJS                                 | Most.js           | Bacon.js          | Kefir             |
+|----------------------------|------------------------------|--------------------------------------|-------------------|-------------------|-------------------|
+| **Bundle size (minified)** | ~15 KB                       | ~35 KB                               | ~7 KB             | ~12 KB            | ~8 KB             |
+| **Dependencies**           | 0                            | 0                                    | 0                 | 0                 | 0                 |
+| **Pull-based**             | ✓                            | ✗                                    | ✗                 | ✗                 | ✗                 |
+| **Sync/Async unify**       | ✓                            | Partial                              | Partial           | Partial           | Partial           |
+| **Built-in polling**       | ✓ (Ticker)                   | ✗ (manual)                           | ✗                 | ✗                 | ✗                 |
+| **Gate/Flow control**      | ✓ (GateTransfer, Bridge)     | Manual                               | Manual            | Manual            | Manual            |
+| **Error handling**         | Local, non-fatal, fail-safe  | Stream-level (`catchError`, `retry`) | Stream terminates | Stream terminates | Stream terminates |
+| **Undefined suppression**  | ✓                            | ✗                                    | ✗                 | ✗                 | ✗                 |
+| **Operators count**        | ~10 (pure transforms)        | 100+                                 | ~40               | ~60               | ~50               |
+| **Flow-control as nodes**  | ✓ (transfers with lifecycle) | ✗ (operators only)                   | ✗                 | ✗                 | ✗                 |
+| **TypeScript support**     | Excellent                    | Excellent                            | Good              | Fair              | Fair              |
+| **Community size**         | Small                        | Very large                           | Medium            | Small             | Small             |
+| **Maintenance status**     | Active                       | Active                               | Maintenance       | Maintenance       | Archived          |
 
 ---
 
@@ -893,7 +895,7 @@ Transferum's capability flags provide more granularity than the two-type model, 
 
 **Consider RxJS if:**
 
-- You need 100+ operators out of the box (windowing, combining, error recovery).
+- You need operators not covered by Transferum's transfers: stream combinators (`combineLatest`, `zip`, `withLatestFrom`), windowing (`bufferCount`, `windowTime`), or retry policies (`retryWhen`). Many common operators (`debounceTime`, `throttleTime`, `filter`, `merge`, `delay`, `takeUntil`) have transfer equivalents — see the comparison table above.
 - Your team already has RxJS expertise.
 - You need advanced scheduling (test scheduler, virtual time).
 - You need complex stream combination operators (e.g., combining 5+ distinct data sources with intricate join logic).
