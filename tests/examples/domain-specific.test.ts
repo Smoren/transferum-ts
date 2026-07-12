@@ -203,7 +203,7 @@ describe('README Domain-Specific: IoT - Monitoring & Alerts', () => {
     const alertPipeline = OutputPipelineBuilder
       .start(tempMonitor)
       .to(createConditionTransfer<number>({ shouldAccept: (temp) => temp > TEMPERATURE_THRESHOLD }))
-      .to(createThrottleTransfer<number>({ interval: 10 }))
+      .to(createThrottleTransfer<number>({ interval: 500 }))
       .finish(createConvertTransfer<number, Alert>({
         operator: createMapOperator((temp) => ({ type: 'HIGH_TEMP', value: temp })),
       }));
@@ -214,8 +214,9 @@ describe('README Domain-Specific: IoT - Monitoring & Alerts', () => {
     await wait(100);
     tempMonitor.deactivate();
 
-    expect(alerts.length).toBeGreaterThan(0);
-    expect(alerts[0].type).toBe('HIGH_TEMP');
+    // ~5 polls in 100ms, but throttle (500ms) passes only the leading edge
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toEqual({ type: 'HIGH_TEMP', value: 100 });
 
     alertPipeline.destroy();
     tempMonitor.destroy();
