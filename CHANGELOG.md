@@ -8,7 +8,7 @@
 ### Example tests
 * **Use-cases tests:** synced with README.
 * **Domain-specific tests:**: synced with README.
-* **Coverage:** Maintained **100% test coverage**. Total tests: **1,925** (was 1,927 — removed 2 tests for non-README sections, added 2 new tests).
+* **Coverage:** Maintained **100% test coverage**. Total tests: **1,925**.
 
 ## v1.0.0 - 2026-07-11
 
