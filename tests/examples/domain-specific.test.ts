@@ -5,6 +5,7 @@ import {
   createBridgeSelector,
   createPassBridge,
   createPushStoredChannelTransfer,
+  createThrottleTransfer,
   createBridgeMultiSelector,
   createMergeTransfer,
   createConditionTransfer,
@@ -190,26 +191,25 @@ describe('README Domain-Specific: IoT - Device Control', () => {
 });
 
 describe('README Domain-Specific: IoT - Monitoring & Alerts', () => {
-  it('monitors temperature with push-channel alerts', async () => {
-    const alertChannel = createPushChannelTransfer<Alert>();
-
-    const alerts: Alert[] = [];
-    alertChannel.subscribe((alert) => {
-      alerts.push(alert);
-    });
-
+  it('polls temperature, filters, throttles, converts to alerts', async () => {
     const tempMonitor = createAsyncPollingSourceTransfer<number>({
-      fetcher: () => Promise.resolve(30),
+      fetcher: () => Promise.resolve(100),
       interval: 20,
       activated: true,
     });
 
-    const THRESHOLD = 25;
-    tempMonitor.subscribe((temp) => {
-      if (temp > THRESHOLD) {
-        alertChannel.push({ type: 'HIGH_TEMP', value: temp });
-      }
-    });
+    const TEMPERATURE_THRESHOLD = 95;
+
+    const alertPipeline = OutputPipelineBuilder
+      .start(tempMonitor)
+      .to(createConditionTransfer<number>({ shouldAccept: (temp) => temp > TEMPERATURE_THRESHOLD }))
+      .to(createThrottleTransfer<number>({ interval: 10 }))
+      .finish(createConvertTransfer<number, Alert>({
+        operator: createMapOperator((temp) => ({ type: 'HIGH_TEMP', value: temp })),
+      }));
+
+    const alerts: Alert[] = [];
+    alertPipeline.subscribe((alert) => alerts.push(alert));
 
     await wait(100);
     tempMonitor.deactivate();
@@ -217,7 +217,7 @@ describe('README Domain-Specific: IoT - Monitoring & Alerts', () => {
     expect(alerts.length).toBeGreaterThan(0);
     expect(alerts[0].type).toBe('HIGH_TEMP');
 
-    alertChannel.destroy();
+    alertPipeline.destroy();
     tempMonitor.destroy();
   });
 });

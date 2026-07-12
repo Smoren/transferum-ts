@@ -434,24 +434,26 @@ commandRouter.select('thermostat'); // switch to thermostat control
 
 **Monitoring & Alerts**
 
-Use `AsyncPollingSourceTransfer` for periodic device status polling.
+Poll device temperature via `AsyncPollingSourceTransfer` → filter by threshold (`ConditionTransfer`) → throttle alerts (`ThrottleTransfer`) → transform into alert (`ConvertTransfer`) → send notification.
 
 ```typescript
-import { createPushChannelTransfer, createAsyncPollingSourceTransfer } from 'transferum';
+import { OutputPipelineBuilder, createConditionTransfer, createThrottleTransfer, createConvertTransfer, createMapOperator, createAsyncPollingSourceTransfer } from 'transferum';
 
-const alertChannel = createPushChannelTransfer<Alert>();
-alertChannel.subscribe((alert) => sendNotification(alert));
+const TEMPERATURE_THRESHOLD = 95;
 
 const tempMonitor = createAsyncPollingSourceTransfer<number>({
   fetcher: async () => await readTemperature(),
   interval: 1000,
   activated: true,
 });
-tempMonitor.subscribe((temp) => {
-  if (temp > THRESHOLD) {
-    alertChannel.push({ type: 'HIGH_TEMP', value: temp });
-  }
-});
+
+const alertPipeline = OutputPipelineBuilder
+  .start(tempMonitor)
+  .to(createConditionTransfer({ shouldAccept: (temp) => temp > TEMPERATURE_THRESHOLD }))
+  .to(createThrottleTransfer({ interval: 5000 }))
+  .finish(createConvertTransfer({ operator: createMapOperator((temp): Alert => ({ type: 'HIGH_TEMP', value: temp })) }));
+
+alertPipeline.subscribe((alert) => sendNotification(alert));
 ```
 
 ---
