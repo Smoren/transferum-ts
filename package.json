@@ -1,6 +1,6 @@
 {
   "name": "transferum",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Type-safe reactive data processing pipelines with composable transfers, bridges, and operators — sync and async in one unified system",
   "license": "MIT",
   "repository": {

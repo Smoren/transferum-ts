@@ -529,10 +529,10 @@ const thresholdChannel = createPushStoredChannelTransfer<number>({ initialValue:
 const indicatorPipeline = DuplexPipelineBuilder
   .start(quoteStream)
   .to(createConvertTransfer<Quote[], TechnicalIndicator>({
-    operator: createMapOperator((quotes) => ({
+    operator: createMapOperator((quotes): TechnicalIndicator => ({
       value: quotes.reduce((sum, q) => sum + q.price, 0),
       symbols: quotes.map((q) => q.symbol),
-      threshold: thresholdChannel.pull(),
+      threshold: thresholdChannel.pull() ?? 0,
     })),
   }))
   .to(createConditionTransfer<TechnicalIndicator>({ shouldAccept: (ind) => ind.value > ind.threshold }))

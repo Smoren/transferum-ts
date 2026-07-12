@@ -28,8 +28,8 @@ import { describe, expect, it, jest } from '@jest/globals';
 import type {
   ServerState,
   ViewModel,
-  SensorData,
-  FeedItem,
+  SensorReading,
+  SensorState,
   ValidationResult,
   RawData,
   ProcessedData,
@@ -42,7 +42,6 @@ import {
   wait,
   toViewModel,
   validate,
-  // @ts-ignore
 } from './fixtures';
 
 // ═══════════════════════════════════════════════════════════════
@@ -146,14 +145,14 @@ describe('README Use Cases: Debounced search with error handling and empty-resul
 
 describe('README Use Cases: Merging multiple data sources into a single view', () => {
   it('merges multiple sensor streams into one', async () => {
-    const tempSensor = createAsyncPollingSourceTransfer<SensorData>({ fetcher: () => Promise.resolve({ temperature: 25, humidity: 50 }), interval: 1000, activated: true });
-    const humiditySensor = createAsyncPollingSourceTransfer<SensorData>({ fetcher: () => Promise.resolve({ temperature: 26, humidity: 55 }), interval: 1000, activated: true });
+    const tempSensor = createAsyncPollingSourceTransfer<SensorReading>({ fetcher: () => Promise.resolve({ sensor: 'temperature', value: 25 }), interval: 1000, activated: true });
+    const humiditySensor = createAsyncPollingSourceTransfer<SensorReading>({ fetcher: () => Promise.resolve({ sensor: 'humidity', value: 55 }), interval: 1000, activated: true });
 
-    const merge = createMergeTransfer<SensorData>({
+    const merge = createMergeTransfer<SensorReading>({
       sources: [tempSensor, humiditySensor],
     });
 
-    const received: SensorData[] = [];
+    const received: SensorReading[] = [];
     merge.subscribe((data) => {
       received.push(data);
     });
@@ -161,8 +160,8 @@ describe('README Use Cases: Merging multiple data sources into a single view', (
     await wait(0);
 
     expect(received.length).toBe(2);
-    expect(received[0]).toEqual({ temperature: 25, humidity: 50 });
-    expect(received[1]).toEqual({ temperature: 26, humidity: 55 });
+    expect(received[0]).toEqual({ sensor: 'temperature', value: 25 });
+    expect(received[1]).toEqual({ sensor: 'humidity', value: 55 });
 
     tempSensor.destroy();
     humiditySensor.destroy();
@@ -220,21 +219,21 @@ describe('README Use Cases: Conditional routing with bridges', () => {
 describe('README Use Cases: Idle fallback polling', () => {
   it('falls back to polling on idle', async () => {
     let counter = 0;
-    const fetcher = jest.fn<() => Promise<FeedItem>>(() => Promise.resolve({ id: ++counter, content: `item-${counter}` }));
+    const fetcher = jest.fn<() => Promise<SensorState>>(() => Promise.resolve({ temperature: ++counter }));
 
-    const channel = createAsyncIdlePollingTransfer<FeedItem>({
+    const channel = createAsyncIdlePollingTransfer<SensorState>({
       fetcher,
       timeout: 50,
       interval: 20,
       activated: true,
     });
 
-    const received: FeedItem[] = [];
+    const received: SensorState[] = [];
     channel.subscribe((item) => received.push(item));
 
     // Push real-time data
-    channel.push({ id: 0, content: 'realtime' });
-    expect(received).toEqual([{ id: 0, content: 'realtime' }]);
+    channel.push({ temperature: 0 });
+    expect(received).toEqual([{ temperature: 0 }]);
 
     // Wait for idle polling to kick in
     await wait(150);
@@ -243,6 +242,40 @@ describe('README Use Cases: Idle fallback polling', () => {
 
     expect(received.length).toBeGreaterThan(1);
     expect(fetcher).toHaveBeenCalled();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// Use Cases — Debounced user input with async validation
+// ═══════════════════════════════════════════════════════════════
+
+describe('README Use Cases: Debounced user input with async validation', () => {
+  it('debounces input, async-validates, and sends to async sink', async () => {
+    const input = createPushStoredChannelTransfer<string>();
+
+    const saved: ValidationResult[] = [];
+    const pipeline = AsyncInputPipelineBuilder
+      .start(input)
+      .to(createDebounceTransfer<string>({ delay: 50 }))
+      .to(createAsyncConditionTransfer<string>({ shouldAccept: async (s) => s.length > 0 }))
+      .to(createAsyncConvertTransfer<string, ValidationResult>({
+        operator: createAsyncMapOperator(async (s) => await validate(s)),
+      }))
+      .finish(createAsyncSinkTransfer<ValidationResult>({ callback: async (result) => { saved.push(result); } }));
+
+    input.push('user@example.com');
+    await wait(100);
+
+    expect(saved.length).toBe(1);
+    expect(saved[0]).toEqual({ valid: true });
+
+    // Empty string — rejected by shouldAccept
+    input.push('');
+    await wait(100);
+
+    expect(saved.length).toBe(1);
+
+    pipeline.destroy();
   });
 });
 

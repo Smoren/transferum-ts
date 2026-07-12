@@ -5,109 +5,79 @@ import {
   createBridgeSelector,
   createPassBridge,
   createPushStoredChannelTransfer,
-  createThrottleTransfer,
-  createGateTransfer,
-  linkTransfers,
   createBridgeMultiSelector,
   createMergeTransfer,
   createConditionTransfer,
   createSinkTransfer,
   createPushChannelTransfer,
-  createSplitTransfer,
   createAsyncPollingSourceTransfer,
+  createAsyncConditionTransfer,
+  createAsyncConvertTransfer,
+  createAsyncMapOperator,
+  createAsyncSinkTransfer,
   OutputPipelineBuilder,
   DuplexPipelineBuilder,
-  RAFTicker,
+  AsyncDuplexPipelineBuilder,
+  linkTransfers,
 } from '../../src';
 import type {
-  InputEvent,
-  GameCommand,
-  GameState,
-  PhysicsEvent,
+  KeyInput,
   SensorData,
   Alert,
-  ComponentState,
-  UIEvent,
   Metric,
-  LogEntry,
   Quote,
   TechnicalIndicator,
+  TradingSignal,
+  SearchResult,
   // @ts-ignore
 } from './fixtures';
 import { describe, expect, it } from '@jest/globals';
-import {
-  wait,
-  eventToCommand,
-  detectAnomaly,
-  // @ts-ignore
-} from './fixtures';
+import { wait } from './fixtures';
 
 // ═══════════════════════════════════════════════════════════════
 // Domain-Specific Applications — Game Development
 // ═══════════════════════════════════════════════════════════════
 
 describe('README Domain-Specific: Game Development - Input Processing Pipeline', () => {
-  it('collects events, filters, transforms, routes to systems', async () => {
-    const inputChannel = createDebounceTransfer<InputEvent>({ delay: 50 });
-    const commandConverter = createConvertTransfer<InputEvent, GameCommand>({
-      operator: createMapOperator((e) => eventToCommand(e)),
+  it('debounces raw input, converts to key code, routes to subsystems', async () => {
+    const rawInputSource = createDebounceTransfer<KeyInput>({ delay: 50 });
+
+    const inputConverter = createConvertTransfer<KeyInput, string>({
+      operator: createMapOperator((event) => event.code),
     });
 
-    const walkTarget: GameCommand[] = [];
-    const runTarget: GameCommand[] = [];
-    const shootTarget: GameCommand[] = [];
+    const drivingTarget: string[] = [];
+    const flyingTarget: string[] = [];
+    const uiTarget: string[] = [];
 
-    const router = createBridgeSelector({
+    const gameplayRouter = createBridgeSelector({
       bridges: {
-        walk: createPassBridge({ source: commandConverter, target: createSinkTransfer<GameCommand>({ callback: (c) => walkTarget.push(c) }), activated: false }),
-        run: createPassBridge({ source: commandConverter, target: createSinkTransfer<GameCommand>({ callback: (c) => runTarget.push(c) }), activated: false }),
-        shoot: createPassBridge({ source: commandConverter, target: createSinkTransfer<GameCommand>({ callback: (c) => shootTarget.push(c) }), activated: false }),
+        driving: createPassBridge({ source: inputConverter, target: createSinkTransfer<string>({ callback: (c) => drivingTarget.push(c) }), activated: false }),
+        flying: createPassBridge({ source: inputConverter, target: createSinkTransfer<string>({ callback: (c) => flyingTarget.push(c) }), activated: false }),
+        ui: createPassBridge({ source: inputConverter, target: createSinkTransfer<string>({ callback: (c) => uiTarget.push(c) }), activated: false }),
       },
-      initialKey: 'walk',
+      initialKey: 'driving',
       activated: true,
       owned: true,
     });
 
-    linkTransfers(inputChannel, commandConverter);
+    linkTransfers(rawInputSource, inputConverter);
 
-    inputChannel.push({ type: 'keydown', key: 'w' });
+    rawInputSource.push({ code: 'KeyW' });
     await wait(100);
 
-    expect(walkTarget.length).toBe(1);
-    expect(runTarget.length).toBe(0);
+    expect(drivingTarget).toEqual(['KeyW']);
+    expect(flyingTarget).toEqual([]);
 
-    router.select('run');
-    inputChannel.push({ type: 'keydown', key: 'r' });
+    gameplayRouter.select('flying');
+    rawInputSource.push({ code: 'KeyW' });
     await wait(100);
-    expect(runTarget.length).toBe(1);
 
-    router.destroy();
-    inputChannel.destroy();
-  });
-});
+    expect(flyingTarget).toEqual(['KeyW']);
+    expect(drivingTarget).toEqual(['KeyW']);
 
-describe('README Domain-Specific: Game Development - Game Logic & State Management', () => {
-  it('manages game state with throttled UI updates', () => {
-    const gameState = createPushStoredChannelTransfer<GameState>({ initialValue: { score: 0, level: 1 } });
-    const uiUpdate = createThrottleTransfer<GameState>({ interval: 100 });
-
-    linkTransfers(gameState, uiUpdate);
-
-    const hudUpdates: GameState[] = [];
-    uiUpdate.subscribe((state) => hudUpdates.push(state));
-
-    gameState.push({ score: 100, level: 1 });
-    gameState.push({ score: 200, level: 1 });
-
-    expect(hudUpdates.length).toBeGreaterThan(0);
-
-    const physicsGate = createGateTransfer<PhysicsEvent>({ activated: true });
-    physicsGate.deactivate();
-    expect(physicsGate.active).toBe(false);
-
-    physicsGate.destroy();
-    gameState.destroy();
-    uiUpdate.destroy();
+    gameplayRouter.destroy();
+    rawInputSource.destroy();
   });
 });
 
@@ -220,8 +190,8 @@ describe('README Domain-Specific: IoT - Device Control', () => {
 });
 
 describe('README Domain-Specific: IoT - Monitoring & Alerts', () => {
-  it('monitors temperature with debounced alerts', async () => {
-    const alertChannel = createDebounceTransfer<Alert>({ delay: 50 });
+  it('monitors temperature with push-channel alerts', async () => {
+    const alertChannel = createPushChannelTransfer<Alert>();
 
     const alerts: Alert[] = [];
     alertChannel.subscribe((alert) => {
@@ -243,7 +213,6 @@ describe('README Domain-Specific: IoT - Monitoring & Alerts', () => {
 
     await wait(100);
     tempMonitor.deactivate();
-    await wait(100); // wait for debounce to fire after polling stopped
 
     expect(alerts.length).toBeGreaterThan(0);
     expect(alerts[0].type).toBe('HIGH_TEMP');
@@ -257,48 +226,30 @@ describe('README Domain-Specific: IoT - Monitoring & Alerts', () => {
 // Domain-Specific Applications — UI/UX Applications
 // ═══════════════════════════════════════════════════════════════
 
-describe('README Domain-Specific: UI/UX - Component State Management', () => {
-  it('manages component state with multiple consumers', () => {
-    const componentState = createPushStoredChannelTransfer<ComponentState>({
-      initialValue: { loading: false, data: null },
-    });
+describe('README Domain-Specific: UI/UX - Reactive Forms', () => {
+  it('debounces input, validates, async-transforms, stores results', async () => {
+    const searchInput = createDebounceTransfer<string>({ delay: 50 });
 
-    const contentRenders: ComponentState[] = [];
-    const breadcrumbUpdates: ComponentState[] = [];
+    const pipeline = AsyncDuplexPipelineBuilder
+      .start(searchInput)
+      .to(createAsyncConditionTransfer<string>({ shouldAccept: async (s) => s.length >= 3 }))
+      .to(createAsyncConvertTransfer<string, SearchResult[]>({
+        operator: createAsyncMapOperator(async (query) => [{ id: 1, title: query }]),
+      }))
+      .finish(createPushStoredChannelTransfer<SearchResult[]>());
 
-    componentState.subscribe((state) => contentRenders.push(state));
-    componentState.subscribe((state) => breadcrumbUpdates.push(state));
+    const received: SearchResult[][] = [];
+    pipeline.subscribe((results) => received.push(results));
 
-    componentState.push({ loading: true, data: null });
+    searchInput.push('ab');
+    await wait(100);
+    expect(received).toEqual([]);
 
-    expect(contentRenders.length).toBe(1);
-    expect(breadcrumbUpdates.length).toBe(1);
+    searchInput.push('hello');
+    await wait(100);
+    expect(received).toEqual([[{ id: 1, title: 'hello' }]]);
 
-    const visibilityGate = createGateTransfer<UIEvent>({ activated: true });
-    visibilityGate.deactivate();
-    expect(visibilityGate.active).toBe(false);
-
-    visibilityGate.destroy();
-    componentState.destroy();
-  });
-});
-
-describe('README Domain-Specific: UI/UX - Animations', () => {
-  it('uses RAFTicker for smooth animations', () => {
-    const frameTicker = new RAFTicker({
-      callback: () => {},
-      interval: 16,
-    });
-    frameTicker.start();
-    expect(frameTicker.active).toBe(true);
-    frameTicker.stop();
-
-    const mouseMove = createThrottleTransfer<{ x: number; y: number }>({ interval: 50 });
-    const moves: { x: number; y: number }[] = [];
-    mouseMove.subscribe((e) => moves.push(e));
-    mouseMove.push({ x: 10, y: 20 });
-
-    mouseMove.destroy();
+    pipeline.destroy();
   });
 });
 
@@ -336,61 +287,38 @@ describe('README Domain-Specific: Monitoring - Metrics Collection', () => {
   });
 });
 
-describe('README Domain-Specific: Monitoring - Real-time Log Analysis', () => {
-  it('separates log streams by severity level', () => {
-    const logSplit = createSplitTransfer<LogEntry>({
-      targets: [
-        createConditionTransfer({ shouldAccept: (l) => l.level === 'ERROR' }),
-        createConditionTransfer({ shouldAccept: (l) => l.level === 'WARN' }),
-        createConditionTransfer({ shouldAccept: (l) => l.level === 'INFO' }),
-      ],
-    });
-
-    linkTransfers(
-      createPushChannelTransfer<LogEntry>(),
-      logSplit
-    );
-
-    const anomalyDetector = createConditionTransfer<LogEntry>({
-      shouldAccept: (l) => detectAnomaly(l),
-    });
-
-    const anomalies: LogEntry[] = [];
-    anomalyDetector.subscribe((l) => anomalies.push(l));
-
-    const errorLog: LogEntry = { level: 'ERROR', message: 'anomaly detected', timestamp: Date.now() };
-    anomalyDetector.push(errorLog);
-
-    expect(anomalies.length).toBe(1);
-    expect(anomalies[0].level).toBe('ERROR');
-
-    anomalyDetector.destroy();
-  });
-});
-
 // ═══════════════════════════════════════════════════════════════
 // Domain-Specific Applications — Financial Applications
 // ═══════════════════════════════════════════════════════════════
 
 describe('README Domain-Specific: Financial - Stock Market Data Processing', () => {
-  it('processes streaming quotes with indicators', () => {
-    const quoteStream = createPushStoredChannelTransfer<Quote[]>({ initialValue: [] });
+  it('processes streaming quotes into trading signals', () => {
+    const quoteStream = createPushChannelTransfer<Quote[]>();
+    const thresholdChannel = createPushStoredChannelTransfer<number>({ initialValue: 100 });
 
     const indicatorPipeline = DuplexPipelineBuilder
       .start(quoteStream)
       .to(createConvertTransfer<Quote[], TechnicalIndicator>({
-        operator: createMapOperator((quotes) => ({
+        operator: createMapOperator((quotes): TechnicalIndicator => ({
           value: quotes.reduce((sum, q) => sum + q.price, 0),
-          threshold: 100,
+          symbols: quotes.map((q) => q.symbol),
+          threshold: thresholdChannel.pull() ?? 0,
         })),
       }))
       .to(createConditionTransfer<TechnicalIndicator>({
         shouldAccept: (ind) => ind.value > ind.threshold,
       }))
-      .finish(createPushStoredChannelTransfer<TechnicalIndicator>());
+      .to(createConvertTransfer<TechnicalIndicator, TradingSignal>({
+        operator: createMapOperator((ind) => ({
+          action: 'BUY',
+          symbols: ind.symbols,
+          targetPrice: ind.value,
+        })),
+      }))
+      .finish(createPushStoredChannelTransfer<TradingSignal>());
 
-    const received: TechnicalIndicator[] = [];
-    indicatorPipeline.subscribe((ind) => received.push(ind));
+    const received: TradingSignal[] = [];
+    indicatorPipeline.subscribe((signal) => received.push(signal));
 
     quoteStream.push([
       { symbol: 'AAPL', price: 60, timestamp: Date.now() },
@@ -398,11 +326,13 @@ describe('README Domain-Specific: Financial - Stock Market Data Processing', () 
     ]);
 
     expect(received.length).toBe(1);
-    expect(received[0].value).toBe(110);
-    expect(received[0].value).toBeGreaterThan(received[0].threshold);
+    expect(received[0].action).toBe('BUY');
+    expect(received[0].targetPrice).toBe(110);
+    expect(received[0].symbols).toEqual(['AAPL', 'AAPL']);
 
     indicatorPipeline.destroy();
     quoteStream.destroy();
+    thresholdChannel.destroy();
   });
 });
 

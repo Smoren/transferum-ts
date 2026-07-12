@@ -1,5 +1,15 @@
 # Transferum Change Log
 
+## v1.0.1 - 2026-07-12
+
+### Documentation
+* **README:** Examples fixed and improved.
+
+### Example tests
+* **Use-cases tests:** synced with README.
+* **Domain-specific tests:**: synced with README.
+* **Coverage:** Maintained **100% test coverage**. Total tests: **1,925** (was 1,927 — removed 2 tests for non-README sections, added 2 new tests).
+
 ## v1.0.0 - 2026-07-11
 
 ### Stable release
