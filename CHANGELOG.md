@@ -1,5 +1,14 @@
 # Transferum Change Log
 
+## v1.0.2 - 2026-07-12
+
+### Documentation
+* **README:** Added project logo.
+* **README — Monitoring & Alerts:** Rewritten example to use `OutputPipelineBuilder` with `ConditionTransfer` → `ThrottleTransfer` → `ConvertTransfer` (instead of manual `PushChannelTransfer` + `subscribe`). Updated imports and accompanying text.
+
+### Example tests
+* **Domain-specific tests:** Synced "Monitoring & Alerts" test with the updated README example — pipeline-based with concrete throttle assertion (1 alert out of ~5 polls).
+
 ## v1.0.1 - 2026-07-12
 
 ### Documentation
@@ -7,7 +16,7 @@
 
 ### Example tests
 * **Use-cases tests:** synced with README.
-* **Domain-specific tests:**: synced with README.
+* **Domain-specific tests:** synced with README.
 * **Coverage:** Maintained **100% test coverage**. Total tests: **1,925**.
 
 ## v1.0.0 - 2026-07-11

@@ -8,6 +8,8 @@
 [![Minified Size](https://badgen.net/bundlephobia/minzip/transferum)](https://bundlephobia.com/result?p=transferum)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+![Transferum Logo](docs/images/transferum-logo.png)
+
 A reactive data processing pipeline system for TypeScript.
 
 The library provides type-safe primitives for building data flows: **transfers** (flow nodes), **bridges** (connectors between flows), **builders** (chain constructors), and **operators** (data transformers).
