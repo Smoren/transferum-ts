@@ -1,6 +1,6 @@
 # Transferum Change Log
 
-## v1.1.0 - TBD
+## v1.1.0 - 2026-07-15
 
 ### Backpressure for async transfers
 * **New shared config:** `BackpressureConfig<T>` (`maxConcurrency?`, `bufferSize?`, `onBufferOverflow?`) added to `configs.ts`.
