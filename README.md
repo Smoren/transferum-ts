@@ -134,7 +134,7 @@ Transferum provides **composable, type-safe building blocks** with a uniform cap
 | **Reactive by default, pull when needed** | Most transfers are subscribable (push-based reactivity). Polling transfers add pull-based data acquisition on the same foundation. Use the right model per stage without switching libraries.                                                                                                                                                                                |
 | **Local, fail-safe error handling**       | Errors are local to each transfer — one stage's failure doesn't kill the pipeline. With `onError` — suppressed, stream continues. Without — visible (exception/rejection), and polling stops (no zombie tickers). Per-stage granularity (`onAcceptError`/`onEmitError`, `onDestroyError`). Typed `ErrorHandler<TSource>` passes the transfer instance. No silent swallowing. |
 | **Undefined suppression**                 | `undefined` never propagates through the chain of transfers — it means "no data", not "empty value." Use `null` as an explicit empty marker when needed. This eliminates an entire class of null-check bugs in downstream consumers.                                                                                                                                         |
-| **Built-in backpressure**                 | Four async transfers (`AsyncSinkTransfer`, `AsyncWriteTransfer`, `AsyncConvertTransfer`, `AsyncConditionTransfer`) support optional `maxConcurrency`, `bufferSize`, and `onBufferOverflow` — limiting parallel async operations, queuing excess data, and handling overflow gracefully. Defaults are backward-compatible (unlimited). See [Backpressure](#backpressure).            |
+| **Built-in backpressure**                 | Four async transfers (`AsyncSinkTransfer`, `AsyncWriteTransfer`, `AsyncConvertTransfer`, `AsyncConditionTransfer`) support optional `maxConcurrency`, `bufferSize`, and `onBufferOverflow` — limiting parallel async operations, queuing excess data, and handling overflow gracefully. Defaults are backward-compatible (unlimited). See [Backpressure](#backpressure).     |
 
 ### Use Cases
 
@@ -1995,11 +1995,11 @@ const value = await channel.asyncPull(); // 42
 
 Four async transfers — `AsyncSinkTransfer`, `AsyncWriteTransfer`, `AsyncConvertTransfer`, and `AsyncConditionTransfer` — support optional backpressure via the shared `BackpressureConfig<T>`:
 
-| Option             | Type              | Default     | Description                                                                              |
-|--------------------|-------------------|-------------|------------------------------------------------------------------------------------------|
-| `maxConcurrency`   | `number`          | `Infinity`  | Maximum number of concurrent async operations. Excess data is queued in the buffer.      |
-| `bufferSize`       | `number`          | `Infinity`  | Maximum items held in the buffer while all concurrency slots are occupied.               |
-| `onBufferOverflow` | `DataHandler<T>`  | `undefined` | Called when both concurrency and buffer are full. If omitted, excess data is silently dropped. |
+| Option             | Type             | Default     | Description                                                                                    |
+|--------------------|------------------|-------------|------------------------------------------------------------------------------------------------|
+| `maxConcurrency`   | `number`         | `Infinity`  | Maximum number of concurrent async operations. Excess data is queued in the buffer.            |
+| `bufferSize`       | `number`         | `Infinity`  | Maximum items held in the buffer while all concurrency slots are occupied.                     |
+| `onBufferOverflow` | `DataHandler<T>` | `undefined` | Called when both concurrency and buffer are full. If omitted, excess data is silently dropped. |
 
 **Mechanics:**
 
@@ -2671,20 +2671,20 @@ Configs are defined in `configs.ts`. All configs are types (not classes), passed
 
 **Async configs:**
 
-| Config                                  | For                                | Required fields                                                              |
-|-----------------------------------------|------------------------------------|------------------------------------------------------------------------------|
-| `AsyncPollingProxyTransferConfig<T>`    | Async polling transfers            | `interval`, `activated`                                                      |
-| `AsyncPollingSourceTransferConfig<T>`   | `AsyncPollingSourceTransfer`       | `fetcher`, `interval`, `activated`                                           |
-| `AsyncPollingFlowTransferConfig<T>`     | `AsyncPollingFlowTransfer`         | `flow`, `interval`, `activated`                                              |
-| `AsyncIdlePollingTransferConfig<T>`     | `AsyncIdlePollingTransfer`         | `fetcher`, `timeout`, `interval`, `activated`                                |
-| `AsyncSinkTransferConfig<T>`            | `AsyncSinkTransfer`                | `callback`, `onError?`, `maxConcurrency?`, `bufferSize?`, `onBufferOverflow?`                               |
-| `AsyncWriteTransferConfig<T>`           | `AsyncWriteTransfer`               | `flow`, `onError?`, `maxConcurrency?`, `bufferSize?`, `onBufferOverflow?`                                  |
-| `AsyncReadTransferConfig<T>`            | `AsyncReadTransfer`                | `flow`                                                                                                      |
-| `AsyncConvertTransferConfig<TIn, TOut>` | `AsyncConvertTransfer`             | `operator` (AsyncOperatorInterface), `onError?`, `maxConcurrency?`, `bufferSize?`, `onBufferOverflow?`     |
+| Config                                  | For                                | Required fields                                                                                                                     |
+|-----------------------------------------|------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| `AsyncPollingProxyTransferConfig<T>`    | Async polling transfers            | `interval`, `activated`                                                                                                             |
+| `AsyncPollingSourceTransferConfig<T>`   | `AsyncPollingSourceTransfer`       | `fetcher`, `interval`, `activated`                                                                                                  |
+| `AsyncPollingFlowTransferConfig<T>`     | `AsyncPollingFlowTransfer`         | `flow`, `interval`, `activated`                                                                                                     |
+| `AsyncIdlePollingTransferConfig<T>`     | `AsyncIdlePollingTransfer`         | `fetcher`, `timeout`, `interval`, `activated`                                                                                       |
+| `AsyncSinkTransferConfig<T>`            | `AsyncSinkTransfer`                | `callback`, `onError?`, `maxConcurrency?`, `bufferSize?`, `onBufferOverflow?`                                                       |
+| `AsyncWriteTransferConfig<T>`           | `AsyncWriteTransfer`               | `flow`, `onError?`, `maxConcurrency?`, `bufferSize?`, `onBufferOverflow?`                                                           |
+| `AsyncReadTransferConfig<T>`            | `AsyncReadTransfer`                | `flow`                                                                                                                              |
+| `AsyncConvertTransferConfig<TIn, TOut>` | `AsyncConvertTransfer`             | `operator` (AsyncOperatorInterface), `onError?`, `maxConcurrency?`, `bufferSize?`, `onBufferOverflow?`                              |
 | `AsyncConditionTransferConfig<T>`       | `AsyncConditionTransfer`           | — (predicates are optional, sync or async), `onAcceptError?`, `onEmitError?`, `maxConcurrency?`, `bufferSize?`, `onBufferOverflow?` |
-| `AsyncStoredChannelTransferConfig<T>`   | `AsyncStoredChannelTransfer`       | `setup`, `destroy`, `onError?`, `onDestroyError?`                            |
-| `AsyncTransformBridgeConfig<TIn, TOut>` | `AsyncTransformBridge`             | `source`, `target`, `operator`, `activated`                                  |
-| `LinkConfig<TTargetTransfer>`           | `linkTransfers` (async strategies) | `onError?`                                                                   |
+| `AsyncStoredChannelTransferConfig<T>`   | `AsyncStoredChannelTransfer`       | `setup`, `destroy`, `onError?`, `onDestroyError?`                                                                                   |
+| `AsyncTransformBridgeConfig<TIn, TOut>` | `AsyncTransformBridge`             | `source`, `target`, `operator`, `activated`                                                                                         |
+| `LinkConfig<TTargetTransfer>`           | `linkTransfers` (async strategies) | `onError?`                                                                                                                          |
 
 All polling transfers support an optional `tickerFactory?: TickerFactory` to replace the default ticker (`RAFTicker.factory`).
 
