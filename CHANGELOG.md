@@ -1,5 +1,21 @@
 # Transferum Change Log
 
+## v1.1.1 - 2026-07-16
+
+### Documentation
+* **README — Tagline:** Replaced "A reactive data processing pipeline system for TypeScript" with "A language for describing interactions between components" — describes the essence, not an application.
+* **README — Graph diagram:** Added ASCII graph diagram illustrating transfers as nodes and bridges as edges, with the caption "This is a graph."
+* **README — Architectural Invariants:** Integrated the central philosophical formulation: "Behavior can be described as a composition of independent capabilities that simultaneously determine the type, the implementation, and the rules of interaction."
+* **README — Audit corrections, verbosity reduction**.
+* **package.json:** Description aligned with the new tagline.
+
+### Code style
+* **`src/transfers.ts`:** Transfer class definitions reordered for logical grouping — `ChannelTransfer`, `StoredChannelTransfer`, `PushStoredChannelTransfer` moved adjacent to `PushChannelTransfer`. No functional changes.
+* **`src/factories.ts`:** `createPushStoredChannelTransfer` factory moved adjacent to `createPushChannelTransfer`. Multi-line function signatures collapsed to single lines, trailing commas added for consistency. No functional changes.
+
+### Tests
+* No test changes. **100% coverage** maintained. Total tests: **1,957**.
+
 ## v1.1.0 - 2026-07-15
 
 ### Backpressure for async transfers
