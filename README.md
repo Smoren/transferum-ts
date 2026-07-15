@@ -124,17 +124,17 @@ Transferum provides **composable, type-safe building blocks** with a uniform cap
 
 ### Key Benefits
 
-| Benefit                                   | How                                                                                                                                                                                                                                                                                                                                                                          |
-|-------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Type-safe pipelines**                   | Each transfer and operator carries its input/output types. Builders enforce type compatibility at compile time — a mismatch is a compile error, not a runtime crash.                                                                                                                                                                                                         |
-| **Uniform capability model**              | Every transfer declares its capabilities via flags (`isPushable`, `isSubscribable`, `isGate`, …). `linkTransfers` automatically selects the correct wiring strategy — no manual glue code.                                                                                                                                                                                   |
-| **Sync + async in one system**            | Sync and async transfers coexist. `linkTransfers` prefers sync when possible and falls back to async strategies when needed. No separate "async world."                                                                                                                                                                                                                      |
-| **Composable architecture**               | Transfers link into chains, bridges connect chains with gate control, builders assemble chains fluently, operators transform data — all orthogonal and reusable.                                                                                                                                                                                                             |
-| **Explicit lifecycle**                    | Every resource (transfer, bridge, subscription, ticker) supports `destroy()`. Builders track `owned` resources and clean them up in one call. No leaked timers or subscriptions.                                                                                                                                                                                             |
-| **Reactive by default, pull when needed** | Most transfers are subscribable (push-based reactivity). Polling transfers add pull-based data acquisition on the same foundation. Use the right model per stage without switching libraries.                                                                                                                                                                                |
-| **Local, fail-safe error handling**       | Errors are local to each transfer — one stage's failure doesn't kill the pipeline. With `onError` — suppressed, stream continues. Without — visible (exception/rejection), and polling stops (no zombie tickers). Per-stage granularity (`onAcceptError`/`onEmitError`, `onDestroyError`). Typed `ErrorHandler<TSource>` passes the transfer instance. No silent swallowing. |
-| **Undefined suppression**                 | `undefined` never propagates through the chain of transfers — it means "no data", not "empty value." Use `null` as an explicit empty marker when needed. This eliminates an entire class of null-check bugs in downstream consumers.                                                                                                                                         |
-| **Built-in backpressure**                 | Four async transfers (`AsyncSinkTransfer`, `AsyncWriteTransfer`, `AsyncConvertTransfer`, `AsyncConditionTransfer`) support optional `maxConcurrency`, `bufferSize`, and `onBufferOverflow` — limiting parallel async operations, queuing excess data, and handling overflow gracefully. Defaults are backward-compatible (unlimited). See [Backpressure](#backpressure).     |
+| Benefit                                   | How                                                                                                                                                                                                                                                                                                                                                                                                           |
+|-------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Type-safe pipelines**                   | Each transfer and operator carries its input/output types. Builders enforce type compatibility at compile time — a mismatch is a compile error, not a runtime crash.                                                                                                                                                                                                                                          |
+| **Uniform capability model**              | Every transfer declares its capabilities via flags (`isPushable`, `isSubscribable`, `isGate`, …). `linkTransfers` automatically selects the correct wiring strategy — no manual glue code. Flags also define the transfer's TypeScript interface at compile time — methods like `push()` or `subscribe()` are type-guaranteed, not runtime-guessed (see [Capability Flags System](#capability-flags-system)). |
+| **Sync + async in one system**            | Sync and async transfers coexist. `linkTransfers` prefers sync when possible and falls back to async strategies when needed. No separate "async world."                                                                                                                                                                                                                                                       |
+| **Composable architecture**               | Transfers link into chains, bridges connect chains with gate control, builders assemble chains fluently, operators transform data — all orthogonal and reusable.                                                                                                                                                                                                                                              |
+| **Explicit lifecycle**                    | Every resource (transfer, bridge, subscription, ticker) supports `destroy()`. Builders track `owned` resources and clean them up in one call. No leaked timers or subscriptions.                                                                                                                                                                                                                              |
+| **Reactive by default, pull when needed** | Most transfers are subscribable (push-based reactivity). Polling transfers add pull-based data acquisition on the same foundation. Use the right model per stage without switching libraries.                                                                                                                                                                                                                 |
+| **Local, fail-safe error handling**       | Errors are local to each transfer — one stage's failure doesn't kill the pipeline. With `onError` — suppressed, stream continues. Without — visible (exception/rejection), and polling stops (no zombie tickers). Per-stage granularity (`onAcceptError`/`onEmitError`, `onDestroyError`). Typed `ErrorHandler<TSource>` passes the transfer instance. No silent swallowing.                                  |
+| **Undefined suppression**                 | `undefined` never propagates through the chain of transfers — it means "no data", not "empty value." Use `null` as an explicit empty marker when needed. This eliminates an entire class of null-check bugs in downstream consumers.                                                                                                                                                                          |
+| **Built-in backpressure**                 | Four async transfers (`AsyncSinkTransfer`, `AsyncWriteTransfer`, `AsyncConvertTransfer`, `AsyncConditionTransfer`) support optional `maxConcurrency`, `bufferSize`, and `onBufferOverflow` — limiting parallel async operations, queuing excess data, and handling overflow gracefully. Defaults are backward-compatible (unlimited). See [Backpressure](#backpressure).                                      |
 
 ### Use Cases
 
@@ -815,7 +815,7 @@ Most.js excels in raw performance for push-based streams but lacks Transferum's 
 | **Bundle size**    | ~15 KB                                               | ~12 KB (Bacon), ~8 KB (Kefir)        |
 | **Status**         | Active                                               | Bacon: maintenance, Kefir: archived  |
 
-Transferum's capability flags provide more granularity than the two-type model, allowing fine-grained control over data flow mechanics.
+Transferum's capability flags provide more granularity than the two-type model, allowing fine-grained control over data flow mechanics. Unlike Bacon.js/Kefir's runtime-only `EventStream` / `Property` distinction, Transferum's flags are compile-time type literals — TypeScript knows which methods each transfer exposes without runtime checks.
 
 ---
 
@@ -843,7 +843,7 @@ Transferum's capability flags provide more granularity than the two-type model, 
 
 **Transferum is ideal for:**
 
-1. **TypeScript-first projects** — Strict type inference, capability flags checked at compile time.
+1. **TypeScript-first projects** — Strict type inference. Capability flags are compile-time literals (`isPushable: true`, not `boolean`), so TypeScript knows which methods each transfer exposes — `push()`, `subscribe()`, `pull()` are type-guaranteed without casts or runtime checks.
 2. **Mixed sync/async pipelines** — Unified model without manual conversion.
 3. **Pull-based data acquisition** — Polling APIs, sensors, or storage with `PollingProxy`.
 4. **Explicit flow control** — Gates, bridges, and selectors for runtime routing.
@@ -996,7 +996,7 @@ import {
 
 ### Capability Flags System
 
-Each transfer implements `CommunicationContractInterface` — a set of boolean flags that determine available methods:
+Each transfer implements `CommunicationContractInterface` — a set of boolean flags. Each flag is both a **runtime value** and a **compile-time guarantee**: when a flag is `true`, the corresponding method is part of the transfer's TypeScript type — TypeScript knows it exists without any casts or runtime checks.
 
 | Flag              | Methods                                                                          | Description                                                  |
 |-------------------|----------------------------------------------------------------------------------|--------------------------------------------------------------|
@@ -1022,7 +1022,47 @@ Each transfer implements `CommunicationContractInterface` — a set of boolean f
 
 > `isAsyncSubscribable` and `isAsyncPollingSource` **are not required** — subscription remains synchronous in all async transfers, and `isPollingSource` is reused.
 
-Flags are set as `readonly` properties in each transfer class. Flag checking occurs at runtime — calling a method not supported by the transfer throws an `Error`.
+**How flags become compile-time guarantees:** In `interfaces.ts`, each flag has a corresponding interface that narrows the flag to the literal type `true` (not `boolean`) and extends the matching method contract. When a transfer class `implements` these interfaces, TypeScript guarantees the presence of the methods at compile time:
+
+```typescript
+// Base contract — all flags are `boolean` (runtime-checkable)
+interface CommunicationContractInterface {
+  readonly isPushable: boolean;
+  readonly isPullable: boolean;
+  readonly isSubscribable: boolean;
+  // …
+}
+
+// isPushable: true  →  push(data: T) is guaranteed to exist
+interface PushableTransferInterface<T> extends PushableInterface<T>, BaseTransferInterface {
+  readonly isInput: true;
+  readonly isPushable: true;   // → TypeScript guarantees push(data) exists
+}
+
+// isPullable: true  →  pull(): T | undefined is guaranteed to exist
+interface PullableTransferInterface<T> extends PullableInterface<T>, BaseTransferInterface {
+  readonly isOutput: true;
+  readonly isPullable: true;   // → TypeScript guarantees pull() exists
+}
+
+// isSubscribable: true  →  subscribe(handler) is guaranteed to exist
+interface SubscribableTransferInterface<T> extends SubscribableInterface<T>, BaseTransferInterface {
+  readonly isOutput: true;
+  readonly isSubscribable: true;  // → TypeScript guarantees subscribe(handler) exists
+}
+```
+
+This means: if a transfer's type includes `isPushable: true`, you can call `push()` on it — TypeScript will not error. If the flag is absent (or `false`), the method is not on the type, and calling it is a **compile error**, not a runtime surprise.
+
+This carries through to the type system in `types.ts`, where flags define entire transfer categories:
+
+- `InputTransfer<T>` — union of all interfaces with `isInput: true` (push, poll-proxy, gate, async-push, async-poll-proxy).
+- `OutputTransfer<T>` — union of all interfaces with `isOutput: true` (pull, subscribe, gate, async-pull).
+- `DuplexTransfer<TIn, TOut>` — intersection of `InputTransfer<TIn>` & `OutputTransfer<TOut>` with `isDuplex: true`.
+- `Transfer<TIn, TOut, Features[]>` — a computed type that resolves a list of feature flags into a concrete intersection of branded interfaces.
+- `CompositeInputTransfer` / `CompositeOutputTransfer` / `CompositeDuplexTransfer` — builder-produced types that expose only the capabilities of the underlying transfers, with optional `triggerable` and `gate` additions.
+
+Pipeline builders use these types to enforce capability compatibility at compile time — a mismatch (e.g., passing an output-only transfer where an input is required) is a type error.
 
 **Sync priority over async:** If a transfer supports both sync and async operations (e.g., `UniversalCompositeTransfer` with `PushStoredChannelTransfer` inside), `linkTransfers` prefers sync linking. Async strategies are applied only when sync is not applicable.
 
@@ -1151,11 +1191,11 @@ The `source` parameter is the transfer instance where the error occurred, allowi
 
 #### Three scenarios
 
-| Scenario | `onError` provided | `onError` behavior | Result |
-|---|---|---|---|
-| Handler suppresses | ✓ | Returns normally | Exception suppressed, operation continues |
-| No handler | ✗ | — | Exception rethrown |
-| Handler throws | ✓ | Throws | Handler's exception rethrown |
+| Scenario           | `onError` provided | `onError` behavior | Result                                    |
+|--------------------|--------------------|--------------------|-------------------------------------------|
+| Handler suppresses | ✓                  | Returns normally   | Exception suppressed, operation continues |
+| No handler         | ✗                  | —                  | Exception rethrown                        |
+| Handler throws     | ✓                  | Throws             | Handler's exception rethrown              |
 
 #### Per-transfer error handlers
 
@@ -2635,6 +2675,8 @@ Key types are defined in `types.ts`:
 | `AsyncOutputFlowInterface<T>`                    | Async read: `read(): Promise<T \| undefined>`                                             |
 | `AsyncIOFlowInterface<TInput, TOutput>`          | `AsyncInputFlowInterface<TInput> & AsyncOutputFlowInterface<TOutput>`                     |
 | `AsyncStorageInterface<TInput, TOutput>`         | `AsyncIOFlowInterface` + `size`, `clear()`, `reset()` (async)                             |
+
+> **Capability-derived types:** `InputTransfer<T>`, `OutputTransfer<T>`, `DuplexTransfer<TIn, TOut>`, and `Transfer<…>` are not hand-written unions — they are computed from capability flag interfaces (where each flag is narrowed to `true`). Branded types like `Pushable<T>`, `Subscribable<T>`, `Gate` add a literal `true` brand to the corresponding flag. Builders use these types to enforce capability compatibility at compile time. See [Capability Flags System](#capability-flags-system).
 
 ---
 
