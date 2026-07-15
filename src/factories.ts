@@ -125,6 +125,23 @@ export function createPushChannelTransfer<T>(): Transfer<T, [Pushable, Subscriba
 }
 
 /**
+ * Creates a PushStoredChannelTransfer — a channel that stores the last value.
+ *
+ * Capabilities: Pushable, Pullable, Subscribable, Triggerable
+ *
+ * @param config — configuration (initialValue)
+ * @example
+ * const channel = createPushStoredChannelTransfer<number>({ initialValue: 0 });
+ * channel.push(42);
+ * console.log(channel.pull()); // 42
+ */
+export function createPushStoredChannelTransfer<T>(
+  config?: BaseStateTransferConfig<T>,
+): Transfer<T, [Pushable, Pullable, Subscribable, Triggerable]> {
+  return new PushStoredChannelTransfer<T>(config);
+}
+
+/**
  * Creates a DelayedPushChannelTransfer — a reactive channel with delayed emission to subscribers.
  *
  * Capabilities: Pushable, Subscribable
@@ -136,7 +153,7 @@ export function createPushChannelTransfer<T>(): Transfer<T, [Pushable, Subscriba
  * channel.push(42); // 42 will be logged after 100 ms
  */
 export function createDelayedPushChannelTransfer<T>(
-  config: DelayedPushChannelTransferConfig
+  config: DelayedPushChannelTransferConfig,
 ): Transfer<T, [Pushable, Subscribable]> {
   return new DelayedPushChannelTransfer<T>(config);
 }
@@ -154,9 +171,7 @@ export function createDelayedPushChannelTransfer<T>(
  * channel.push(2); // resets the timer
  * // after 200 ms of silence, subscribers receive 2
  */
-export function createDebounceTransfer<T>(
-  config: DebounceTransferConfig
-): Transfer<T, [Pushable, Subscribable]> {
+export function createDebounceTransfer<T>(config: DebounceTransferConfig): Transfer<T, [Pushable, Subscribable]> {
   return new DebounceTransfer<T>(config);
 }
 
@@ -173,27 +188,8 @@ export function createDebounceTransfer<T>(
  * channel.push(2); // saved as pending
  * // after 100 ms subscribers receive 2 (trailing edge)
  */
-export function createThrottleTransfer<T>(
-  config: ThrottleTransferConfig
-): Transfer<T, [Pushable, Subscribable]> {
+export function createThrottleTransfer<T>(config: ThrottleTransferConfig): Transfer<T, [Pushable, Subscribable]> {
   return new ThrottleTransfer<T>(config);
-}
-
-/**
- * Creates a PushStoredChannelTransfer — a channel that stores the last value.
- *
- * Capabilities: Pushable, Pullable, Subscribable, Triggerable
- *
- * @param config — configuration (initialValue)
- * @example
- * const channel = createPushStoredChannelTransfer<number>({ initialValue: 0 });
- * channel.push(42);
- * console.log(channel.pull()); // 42
- */
-export function createPushStoredChannelTransfer<T>(
-  config?: BaseStateTransferConfig<T>
-): Transfer<T, [Pushable, Pullable, Subscribable, Triggerable]> {
-  return new PushStoredChannelTransfer<T>(config);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -242,7 +238,7 @@ export function createManualBufferTransfer<T>(): Transfer<T, [Pushable, Pullable
  * flow.trigger(); // 42
  */
 export function createManualFlowTransfer<T>(
-  config?: BaseStateTransferConfig<T>
+  config?: BaseStateTransferConfig<T>,
 ): Transfer<T, [Pushable, Subscribable, Triggerable]> {
   return new ManualFlowTransfer<T>(config);
 }
@@ -264,9 +260,7 @@ export function createManualFlowTransfer<T>(
  * gate.deactivate();
  * gate.push(100); // ignored
  */
-export function createGateTransfer<T>(
-  config: GateTransferConfig
-): Transfer<T, [Pushable, Subscribable, Gate]> {
+export function createGateTransfer<T>(config: GateTransferConfig): Transfer<T, [Pushable, Subscribable, Gate]> {
   return new GateTransfer<T>(config);
 }
 
@@ -286,9 +280,7 @@ export function createGateTransfer<T>(
  * const merge = createMergeTransfer<number>({ sources: [source1, source2] });
  * merge.subscribe(x => console.log(x));
  */
-export function createMergeTransfer<T>(
-  config: MergeTransferConfig<T>
-): Transfer<T, [Subscribable]> {
+export function createMergeTransfer<T>(config: MergeTransferConfig<T>): Transfer<T, [Subscribable]> {
   return new MergeTransfer<T>(config);
 }
 
@@ -304,9 +296,7 @@ export function createMergeTransfer<T>(
  * const split = createSplitTransfer<number>({ targets: [target1, target2] });
  * split.push(42); // sent to both targets
  */
-export function createSplitTransfer<T>(
-  config: SplitTransferConfig<T>
-): Transfer<T, [Pushable]> {
+export function createSplitTransfer<T>(config: SplitTransferConfig<T>): Transfer<T, [Pushable]> {
   return new SplitTransfer<T>(config);
 }
 
@@ -368,7 +358,7 @@ export function createPollingProxyTransfer<T>(
  * polling.subscribe(x => console.log(x));
  */
 export function createPollingFlowTransfer<T>(
-  config: PollingFlowTransferConfig<T>
+  config: PollingFlowTransferConfig<T>,
 ): Transfer<T, [Pullable, Subscribable, Triggerable, Gate]> {
   return new PollingFlowTransfer<T>(config);
 }
@@ -395,7 +385,7 @@ export function createPollingFlowTransfer<T>(
  * // after 5 seconds without push, polling starts every 1 second
  */
 export function createIdlePollingTransfer<T>(
-  config: IdlePollingTransferConfig<T>
+  config: IdlePollingTransferConfig<T>,
 ): Transfer<T, [Pushable, Pullable, Subscribable, Triggerable, Gate]> {
   return new IdlePollingTransfer<T>(config);
 }
@@ -420,9 +410,7 @@ export function createIdlePollingTransfer<T>(
  * });
  * channel.subscribe(x => console.log(x));
  */
-export function createChannelTransfer<T>(
-  config: ChannelTransferConfig<T>
-): Transfer<T, [Subscribable]> {
+export function createChannelTransfer<T>(config: ChannelTransferConfig<T>): Transfer<T, [Subscribable]> {
   return new ChannelTransfer<T>(config);
 }
 
@@ -444,7 +432,7 @@ export function createChannelTransfer<T>(
  * channel.subscribe(x => console.log(x));
  */
 export function createStoredChannelTransfer<T>(
-  config: StoredChannelTransferConfig<T>
+  config: StoredChannelTransferConfig<T>,
 ): Transfer<T, [Pullable, Subscribable, Triggerable]> {
   return new StoredChannelTransfer<T>(config);
 }
@@ -465,9 +453,7 @@ export function createStoredChannelTransfer<T>(
  * });
  * sink.push(42);
  */
-export function createSinkTransfer<T>(
-  config: SinkTransferConfig<T>
-): Transfer<T, [Pushable]> {
+export function createSinkTransfer<T>(config: SinkTransferConfig<T>): Transfer<T, [Pushable]> {
   return new SinkTransfer<T>(config);
 }
 
@@ -483,9 +469,7 @@ export function createSinkTransfer<T>(
  * });
  * writer.push(42); // storage.write(42)
  */
-export function createWriteTransfer<T>(
-  config: WriteTransferConfig<T>
-): Transfer<T, [Pushable]> {
+export function createWriteTransfer<T>(config: WriteTransferConfig<T>): Transfer<T, [Pushable]> {
   return new WriteTransfer<T>(config);
 }
 
@@ -501,9 +485,7 @@ export function createWriteTransfer<T>(
  * });
  * console.log(reader.pull()); // storage.read()
  */
-export function createReadTransfer<T>(
-  config: ReadTransferConfig<T>
-): Transfer<T, [Pullable]> {
+export function createReadTransfer<T>(config: ReadTransferConfig<T>): Transfer<T, [Pullable]> {
   return new ReadTransfer<T>(config);
 }
 
@@ -525,7 +507,7 @@ export function createReadTransfer<T>(
  * converter.push(42); // "42"
  */
 export function createConvertTransfer<TInput, TOutput>(
-  config: ConvertTransferConfig<TInput, TOutput>
+  config: ConvertTransferConfig<TInput, TOutput>,
 ): Transfer<TInput, TOutput, [Pushable, Subscribable]> {
   return new ConvertTransfer<TInput, TOutput>(config);
 }
@@ -545,9 +527,7 @@ export function createConvertTransfer<TInput, TOutput>(
  * condition.push(42); // passes
  * condition.push(-1); // ignored
  */
-export function createConditionTransfer<T>(
-  config: ConditionTransferConfig<T>
-): Transfer<T, [Pushable, Subscribable]> {
+export function createConditionTransfer<T>(config: ConditionTransferConfig<T>): Transfer<T, [Pushable, Subscribable]> {
   return new ConditionTransfer<T>(config);
 }
 
@@ -572,9 +552,7 @@ export function createConditionTransfer<T>(
  * bridge.deactivate();
  * source.push(100); // ignored
  */
-export function createPassBridge<T>(
-  config: PassBridgeConfig<T>
-): PassBridge<T> {
+export function createPassBridge<T>(config: PassBridgeConfig<T>): PassBridge<T> {
   return new PassBridge<T>(config);
 }
 
@@ -596,7 +574,7 @@ export function createPassBridge<T>(
  * source.push(42); // "42"
  */
 export function createTransformBridge<TInput, TOutput>(
-  config: TransformBridgeConfig<TInput, TOutput>
+  config: TransformBridgeConfig<TInput, TOutput>,
 ): TransformBridge<TInput, TOutput> {
   return new TransformBridge<TInput, TOutput>(config);
 }
@@ -641,9 +619,7 @@ export function createTransferBridge<TInput, TOutput>(
  * });
  * aggregator.active; // true (all bridges active)
  */
-export function createBridgeAggregator(
-  config: BridgeAggregatorConfig
-): BridgeAggregator {
+export function createBridgeAggregator(config: BridgeAggregatorConfig): BridgeAggregator {
   return new BridgeAggregator(config);
 }
 
@@ -691,7 +667,6 @@ export function createBridgeMultiSelector<TMap extends Record<BaseSelectorKey, B
   return new BridgeMultiSelector<TMap>(config);
 }
 
-
 // ═══════════════════════════════════════════════════════════════
 // Operators
 // ═══════════════════════════════════════════════════════════════
@@ -718,9 +693,7 @@ export function createTransparentOperator<T>(): TransparentOperator<T> {
  * const op = createMapOperator<number, string>(n => n.toString());
  * op.apply(42); // "42"
  */
-export function createMapOperator<TInput, TOutput>(
-  mapper: (data: TInput) => TOutput
-): MapOperator<TInput, TOutput> {
+export function createMapOperator<TInput, TOutput>(mapper: (data: TInput) => TOutput): MapOperator<TInput, TOutput> {
   return new MapOperator<TInput, TOutput>(mapper);
 }
 
@@ -733,9 +706,7 @@ export function createMapOperator<TInput, TOutput>(
  * const op = createFilterOperator<number>(n => n % 2 === 0);
  * op.apply([1, 2, 3, 4]); // [2, 4]
  */
-export function createFilterOperator<T>(
-  predicate: (item: T) => boolean
-): FilterOperator<T> {
+export function createFilterOperator<T>(predicate: (item: T) => boolean): FilterOperator<T> {
   return new FilterOperator<T>(predicate);
 }
 
@@ -750,10 +721,7 @@ export function createFilterOperator<T>(
  * op.apply([1, 2, 3]); // 6
  * op.apply([]); // 0
  */
-export function createReducerOperator<T>(
-  reducer: (acc: T, curr: T) => T,
-  defaultValue?: T
-): ReducerOperator<T> {
+export function createReducerOperator<T>(reducer: (acc: T, curr: T) => T, defaultValue?: T): ReducerOperator<T> {
   return new ReducerOperator<T>(reducer, defaultValue);
 }
 
@@ -767,9 +735,7 @@ export function createReducerOperator<T>(
  * op.apply(42); // 42
  * op.apply(-1); // undefined
  */
-export function createGuardOperator<T>(
-  validator: (data: T) => boolean
-): GuardOperator<T> {
+export function createGuardOperator<T>(validator: (data: T) => boolean): GuardOperator<T> {
   return new GuardOperator<T>(validator);
 }
 
@@ -808,9 +774,7 @@ export function createPipelineOperator<TInput, TOutput>(
  * });
  * await sink.asyncPush(42);
  */
-export function createAsyncSinkTransfer<T>(
-  config: AsyncSinkTransferConfig<T>
-): Transfer<T, [AsyncPushable]> {
+export function createAsyncSinkTransfer<T>(config: AsyncSinkTransferConfig<T>): Transfer<T, [AsyncPushable]> {
   return new AsyncSinkTransfer<T>(config);
 }
 
@@ -821,9 +785,7 @@ export function createAsyncSinkTransfer<T>(
  *
  * @param config — configuration (flow, onError)
  */
-export function createAsyncWriteTransfer<T>(
-  config: AsyncWriteTransferConfig<T>
-): Transfer<T, [AsyncPushable]> {
+export function createAsyncWriteTransfer<T>(config: AsyncWriteTransferConfig<T>): Transfer<T, [AsyncPushable]> {
   return new AsyncWriteTransfer<T>(config);
 }
 
@@ -834,9 +796,7 @@ export function createAsyncWriteTransfer<T>(
  *
  * @param config — configuration (flow, onError)
  */
-export function createAsyncReadTransfer<T>(
-  config: AsyncReadTransferConfig<T>
-): Transfer<T, [AsyncPullable]> {
+export function createAsyncReadTransfer<T>(config: AsyncReadTransferConfig<T>): Transfer<T, [AsyncPullable]> {
   return new AsyncReadTransfer<T>(config);
 }
 
@@ -977,9 +937,7 @@ export function createAsyncMapOperator<TInput, TOutput>(
  * const op = createAsyncGuardOperator<number>(async (n) => (await check(n)).valid);
  * const result = await op.apply(42); // 42 or undefined
  */
-export function createAsyncGuardOperator<T>(
-  validator: (data: T) => Promise<boolean>
-): AsyncGuardOperator<T> {
+export function createAsyncGuardOperator<T>(validator: (data: T) => Promise<boolean>): AsyncGuardOperator<T> {
   return new AsyncGuardOperator<T>(validator);
 }
 
