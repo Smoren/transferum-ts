@@ -68,6 +68,13 @@ export type ErrorHandlingConfig<TSource> = {
   readonly onError?: ErrorHandler<TSource>;
 }
 
+/** Shared backpressure configuration — concurrency limit, buffer size, and overflow callback. */
+export type BackpressureConfig<T> = {
+  readonly maxConcurrency?: number;  // default: Infinity (no limit — backward compatible)
+  readonly bufferSize?: number;      // default: Infinity
+  readonly onBufferOverflow?: DataHandler<T>;
+}
+
 /** Configuration for BaseStateTransfer — optional initial value. */
 export type BaseStateTransferConfig<T> = {
   initialValue?: T;
@@ -203,8 +210,8 @@ export type AsyncIdlePollingTransferConfig<T> = BaseStateTransferConfig<T> & Err
   readonly tickerFactory?: TickerFactory;
 }
 
-/** Configuration for AsyncSinkTransfer — sync or async callback invoked on each incoming data, with optional error handler. */
-export type AsyncSinkTransferConfig<T> = ErrorHandlingConfig<AsyncSinkTransfer<T>> & {
+/** Configuration for AsyncSinkTransfer — sync or async callback invoked on each incoming data, with optional error handler and backpressure. */
+export type AsyncSinkTransferConfig<T> = ErrorHandlingConfig<AsyncSinkTransfer<T>> & BackpressureConfig<T> & {
   readonly callback: AsyncDataHandler<T> | DataHandler<T>;
 }
 
@@ -218,8 +225,8 @@ export type AsyncReadTransferConfig<T> = ErrorHandlingConfig<AsyncReadTransfer<T
   readonly flow: AsyncOutputFlowInterface<T> | OutputFlowInterface<T>;
 }
 
-/** Configuration for AsyncConvertTransfer — async operator for data transformation and optional error handler. */
-export type AsyncConvertTransferConfig<TInput, TOutput> = ErrorHandlingConfig<AsyncConvertTransfer<TInput, TOutput>> & {
+/** Configuration for AsyncConvertTransfer — async operator for data transformation, optional error handler and backpressure. */
+export type AsyncConvertTransferConfig<TInput, TOutput> = ErrorHandlingConfig<AsyncConvertTransfer<TInput, TOutput>> & BackpressureConfig<TInput> & {
   readonly operator: AsyncOperatorInterface<TInput, TOutput | undefined>;
 }
 
