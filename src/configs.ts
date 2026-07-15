@@ -215,8 +215,8 @@ export type AsyncSinkTransferConfig<T> = ErrorHandlingConfig<AsyncSinkTransfer<T
   readonly callback: AsyncDataHandler<T> | DataHandler<T>;
 }
 
-/** Configuration for AsyncWriteTransfer — async or sync target flow with write() and optional error handler. */
-export type AsyncWriteTransferConfig<T> = ErrorHandlingConfig<AsyncWriteTransfer<T>> & {
+/** Configuration for AsyncWriteTransfer — async or sync target flow with write(), optional error handler and backpressure. */
+export type AsyncWriteTransferConfig<T> = ErrorHandlingConfig<AsyncWriteTransfer<T>> & BackpressureConfig<T> & {
   readonly flow: AsyncInputFlowInterface<T> | InputFlowInterface<T>;
 }
 
@@ -230,8 +230,8 @@ export type AsyncConvertTransferConfig<TInput, TOutput> = ErrorHandlingConfig<As
   readonly operator: AsyncOperatorInterface<TInput, TOutput | undefined>;
 }
 
-/** Configuration for AsyncConditionTransfer — optional sync/async input/output predicates and per-stage error handlers. */
-export type AsyncConditionTransferConfig<T> = {
+/** Configuration for AsyncConditionTransfer — optional sync/async input/output predicates, per-stage error handlers and backpressure. */
+export type AsyncConditionTransferConfig<T> = BackpressureConfig<T> & {
   readonly shouldAccept?: (incomingData: T) => Promise<boolean> | boolean;
   readonly shouldEmit?: (currentState: T | undefined) => Promise<boolean> | boolean;
   readonly onAcceptError?: ErrorHandler<AsyncConditionTransfer<T>>;

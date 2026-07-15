@@ -2123,23 +2123,53 @@ export class AsyncWriteTransfer<T> extends BaseTransfer implements AsyncPushable
 
   private readonly _flow: AsyncInputFlowInterface<T> | InputFlowInterface<T>;
   private readonly _onError?: ErrorHandler<AsyncWriteTransfer<T>>;
+  private readonly _maxConcurrency: number;
+  private readonly _bufferSize: number;
+  private readonly _onBufferOverflow?: DataHandler<T>;
+
+  private _activeCount: number = 0;
+  private _buffer: T[] = [];
 
   constructor(config: AsyncWriteTransferConfig<T>) {
     super();
     this._flow = config.flow;
     this._onError = config.onError;
+    this._maxConcurrency = config.maxConcurrency ?? Infinity;
+    this._bufferSize = config.bufferSize ?? Infinity;
+    this._onBufferOverflow = config.onBufferOverflow;
   }
 
   public async asyncPush(data: T): Promise<void> {
-    try {
-      await this._flow.write(data);
-    } catch (e) {
-      handleError(e, this, this._onError);
+    if (this._activeCount < this._maxConcurrency) {
+      await this._process(data);
+    } else if (this._buffer.length < this._bufferSize) {
+      this._buffer.push(data);
+    } else {
+      this._onBufferOverflow?.(data);
     }
   }
 
   public override destroy() {
-    // Nothing to do
+    this._buffer = [];
+  }
+
+  private async _process(data: T): Promise<void> {
+    this._activeCount++;
+    try {
+      await this._flow.write(data);
+    } catch (e) {
+      handleError(e, this, this._onError);
+    } finally {
+      this._activeCount--;
+      this._dequeue();
+    }
+  }
+
+  private _dequeue(): void {
+    if (this._buffer.length > 0 && this._activeCount < this._maxConcurrency) {
+      const next = this._buffer.shift() as T;
+      this._process(next);
+    }
   }
 }
 
@@ -2948,6 +2978,12 @@ export class AsyncConditionTransfer<T> extends BaseStateTransfer<T> implements A
   private readonly _shouldEmit: (currentState: T | undefined) => Promise<boolean> | boolean;
   private readonly _onAcceptError?: ErrorHandler<AsyncConditionTransfer<T>>;
   private readonly _onEmitError?: ErrorHandler<AsyncConditionTransfer<T>>;
+  private readonly _maxConcurrency: number;
+  private readonly _bufferSize: number;
+  private readonly _onBufferOverflow?: DataHandler<T>;
+
+  private _activeCount: number = 0;
+  private _buffer: T[] = [];
 
   constructor(config: AsyncConditionTransferConfig<T>) {
     super();
@@ -2956,31 +2992,19 @@ export class AsyncConditionTransfer<T> extends BaseStateTransfer<T> implements A
     this._shouldEmit = config.shouldEmit ?? (() => true);
     this._onAcceptError = config.onAcceptError;
     this._onEmitError = config.onEmitError;
+    this._maxConcurrency = config.maxConcurrency ?? Infinity;
+    this._bufferSize = config.bufferSize ?? Infinity;
+    this._onBufferOverflow = config.onBufferOverflow;
   }
 
   public async asyncPush(data: T): Promise<void> {
-    try {
-      if (!await this._shouldAccept(data)) {
-        return;
-      }
-    } catch (e) {
-      handleError(e, this, this._onAcceptError);
-      return;
+    if (this._activeCount < this._maxConcurrency) {
+      await this._process(data);
+    } else if (this._buffer.length < this._bufferSize) {
+      this._buffer.push(data);
+    } else {
+      this._onBufferOverflow?.(data);
     }
-
-    this._state.value = data;
-
-    try {
-      if (!await this._shouldEmit(this._state.value)) {
-        return;
-      }
-    } catch (e) {
-      handleError(e, this, this._onEmitError);
-      return;
-    }
-
-    this._subscription.sendState();
-    this._state.clear();
   }
 
   public subscribe(handler: DataHandler<T>): SubscriberInterface {
@@ -2988,8 +3012,47 @@ export class AsyncConditionTransfer<T> extends BaseStateTransfer<T> implements A
   }
 
   public override destroy() {
+    this._buffer = [];
     this._subscription.destroy();
     super.destroy();
+  }
+
+  private async _process(data: T): Promise<void> {
+    this._activeCount++;
+    try {
+      try {
+        if (!await this._shouldAccept(data)) {
+          return;
+        }
+      } catch (e) {
+        handleError(e, this, this._onAcceptError);
+        return;
+      }
+
+      this._state.value = data;
+
+      try {
+        if (!await this._shouldEmit(this._state.value)) {
+          return;
+        }
+      } catch (e) {
+        handleError(e, this, this._onEmitError);
+        return;
+      }
+
+      this._subscription.sendState();
+      this._state.clear();
+    } finally {
+      this._activeCount--;
+      this._dequeue();
+    }
+  }
+
+  private _dequeue(): void {
+    if (this._buffer.length > 0 && this._activeCount < this._maxConcurrency) {
+      const next = this._buffer.shift() as T;
+      this._process(next);
+    }
   }
 }
 
