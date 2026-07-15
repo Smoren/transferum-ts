@@ -1,5 +1,24 @@
 # Transferum Change Log
 
+## v1.1.0 - TBD
+
+### Backpressure for async transfers
+* **New shared config:** `BackpressureConfig<T>` (`maxConcurrency?`, `bufferSize?`, `onBufferOverflow?`) added to `configs.ts`.
+* **Four async transfers gained backpressure support:** `AsyncSinkTransfer`, `AsyncWriteTransfer`, `AsyncConvertTransfer`, `AsyncConditionTransfer`. Their `asyncPush()` methods now route data through `_process()` / `_dequeue()` — limiting concurrent async operations, queuing excess data in an internal buffer, and invoking `onBufferOverflow` (or silently dropping) when both concurrency and buffer are full.
+* **Backward-compatible:** All backpressure options default to `Infinity` — existing code behaves exactly as before (unlimited parallel processing, no buffering).
+* **`destroy()`** on all four transfers now clears the internal buffer, discarding queued items.
+
+### Documentation
+* **README — Backpressure section:** New subsection under Async Transfers documenting `BackpressureConfig<T>` options, mechanics, and a usage example.
+* **README — Key Benefits:** Added "Built-in backpressure" row.
+* **README — Async Transfer Comparison Table:** Added "BP" (Backpressure) column.
+* **README — Transfer descriptions:** Added backpressure notes to `AsyncSinkTransfer`, `AsyncWriteTransfer`, `AsyncConvertTransfer`, `AsyncConditionTransfer`.
+* **README — Configurations:** Updated async configs table with `maxConcurrency?`, `bufferSize?`, `onBufferOverflow?` fields and `BackpressureConfig<T>` reference.
+
+### Tests
+* **Backpressure tests:** Added 8 backpressure test scenarios for each of the 4 async transfers (32 tests total): `maxConcurrency` sequential/parallel/default, `bufferSize` with/without `onBufferOverflow`, error-frees-slot, `destroy()` clears buffer.
+* **Coverage:** Maintained **100% test coverage** (statements, branches, functions, lines) across all 11 source files. Total tests: **1,957**.
+
 ## v1.0.2 - 2026-07-12
 
 ### Documentation
