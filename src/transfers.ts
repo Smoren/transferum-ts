@@ -142,6 +142,188 @@ export abstract class BaseStateTransfer<T> extends BaseTransfer {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// ChannelTransfer
+// ═══════════════════════════════════════════════════════════════
+/**
+ * Output channel with external management via setup/destroy callbacks.
+ *
+ * Capabilities: isOutput, isSubscribable
+ *
+ * Mechanics:
+ * 1. The constructor accepts config with callbacks:
+ *    - setup(emit) — called immediately, receives the emit(data) function
+ *    - destroy() — cleanup function (called on transfer destroy)
+ * 2. setup() should call emit(data) to send data to subscribers
+ * 3. subscribe(handler) — subscribes to notifications
+ * 4. destroy() — calls config.destroy(), unsubscribes subscribers
+ *
+ * Error handling:
+ * - onError — for errors in emit() (when sending data to subscribers)
+ * - onDestroyError — for errors in destroy()
+ * - With the corresponding handler provided, the exception is suppressed.
+ * - Without a handler, the exception is rethrown.
+ * - setup() errors are always rethrown (no onSetupError — a failed setup
+ *   means the transfer is unusable, suppressing would create a zombie object).
+ *
+ * Configuration (ChannelTransferConfig):
+ * - setup: (emit: DataHandler<T>) => void — channel initialization
+ * - destroy: () => void — channel cleanup
+ * - onError?: ErrorHandler — emit() error handler
+ * - onDestroyError?: ErrorHandler — destroy() error handler
+ *
+ * Difference from StoredChannelTransfer:
+ * - No pull() — only reactive subscription
+ * - No trigger() — emission only via external emit()
+ * - _state does not store a value for reading (cleared after sendState)
+ *
+ * Use cases:
+ * - Integration with external event sources (WebSocket, DOM events)
+ * - Adapting legacy API to pipeline
+ * - Custom data sources with their own logic
+ */
+export class ChannelTransfer<T> extends BaseStateTransfer<T> implements SubscribableTransferInterface<T> {
+  override readonly isOutput = true;
+
+  override readonly isSubscribable = true;
+
+  protected readonly _emit: DataHandler<T>;
+  protected readonly _destroy: () => void;
+  protected readonly _onError?: ErrorHandler<ChannelTransfer<T>>;
+  protected readonly _onDestroyError?: ErrorHandler<ChannelTransfer<T>>;
+
+  private readonly _subscription: SubscriptionManager<T>;
+
+  constructor(config: ChannelTransferConfig<T>) {
+    super({ ...config, initialValue: undefined });
+    this._subscription = new SubscriptionManager(this._state);
+    this._onError = config.onError;
+    this._onDestroyError = config.onDestroyError;
+
+    this._destroy = config.destroy;
+    this._emit = (data: T) => {
+      this._state.value = data;
+      try {
+        this._subscription.sendState();
+      } catch (e) {
+        handleError(e, this, this._onError);
+      }
+      this._state.clear();
+    };
+
+    config.setup(this._emit);
+  }
+
+  public subscribe(handler: DataHandler<T>): SubscriberInterface {
+    return this._subscription.subscribe(handler);
+  }
+
+  public override destroy() {
+    this._subscription.destroy();
+    try {
+      this._destroy();
+    } catch (e) {
+      handleError(e, this, this._onDestroyError);
+    }
+    super.destroy();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// StoredChannelTransfer
+// ═══════════════════════════════════════════════════════════════
+/**
+ * Output channel with last-value retention and external management.
+ *
+ * Capabilities: isOutput, isPullable, isTriggerable, isSubscribable
+ *
+ * Mechanics:
+ * 1. The constructor accepts config with setup/destroy callbacks (like ChannelTransfer)
+ * 2. setup() calls emit(data), which writes the value to _state and calls trigger()
+ * 3. trigger() — notifies subscribers with the current value (without clearing _state)
+ * 4. pull() — reads the current value without clearing
+ * 5. subscribe(handler) — subscribes to notifications
+ * 6. destroy() — calls config.destroy(), unsubscribes subscribers
+ *
+ * Error handling:
+ * - onError — for errors in emit() (when sending data to subscribers)
+ * - onDestroyError — for errors in destroy()
+ * - With the corresponding handler provided, the exception is suppressed.
+ * - Without a handler, the exception is rethrown.
+ * - setup() errors are always rethrown (no onSetupError).
+ *
+ * Configuration (StoredChannelTransferConfig):
+ * - setup: (emit: DataHandler<T>) => void — channel initialization
+ * - destroy: () => void — channel cleanup
+ * - initialValue?: T — initial value in _state
+ * - onError?: ErrorHandler — emit() error handler
+ * - onDestroyError?: ErrorHandler — destroy() error handler
+ *
+ * Difference from ChannelTransfer:
+ * - Retains the last value (pull() is available)
+ * - Has trigger() for re-emitting the current value
+ * - emit() calls trigger() instead of sendState() + clear()
+ *
+ * Use cases:
+ * - Integration with external sources with caching
+ * - Channel with the ability to re-read the last value
+ * - Storing state from an external source
+ */
+export class StoredChannelTransfer<T> extends BaseStateTransfer<T> implements SubscribableTransferInterface<T>, PullableTransferInterface<T>, TriggerableTransferInterface {
+  override readonly isOutput = true;
+
+  override readonly isPullable = true;
+  override readonly isTriggerable = true;
+  override readonly isSubscribable = true;
+
+  protected readonly _emit: DataHandler<T>;
+  protected readonly _destroy: () => void;
+  protected readonly _onError?: ErrorHandler<StoredChannelTransfer<T>>;
+  protected readonly _onDestroyError?: ErrorHandler<StoredChannelTransfer<T>>;
+
+  private readonly _subscription: SubscriptionManager<T>;
+
+  constructor(config: StoredChannelTransferConfig<T>) {
+    super(config);
+    this._subscription = new SubscriptionManager(this._state);
+    this._onError = config.onError;
+    this._onDestroyError = config.onDestroyError;
+    this._destroy = config.destroy;
+    this._emit = (data: T) => {
+      this._state.value = data;
+      this.trigger();
+    };
+
+    config.setup(this._emit);
+  }
+
+  public pull(): T | undefined {
+    return this._state.value;
+  }
+
+  public subscribe(handler: DataHandler<T>): SubscriberInterface {
+    return this._subscription.subscribe(handler);
+  }
+
+  public trigger() {
+    try {
+      this._subscription.sendState();
+    } catch (e) {
+      handleError(e, this, this._onError);
+    }
+  }
+
+  public override destroy() {
+    this._subscription.destroy();
+    try {
+      this._destroy();
+    } catch (e) {
+      handleError(e, this, this._onDestroyError);
+    }
+    super.destroy();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // PushChannelTransfer
 // ═══════════════════════════════════════════════════════════════
 /**
@@ -182,6 +364,71 @@ export class PushChannelTransfer<T> extends BaseStateTransfer<T> implements Push
 
   public subscribe(handler: DataHandler<T>): SubscriberInterface {
     return this._subscription.subscribe(handler);
+  }
+
+  public override destroy() {
+    this._subscription.destroy();
+    super.destroy();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PushStoredChannelTransfer
+// ═══════════════════════════════════════════════════════════════
+/**
+ * Reactive channel with last-value retention.
+ * Combines push/pull/subscribe/trigger.
+ *
+ * Capabilities: isInput, isOutput, isPushable, isPullable, isSubscribable, isTriggerable
+ *
+ * Mechanics:
+ * 1. push(data) — writes the value, notifies subscribers (does NOT clear _state)
+ * 2. pull() — reads the current value without clearing
+ * 3. subscribe(handler) — subscribes to notifications
+ * 4. trigger() — manually sends the current value to subscribers
+ * 5. destroy() — unsubscribes subscribers, clears state
+ *
+ * Difference from PushChannelTransfer:
+ * - Does not clear _state after push() — the value is available for pull()
+ * - Has trigger() for manual emission without changing data
+ *
+ * Use cases:
+ * - Caching the last value with reactive updates
+ * - Component state with manual synchronization capability
+ * - Buffer with subscription to changes
+ */
+export class PushStoredChannelTransfer<T> extends BaseStateTransfer<T> implements PushableTransferInterface<T>, PullableTransferInterface<T>, SubscribableTransferInterface<T>, TriggerableTransferInterface {
+  override readonly isInput = true;
+  override readonly isOutput = true;
+  override readonly isDuplex = true;
+
+  override readonly isPushable = true;
+  override readonly isPullable = true;
+  override readonly isSubscribable = true;
+  override readonly isTriggerable = true;
+
+  private readonly _subscription: SubscriptionManager<T>;
+
+  constructor(config?: BaseStateTransferConfig<T>) {
+    super(config);
+    this._subscription = new SubscriptionManager(this._state);
+  }
+
+  public push(data: T): void {
+    this._state.value = data;
+    this._subscription.sendState();
+  }
+
+  public pull(): T | undefined {
+    return this._state.value;
+  }
+
+  public subscribe(handler: DataHandler<T>): SubscriberInterface {
+    return this._subscription.subscribe(handler);
+  }
+
+  public trigger() {
+    this._subscription.sendState();
   }
 
   public override destroy() {
@@ -434,71 +681,6 @@ export class ThrottleTransfer<T> extends BaseStateTransfer<T> implements Pushabl
     }
     this._pendingValue = undefined;
     this._hasPending = false;
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// PushStoredChannelTransfer
-// ═══════════════════════════════════════════════════════════════
-/**
- * Reactive channel with last-value retention.
- * Combines push/pull/subscribe/trigger.
- *
- * Capabilities: isInput, isOutput, isPushable, isPullable, isSubscribable, isTriggerable
- *
- * Mechanics:
- * 1. push(data) — writes the value, notifies subscribers (does NOT clear _state)
- * 2. pull() — reads the current value without clearing
- * 3. subscribe(handler) — subscribes to notifications
- * 4. trigger() — manually sends the current value to subscribers
- * 5. destroy() — unsubscribes subscribers, clears state
- *
- * Difference from PushChannelTransfer:
- * - Does not clear _state after push() — the value is available for pull()
- * - Has trigger() for manual emission without changing data
- *
- * Use cases:
- * - Caching the last value with reactive updates
- * - Component state with manual synchronization capability
- * - Buffer with subscription to changes
- */
-export class PushStoredChannelTransfer<T> extends BaseStateTransfer<T> implements PushableTransferInterface<T>, PullableTransferInterface<T>, SubscribableTransferInterface<T>, TriggerableTransferInterface {
-  override readonly isInput = true;
-  override readonly isOutput = true;
-  override readonly isDuplex = true;
-
-  override readonly isPushable = true;
-  override readonly isPullable = true;
-  override readonly isSubscribable = true;
-  override readonly isTriggerable = true;
-
-  private readonly _subscription: SubscriptionManager<T>;
-
-  constructor(config?: BaseStateTransferConfig<T>) {
-    super(config);
-    this._subscription = new SubscriptionManager(this._state);
-  }
-
-  public push(data: T): void {
-    this._state.value = data;
-    this._subscription.sendState();
-  }
-
-  public pull(): T | undefined {
-    return this._state.value;
-  }
-
-  public subscribe(handler: DataHandler<T>): SubscriberInterface {
-    return this._subscription.subscribe(handler);
-  }
-
-  public trigger() {
-    this._subscription.sendState();
-  }
-
-  public override destroy() {
-    this._subscription.destroy();
-    super.destroy();
   }
 }
 
@@ -1157,184 +1339,332 @@ export class PollingProxyTransfer<T> extends BaseStateTransfer<T> implements Pol
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ChannelTransfer
+// PollingFlowTransfer
 // ═══════════════════════════════════════════════════════════════
 /**
- * Output channel with external management via setup/destroy callbacks.
+ * Output transfer with polling from OutputFlowInterface (e.g., Storage).
  *
- * Capabilities: isOutput, isSubscribable
+ * Capabilities: isOutput, isPollingSource, isPullable, isSubscribable, isTriggerable, isGate
  *
  * Mechanics:
- * 1. The constructor accepts config with callbacks:
- *    - setup(emit) — called immediately, receives the emit(data) function
- *    - destroy() — cleanup function (called on transfer destroy)
- * 2. setup() should call emit(data) to send data to subscribers
- * 3. subscribe(handler) — subscribes to notifications
- * 4. destroy() — calls config.destroy(), unsubscribes subscribers
+ * 1. The constructor accepts config.flow: OutputFlowInterface<T> and config.interval
+ * 2. An internal Ticker (RAFTicker by default) calls trigger() at the specified interval
+ * 3. trigger() — calls flow.read(), writes the result, notifies subscribers
+ * 4. pull() — calls flow.read() directly (without writing to state)
+ * 5. subscribe(handler) — subscribes to periodic updates
+ * 6. activate()/deactivate()/toggle() — control polling
+ * 7. destroy() — stops the ticker, unsubscribes subscribers
  *
  * Error handling:
- * - onError — for errors in emit() (when sending data to subscribers)
- * - onDestroyError — for errors in destroy()
- * - With the corresponding handler provided, the exception is suppressed.
- * - Without a handler, the exception is rethrown.
- * - setup() errors are always rethrown (no onSetupError — a failed setup
- *   means the transfer is unusable, suppressing would create a zombie object).
+ * - If flow.read() throws an exception in trigger() or pull(), onError is called.
+ * - With onError provided, the exception is suppressed.
  *
- * Configuration (ChannelTransferConfig):
- * - setup: (emit: DataHandler<T>) => void — channel initialization
- * - destroy: () => void — channel cleanup
- * - onError?: ErrorHandler — emit() error handler
- * - onDestroyError?: ErrorHandler — destroy() error handler
+ * Configuration (PollingFlowTransferConfig):
+ * - flow: OutputFlowInterface<T> — data source with a read() method
+ * - interval: number — polling interval (ms)
+ * - activated: boolean — initial polling state
+ * - tickerFactory?: TickerFactory — custom ticker factory (default: RAFTicker.factory)
+ * - onError?: ErrorHandler — error handler
  *
- * Difference from StoredChannelTransfer:
- * - No pull() — only reactive subscription
- * - No trigger() — emission only via external emit()
- * - _state does not store a value for reading (cleared after sendState)
+ * Difference from PollingSourceTransfer:
+ * - Uses FlowInterface instead of DataFetcher
+ * - Convenient for working with Storage (LatestStorage, QueueStorage, StackStorage)
  *
  * Use cases:
- * - Integration with external event sources (WebSocket, DOM events)
- * - Adapting legacy API to pipeline
- * - Custom data sources with their own logic
+ * - Periodic reading from storage
+ * - Polling state from shared storage
+ * - Integration with external sources via FlowInterface
  */
-export class ChannelTransfer<T> extends BaseStateTransfer<T> implements SubscribableTransferInterface<T> {
+export class PollingFlowTransfer<T> extends BaseStateTransfer<T> implements PollingSourceTransferInterface, SubscribableTransferInterface<T>, PullableTransferInterface<T>, TriggerableTransferInterface, GateInterface {
   override readonly isOutput = true;
 
+  override readonly isPollingSource = true;
+  override readonly isPullable = true;
   override readonly isSubscribable = true;
-
-  protected readonly _emit: DataHandler<T>;
-  protected readonly _destroy: () => void;
-  protected readonly _onError?: ErrorHandler<ChannelTransfer<T>>;
-  protected readonly _onDestroyError?: ErrorHandler<ChannelTransfer<T>>;
+  override readonly isTriggerable = true;
+  override readonly isGate = true;
 
   private readonly _subscription: SubscriptionManager<T>;
+  private readonly _gateState: StateSubscriptionManager<GateInterface>;
+  private readonly _flow: OutputFlowInterface<T>;
+  private readonly _ticker: TickerInterface;
+  private readonly _onError?: ErrorHandler<PollingFlowTransfer<T>>;
 
-  constructor(config: ChannelTransferConfig<T>) {
+  constructor(config: PollingFlowTransferConfig<T>) {
     super({ ...config, initialValue: undefined });
+
     this._subscription = new SubscriptionManager(this._state);
+    this._gateState = new StateSubscriptionManager<GateInterface>(this);
+    this._flow = config.flow;
     this._onError = config.onError;
-    this._onDestroyError = config.onDestroyError;
 
-    this._destroy = config.destroy;
-    this._emit = (data: T) => {
-      this._state.value = data;
-      try {
-        this._subscription.sendState();
-      } catch (e) {
-        handleError(e, this, this._onError);
-      }
-      this._state.clear();
-    };
+    this._ticker = (config.tickerFactory ?? RAFTicker.factory)({
+      callback: () => this.trigger(),
+      interval: config.interval,
+    });
 
-    config.setup(this._emit);
+    if (config.activated) {
+      this._ticker.start();
+    }
+  }
+
+  public pull(): T | undefined {
+    try {
+      return this._flow.read();
+    } catch (e) {
+      handleError(e, this, this._onError);
+      return undefined;
+    }
   }
 
   public subscribe(handler: DataHandler<T>): SubscriberInterface {
     return this._subscription.subscribe(handler);
   }
 
-  public override destroy() {
-    this._subscription.destroy();
+  public onStateChange(handler: DataHandler<GateInterface>): SubscriberInterface {
+    return this._gateState.subscribe(handler);
+  }
+
+  public trigger(): void {
     try {
-      this._destroy();
+      this._state.value = this._flow.read();
+      this._subscription.sendState();
+      this._state.clear();
     } catch (e) {
-      handleError(e, this, this._onDestroyError);
+      try {
+        handleError(e, this, this._onError);
+      } catch (handlerError) {
+        this._ticker.stop();
+        throw handlerError;
+      }
     }
+  }
+
+  public get active(): boolean {
+    return this._ticker.active;
+  }
+
+  public activate(): void {
+    this._ticker.start();
+    this._gateState.notify();
+  }
+
+  public deactivate(): void {
+    this._ticker.stop();
+    this._gateState.notify();
+  }
+
+  public toggle(): boolean {
+    const result = this._ticker.toggle();
+    this._gateState.notify();
+    return result;
+  }
+
+  public override destroy(): void {
+    this._ticker.stop();
+    this._subscription.destroy();
+    this._gateState.destroy();
     super.destroy();
   }
 }
 
 // ═══════════════════════════════════════════════════════════════
-// StoredChannelTransfer
+// IdlePollingTransfer
 // ═══════════════════════════════════════════════════════════════
 /**
- * Output channel with last-value retention and external management.
+ * Reactive channel with fallback polling on idle incoming data.
  *
- * Capabilities: isOutput, isPullable, isTriggerable, isSubscribable
+ * Capabilities: isInput, isOutput, isDuplex, isPushable, isPullable, isSubscribable, isPollingSource, isTriggerable, isGate
  *
  * Mechanics:
- * 1. The constructor accepts config with setup/destroy callbacks (like ChannelTransfer)
- * 2. setup() calls emit(data), which writes the value to _state and calls trigger()
- * 3. trigger() — notifies subscribers with the current value (without clearing _state)
- * 4. pull() — reads the current value without clearing
+ * 1. push(data) — writes the value, notifies subscribers, clears _state,
+ *    resets the idle timer and stops polling if it was active
+ * 2. If no data arrived via push() for longer than timeout ms — an internal
+ *    Ticker (via tickerFactory) starts, periodically polling the fetcher at interval
+ * 3. trigger() — manually calls the fetcher and notifies subscribers, restarts the idle timer
+ * 4. pull() — calls the fetcher directly (without writing to state or notifying subscribers)
  * 5. subscribe(handler) — subscribes to notifications
- * 6. destroy() — calls config.destroy(), unsubscribes subscribers
+ * 6. activate()/deactivate()/toggle() — control idle monitoring
+ * 7. destroy() — stops timers, unsubscribes subscribers, clears state
  *
  * Error handling:
- * - onError — for errors in emit() (when sending data to subscribers)
- * - onDestroyError — for errors in destroy()
- * - With the corresponding handler provided, the exception is suppressed.
- * - Without a handler, the exception is rethrown.
- * - setup() errors are always rethrown (no onSetupError).
+ * - If fetcher() throws an exception in trigger() or during polling, onError is called.
+ * - With onError provided, the exception is suppressed (polling continues).
+ * - Without onError, the exception is rethrown.
  *
- * Configuration (StoredChannelTransferConfig):
- * - setup: (emit: DataHandler<T>) => void — channel initialization
- * - destroy: () => void — channel cleanup
+ * Configuration (IdlePollingTransferConfig):
+ * - fetcher: DataFetcher<T> — data retrieval function for idle polling
+ * - timeout: number — idle time (ms) before polling starts
+ * - interval: number — fetcher polling interval (ms)
+ * - activated: boolean — initial idle monitoring state
  * - initialValue?: T — initial value in _state
- * - onError?: ErrorHandler — emit() error handler
- * - onDestroyError?: ErrorHandler — destroy() error handler
- *
- * Difference from ChannelTransfer:
- * - Retains the last value (pull() is available)
- * - Has trigger() for re-emitting the current value
- * - emit() calls trigger() instead of sendState() + clear()
+ * - tickerFactory?: TickerFactory — custom ticker factory (default: RAFTicker.factory)
+ * - onError?: ErrorHandler — fetcher error handler
  *
  * Use cases:
- * - Integration with external sources with caching
- * - Channel with the ability to re-read the last value
- * - Storing state from an external source
+ * - Refreshing data from an API when the external source stops sending events
+ * - Heartbeat / keep-alive mechanism: polling on absence of incoming data
+ * - Fallback data source when the main stream is idle
  */
-export class StoredChannelTransfer<T> extends BaseStateTransfer<T> implements SubscribableTransferInterface<T>, PullableTransferInterface<T>, TriggerableTransferInterface {
+export class IdlePollingTransfer<T> extends BaseStateTransfer<T> implements PushableTransferInterface<T>, SubscribableTransferInterface<T>, PullableTransferInterface<T>, TriggerableTransferInterface, PollingSourceTransferInterface, GateInterface {
+  override readonly isInput = true;
   override readonly isOutput = true;
+  override readonly isDuplex = true;
 
+  override readonly isPushable = true;
   override readonly isPullable = true;
-  override readonly isTriggerable = true;
   override readonly isSubscribable = true;
-
-  protected readonly _emit: DataHandler<T>;
-  protected readonly _destroy: () => void;
-  protected readonly _onError?: ErrorHandler<StoredChannelTransfer<T>>;
-  protected readonly _onDestroyError?: ErrorHandler<StoredChannelTransfer<T>>;
+  override readonly isPollingSource = true;
+  override readonly isTriggerable = true;
+  override readonly isGate = true;
 
   private readonly _subscription: SubscriptionManager<T>;
+  private readonly _gateState: StateSubscriptionManager<GateInterface>;
+  private readonly _timeout: number;
+  private readonly _interval: number;
+  private readonly _fetcher: DataFetcher<T>;
+  private readonly _onError?: ErrorHandler<IdlePollingTransfer<T>>;
+  private readonly _tickerFactory: TickerFactory;
 
-  constructor(config: StoredChannelTransferConfig<T>) {
+  private _active: boolean;
+  private _idleTimer: ReturnType<typeof setTimeout> | null = null;
+  private _ticker: TickerInterface | null = null;
+
+  constructor(config: IdlePollingTransferConfig<T>) {
     super(config);
     this._subscription = new SubscriptionManager(this._state);
+    this._gateState = new StateSubscriptionManager<GateInterface>(this);
+    this._timeout = config.timeout;
+    this._interval = config.interval;
+    this._fetcher = config.fetcher;
     this._onError = config.onError;
-    this._onDestroyError = config.onDestroyError;
-    this._destroy = config.destroy;
-    this._emit = (data: T) => {
-      this._state.value = data;
-      this.trigger();
-    };
+    this._tickerFactory = config.tickerFactory ?? RAFTicker.factory;
+    this._active = config.activated;
 
-    config.setup(this._emit);
+    if (this._active) {
+      this._startIdleTimer();
+    }
   }
 
-  public pull(): T | undefined {
-    return this._state.value;
+  public push(data: T): void {
+    this._state.value = data;
+    this._subscription.sendState();
+    this._state.clear();
+
+    if (this._active) {
+      this._stopPolling();
+      this._startIdleTimer();
+    }
   }
 
   public subscribe(handler: DataHandler<T>): SubscriberInterface {
     return this._subscription.subscribe(handler);
   }
 
-  public trigger() {
+  public pull(): T | undefined {
     try {
-      this._subscription.sendState();
+      return this._fetcher();
     } catch (e) {
       handleError(e, this, this._onError);
+      return undefined;
     }
   }
 
-  public override destroy() {
-    this._subscription.destroy();
-    try {
-      this._destroy();
-    } catch (e) {
-      handleError(e, this, this._onDestroyError);
+  public onStateChange(handler: DataHandler<GateInterface>): SubscriberInterface {
+    return this._gateState.subscribe(handler);
+  }
+
+  public trigger(): void {
+    this._poll();
+    if (this._active) {
+      this._startIdleTimer();
     }
+  }
+
+  public get active(): boolean {
+    return this._active;
+  }
+
+  public activate(): void {
+    if (this._active) {
+      return;
+    }
+    this._active = true;
+    this._startIdleTimer();
+    this._gateState.notify();
+  }
+
+  public deactivate(): void {
+    this._active = false;
+    this._clearIdleTimer();
+    this._stopPolling();
+    this._gateState.notify();
+  }
+
+  public toggle(): boolean {
+    if (this._active) {
+      this.deactivate();
+      return false;
+    }
+    this.activate();
+    return true;
+  }
+
+  public override destroy(): void {
+    this._active = false;
+    this._clearIdleTimer();
+    this._stopPolling();
+    this._subscription.destroy();
+    this._gateState.destroy();
     super.destroy();
+  }
+
+  private _startIdleTimer(): void {
+    this._clearIdleTimer();
+    this._idleTimer = setTimeout(() => {
+      this._idleTimer = null;
+      this._startPolling();
+    }, this._timeout);
+  }
+
+  private _clearIdleTimer(): void {
+    if (this._idleTimer !== null) {
+      clearTimeout(this._idleTimer);
+      this._idleTimer = null;
+    }
+  }
+
+  private _startPolling(): void {
+    if (this._ticker !== null) {
+      return;
+    }
+    this._ticker = this._tickerFactory({
+      callback: () => this._poll(),
+      interval: this._interval,
+    });
+    this._ticker.start();
+  }
+
+  private _stopPolling(): void {
+    if (this._ticker !== null) {
+      this._ticker.stop();
+      this._ticker = null;
+    }
+  }
+
+  private _poll(): void {
+    try {
+      this._state.value = this._fetcher();
+      this._subscription.sendState();
+      this._state.clear();
+    } catch (e) {
+      try {
+        handleError(e, this, this._onError);
+      } catch (handlerError) {
+        this._stopPolling();
+        throw handlerError;
+      }
+    }
   }
 }
 
@@ -1679,332 +2009,81 @@ export class ConditionTransfer<T> extends BaseStateTransfer<T> implements Pushab
 }
 
 // ═══════════════════════════════════════════════════════════════
-// PollingFlowTransfer
+// AsyncStoredChannelTransfer
 // ═══════════════════════════════════════════════════════════════
 /**
- * Output transfer with polling from OutputFlowInterface (e.g., Storage).
+ * Output channel with value retention, external management, and async interface.
  *
- * Capabilities: isOutput, isPollingSource, isPullable, isSubscribable, isTriggerable, isGate
- *
- * Mechanics:
- * 1. The constructor accepts config.flow: OutputFlowInterface<T> and config.interval
- * 2. An internal Ticker (RAFTicker by default) calls trigger() at the specified interval
- * 3. trigger() — calls flow.read(), writes the result, notifies subscribers
- * 4. pull() — calls flow.read() directly (without writing to state)
- * 5. subscribe(handler) — subscribes to periodic updates
- * 6. activate()/deactivate()/toggle() — control polling
- * 7. destroy() — stops the ticker, unsubscribes subscribers
- *
- * Error handling:
- * - If flow.read() throws an exception in trigger() or pull(), onError is called.
- * - With onError provided, the exception is suppressed.
- *
- * Configuration (PollingFlowTransferConfig):
- * - flow: OutputFlowInterface<T> — data source with a read() method
- * - interval: number — polling interval (ms)
- * - activated: boolean — initial polling state
- * - tickerFactory?: TickerFactory — custom ticker factory (default: RAFTicker.factory)
- * - onError?: ErrorHandler — error handler
- *
- * Difference from PollingSourceTransfer:
- * - Uses FlowInterface instead of DataFetcher
- * - Convenient for working with Storage (LatestStorage, QueueStorage, StackStorage)
- *
- * Use cases:
- * - Periodic reading from storage
- * - Polling state from shared storage
- * - Integration with external sources via FlowInterface
- */
-export class PollingFlowTransfer<T> extends BaseStateTransfer<T> implements PollingSourceTransferInterface, SubscribableTransferInterface<T>, PullableTransferInterface<T>, TriggerableTransferInterface, GateInterface {
-  override readonly isOutput = true;
-
-  override readonly isPollingSource = true;
-  override readonly isPullable = true;
-  override readonly isSubscribable = true;
-  override readonly isTriggerable = true;
-  override readonly isGate = true;
-
-  private readonly _subscription: SubscriptionManager<T>;
-  private readonly _gateState: StateSubscriptionManager<GateInterface>;
-  private readonly _flow: OutputFlowInterface<T>;
-  private readonly _ticker: TickerInterface;
-  private readonly _onError?: ErrorHandler<PollingFlowTransfer<T>>;
-
-  constructor(config: PollingFlowTransferConfig<T>) {
-    super({ ...config, initialValue: undefined });
-
-    this._subscription = new SubscriptionManager(this._state);
-    this._gateState = new StateSubscriptionManager<GateInterface>(this);
-    this._flow = config.flow;
-    this._onError = config.onError;
-
-    this._ticker = (config.tickerFactory ?? RAFTicker.factory)({
-      callback: () => this.trigger(),
-      interval: config.interval,
-    });
-
-    if (config.activated) {
-      this._ticker.start();
-    }
-  }
-
-  public pull(): T | undefined {
-    try {
-      return this._flow.read();
-    } catch (e) {
-      handleError(e, this, this._onError);
-      return undefined;
-    }
-  }
-
-  public subscribe(handler: DataHandler<T>): SubscriberInterface {
-    return this._subscription.subscribe(handler);
-  }
-
-  public onStateChange(handler: DataHandler<GateInterface>): SubscriberInterface {
-    return this._gateState.subscribe(handler);
-  }
-
-  public trigger(): void {
-    try {
-      this._state.value = this._flow.read();
-      this._subscription.sendState();
-      this._state.clear();
-    } catch (e) {
-      try {
-        handleError(e, this, this._onError);
-      } catch (handlerError) {
-        this._ticker.stop();
-        throw handlerError;
-      }
-    }
-  }
-
-  public get active(): boolean {
-    return this._ticker.active;
-  }
-
-  public activate(): void {
-    this._ticker.start();
-    this._gateState.notify();
-  }
-
-  public deactivate(): void {
-    this._ticker.stop();
-    this._gateState.notify();
-  }
-
-  public toggle(): boolean {
-    const result = this._ticker.toggle();
-    this._gateState.notify();
-    return result;
-  }
-
-  public override destroy(): void {
-    this._ticker.stop();
-    this._subscription.destroy();
-    this._gateState.destroy();
-    super.destroy();
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// IdlePollingTransfer
-// ═══════════════════════════════════════════════════════════════
-/**
- * Reactive channel with fallback polling on idle incoming data.
- *
- * Capabilities: isInput, isOutput, isDuplex, isPushable, isPullable, isSubscribable, isPollingSource, isTriggerable, isGate
+ * Capabilities: isOutput, isSubscribable, isAsyncPullable, isAsyncTriggerable
  *
  * Mechanics:
- * 1. push(data) — writes the value, notifies subscribers, clears _state,
- *    resets the idle timer and stops polling if it was active
- * 2. If no data arrived via push() for longer than timeout ms — an internal
- *    Ticker (via tickerFactory) starts, periodically polling the fetcher at interval
- * 3. trigger() — manually calls the fetcher and notifies subscribers, restarts the idle timer
- * 4. pull() — calls the fetcher directly (without writing to state or notifying subscribers)
- * 5. subscribe(handler) — subscribes to notifications
- * 6. activate()/deactivate()/toggle() — control idle monitoring
- * 7. destroy() — stops timers, unsubscribes subscribers, clears state
+ * 1. setup(emit) / destroy() — sync, like in StoredChannelTransfer
+ * 2. emit(data) — sync, writes the value, calls asyncTrigger (fire-and-forget)
+ * 3. asyncPull() — returns the current value (trivially async)
+ * 4. asyncTrigger() — notifies subscribers (trivially async)
+ * 5. subscribe(handler) — sync subscription
  *
- * Error handling:
- * - If fetcher() throws an exception in trigger() or during polling, onError is called.
- * - With onError provided, the exception is suppressed (polling continues).
- * - Without onError, the exception is rethrown.
+ * Note: setup/emit/subscribe are synchronous (subscription remains sync),
+ * but pull/trigger are async for integration with async pipelines.
  *
- * Configuration (IdlePollingTransferConfig):
- * - fetcher: DataFetcher<T> — data retrieval function for idle polling
- * - timeout: number — idle time (ms) before polling starts
- * - interval: number — fetcher polling interval (ms)
- * - activated: boolean — initial idle monitoring state
- * - initialValue?: T — initial value in _state
- * - tickerFactory?: TickerFactory — custom ticker factory (default: RAFTicker.factory)
- * - onError?: ErrorHandler — fetcher error handler
- *
- * Use cases:
- * - Refreshing data from an API when the external source stops sending events
- * - Heartbeat / keep-alive mechanism: polling on absence of incoming data
- * - Fallback data source when the main stream is idle
+ * Configuration (AsyncStoredChannelTransferConfig):
+ * - setup: (emit: DataHandler<T>) => void
+ * - destroy: () => void
+ * - initialValue?: T
+ * - onError?, onDestroyError?: ErrorHandler
  */
-export class IdlePollingTransfer<T> extends BaseStateTransfer<T> implements PushableTransferInterface<T>, SubscribableTransferInterface<T>, PullableTransferInterface<T>, TriggerableTransferInterface, PollingSourceTransferInterface, GateInterface {
-  override readonly isInput = true;
+export class AsyncStoredChannelTransfer<T> extends BaseStateTransfer<T> implements SubscribableTransferInterface<T>, AsyncPullableTransferInterface<T>, AsyncTriggerableInterface {
   override readonly isOutput = true;
-  override readonly isDuplex = true;
 
-  override readonly isPushable = true;
-  override readonly isPullable = true;
   override readonly isSubscribable = true;
-  override readonly isPollingSource = true;
-  override readonly isTriggerable = true;
-  override readonly isGate = true;
+  override readonly isAsyncPullable = true;
+  override readonly isAsyncTriggerable = true;
+
+  protected readonly _emit: DataHandler<T>;
+  protected readonly _destroy: () => void;
+  protected readonly _onError?: ErrorHandler<AsyncStoredChannelTransfer<T>>;
+  protected readonly _onDestroyError?: ErrorHandler<AsyncStoredChannelTransfer<T>>;
 
   private readonly _subscription: SubscriptionManager<T>;
-  private readonly _gateState: StateSubscriptionManager<GateInterface>;
-  private readonly _timeout: number;
-  private readonly _interval: number;
-  private readonly _fetcher: DataFetcher<T>;
-  private readonly _onError?: ErrorHandler<IdlePollingTransfer<T>>;
-  private readonly _tickerFactory: TickerFactory;
 
-  private _active: boolean;
-  private _idleTimer: ReturnType<typeof setTimeout> | null = null;
-  private _ticker: TickerInterface | null = null;
-
-  constructor(config: IdlePollingTransferConfig<T>) {
+  constructor(config: AsyncStoredChannelTransferConfig<T>) {
     super(config);
     this._subscription = new SubscriptionManager(this._state);
-    this._gateState = new StateSubscriptionManager<GateInterface>(this);
-    this._timeout = config.timeout;
-    this._interval = config.interval;
-    this._fetcher = config.fetcher;
     this._onError = config.onError;
-    this._tickerFactory = config.tickerFactory ?? RAFTicker.factory;
-    this._active = config.activated;
+    this._onDestroyError = config.onDestroyError;
+    this._destroy = config.destroy;
+    this._emit = (data: T) => {
+      this._state.value = data;
+      this.asyncTrigger();
+    };
 
-    if (this._active) {
-      this._startIdleTimer();
-    }
+    config.setup(this._emit);
   }
 
-  public push(data: T): void {
-    this._state.value = data;
-    this._subscription.sendState();
-    this._state.clear();
-
-    if (this._active) {
-      this._stopPolling();
-      this._startIdleTimer();
-    }
+  public async asyncPull(): Promise<T | undefined> {
+    return this._state.value;
   }
 
   public subscribe(handler: DataHandler<T>): SubscriberInterface {
     return this._subscription.subscribe(handler);
   }
 
-  public pull(): T | undefined {
+  public async asyncTrigger(): Promise<void> {
     try {
-      return this._fetcher();
+      this._subscription.sendState();
     } catch (e) {
       handleError(e, this, this._onError);
-      return undefined;
     }
   }
 
-  public onStateChange(handler: DataHandler<GateInterface>): SubscriberInterface {
-    return this._gateState.subscribe(handler);
-  }
-
-  public trigger(): void {
-    this._poll();
-    if (this._active) {
-      this._startIdleTimer();
-    }
-  }
-
-  public get active(): boolean {
-    return this._active;
-  }
-
-  public activate(): void {
-    if (this._active) {
-      return;
-    }
-    this._active = true;
-    this._startIdleTimer();
-    this._gateState.notify();
-  }
-
-  public deactivate(): void {
-    this._active = false;
-    this._clearIdleTimer();
-    this._stopPolling();
-    this._gateState.notify();
-  }
-
-  public toggle(): boolean {
-    if (this._active) {
-      this.deactivate();
-      return false;
-    }
-    this.activate();
-    return true;
-  }
-
-  public override destroy(): void {
-    this._active = false;
-    this._clearIdleTimer();
-    this._stopPolling();
+  public override destroy() {
     this._subscription.destroy();
-    this._gateState.destroy();
-    super.destroy();
-  }
-
-  private _startIdleTimer(): void {
-    this._clearIdleTimer();
-    this._idleTimer = setTimeout(() => {
-      this._idleTimer = null;
-      this._startPolling();
-    }, this._timeout);
-  }
-
-  private _clearIdleTimer(): void {
-    if (this._idleTimer !== null) {
-      clearTimeout(this._idleTimer);
-      this._idleTimer = null;
-    }
-  }
-
-  private _startPolling(): void {
-    if (this._ticker !== null) {
-      return;
-    }
-    this._ticker = this._tickerFactory({
-      callback: () => this._poll(),
-      interval: this._interval,
-    });
-    this._ticker.start();
-  }
-
-  private _stopPolling(): void {
-    if (this._ticker !== null) {
-      this._ticker.stop();
-      this._ticker = null;
-    }
-  }
-
-  private _poll(): void {
     try {
-      this._state.value = this._fetcher();
-      this._subscription.sendState();
-      this._state.clear();
+      this._destroy();
     } catch (e) {
-      try {
-        handleError(e, this, this._onError);
-      } catch (handlerError) {
-        this._stopPolling();
-        throw handlerError;
-      }
+      handleError(e, this, this._onDestroyError);
     }
+    super.destroy();
   }
 }
 
@@ -3053,85 +3132,6 @@ export class AsyncConditionTransfer<T> extends BaseStateTransfer<T> implements A
       const next = this._buffer.shift() as T;
       this._process(next);
     }
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// AsyncStoredChannelTransfer
-// ═══════════════════════════════════════════════════════════════
-/**
- * Output channel with value retention, external management, and async interface.
- *
- * Capabilities: isOutput, isSubscribable, isAsyncPullable, isAsyncTriggerable
- *
- * Mechanics:
- * 1. setup(emit) / destroy() — sync, like in StoredChannelTransfer
- * 2. emit(data) — sync, writes the value, calls asyncTrigger (fire-and-forget)
- * 3. asyncPull() — returns the current value (trivially async)
- * 4. asyncTrigger() — notifies subscribers (trivially async)
- * 5. subscribe(handler) — sync subscription
- *
- * Note: setup/emit/subscribe are synchronous (subscription remains sync),
- * but pull/trigger are async for integration with async pipelines.
- *
- * Configuration (AsyncStoredChannelTransferConfig):
- * - setup: (emit: DataHandler<T>) => void
- * - destroy: () => void
- * - initialValue?: T
- * - onError?, onDestroyError?: ErrorHandler
- */
-export class AsyncStoredChannelTransfer<T> extends BaseStateTransfer<T> implements SubscribableTransferInterface<T>, AsyncPullableTransferInterface<T>, AsyncTriggerableInterface {
-  override readonly isOutput = true;
-
-  override readonly isSubscribable = true;
-  override readonly isAsyncPullable = true;
-  override readonly isAsyncTriggerable = true;
-
-  protected readonly _emit: DataHandler<T>;
-  protected readonly _destroy: () => void;
-  protected readonly _onError?: ErrorHandler<AsyncStoredChannelTransfer<T>>;
-  protected readonly _onDestroyError?: ErrorHandler<AsyncStoredChannelTransfer<T>>;
-
-  private readonly _subscription: SubscriptionManager<T>;
-
-  constructor(config: AsyncStoredChannelTransferConfig<T>) {
-    super(config);
-    this._subscription = new SubscriptionManager(this._state);
-    this._onError = config.onError;
-    this._onDestroyError = config.onDestroyError;
-    this._destroy = config.destroy;
-    this._emit = (data: T) => {
-      this._state.value = data;
-      this.asyncTrigger();
-    };
-
-    config.setup(this._emit);
-  }
-
-  public async asyncPull(): Promise<T | undefined> {
-    return this._state.value;
-  }
-
-  public subscribe(handler: DataHandler<T>): SubscriberInterface {
-    return this._subscription.subscribe(handler);
-  }
-
-  public async asyncTrigger(): Promise<void> {
-    try {
-      this._subscription.sendState();
-    } catch (e) {
-      handleError(e, this, this._onError);
-    }
-  }
-
-  public override destroy() {
-    this._subscription.destroy();
-    try {
-      this._destroy();
-    } catch (e) {
-      handleError(e, this, this._onDestroyError);
-    }
-    super.destroy();
   }
 }
 
