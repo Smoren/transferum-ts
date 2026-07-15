@@ -2119,6 +2119,7 @@ export class AsyncSinkTransfer<T> extends BaseStateTransfer<T> implements AsyncP
 
   private readonly _callback: AsyncDataHandler<T> | DataHandler<T>;
   private readonly _onError?: ErrorHandler<AsyncSinkTransfer<T>>;
+
   private readonly _maxConcurrency: number;
   private readonly _bufferSize: number;
   private readonly _onBufferOverflow?: DataHandler<T>;
@@ -2130,6 +2131,7 @@ export class AsyncSinkTransfer<T> extends BaseStateTransfer<T> implements AsyncP
     super({ ...config, initialValue: undefined });
     this._callback = config.callback;
     this._onError = config.onError;
+
     this._maxConcurrency = config.maxConcurrency ?? Infinity;
     this._bufferSize = config.bufferSize ?? Infinity;
     this._onBufferOverflow = config.onBufferOverflow;
@@ -2202,6 +2204,7 @@ export class AsyncWriteTransfer<T> extends BaseTransfer implements AsyncPushable
 
   private readonly _flow: AsyncInputFlowInterface<T> | InputFlowInterface<T>;
   private readonly _onError?: ErrorHandler<AsyncWriteTransfer<T>>;
+
   private readonly _maxConcurrency: number;
   private readonly _bufferSize: number;
   private readonly _onBufferOverflow?: DataHandler<T>;
@@ -2213,6 +2216,7 @@ export class AsyncWriteTransfer<T> extends BaseTransfer implements AsyncPushable
     super();
     this._flow = config.flow;
     this._onError = config.onError;
+
     this._maxConcurrency = config.maxConcurrency ?? Infinity;
     this._bufferSize = config.bufferSize ?? Infinity;
     this._onBufferOverflow = config.onBufferOverflow;
@@ -2925,7 +2929,7 @@ export class AsyncIdlePollingTransfer<T> extends BaseStateTransfer<T> implements
     }
   }
 }
-
+;
 // ═══════════════════════════════════════════════════════════════
 // AsyncConvertTransfer
 // ═══════════════════════════════════════════════════════════════
@@ -2960,6 +2964,7 @@ export class AsyncConvertTransfer<TInput, TOutput> extends BaseStateTransfer<TOu
   private readonly _subscription: SubscriptionManager<TOutput>;
   private readonly _operator: AsyncOperatorInterface<TInput, TOutput | undefined>;
   private readonly _onError?: ErrorHandler<AsyncConvertTransfer<TInput, TOutput>>;
+
   private readonly _maxConcurrency: number;
   private readonly _bufferSize: number;
   private readonly _onBufferOverflow?: DataHandler<TInput>;
@@ -2972,6 +2977,7 @@ export class AsyncConvertTransfer<TInput, TOutput> extends BaseStateTransfer<TOu
     this._subscription = new SubscriptionManager(this._state);
     this._operator = config.operator;
     this._onError = config.onError;
+
     this._maxConcurrency = config.maxConcurrency ?? Infinity;
     this._bufferSize = config.bufferSize ?? Infinity;
     this._onBufferOverflow = config.onBufferOverflow;
@@ -3057,6 +3063,7 @@ export class AsyncConditionTransfer<T> extends BaseStateTransfer<T> implements A
   private readonly _shouldEmit: (currentState: T | undefined) => Promise<boolean> | boolean;
   private readonly _onAcceptError?: ErrorHandler<AsyncConditionTransfer<T>>;
   private readonly _onEmitError?: ErrorHandler<AsyncConditionTransfer<T>>;
+
   private readonly _maxConcurrency: number;
   private readonly _bufferSize: number;
   private readonly _onBufferOverflow?: DataHandler<T>;
@@ -3071,6 +3078,7 @@ export class AsyncConditionTransfer<T> extends BaseStateTransfer<T> implements A
     this._shouldEmit = config.shouldEmit ?? (() => true);
     this._onAcceptError = config.onAcceptError;
     this._onEmitError = config.onEmitError;
+
     this._maxConcurrency = config.maxConcurrency ?? Infinity;
     this._bufferSize = config.bufferSize ?? Infinity;
     this._onBufferOverflow = config.onBufferOverflow;
