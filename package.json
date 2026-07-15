@@ -1,7 +1,7 @@
 {
   "name": "transferum",
-  "version": "1.1.0",
-  "description": "Type-safe reactive data processing pipelines with composable transfers, bridges, and operators — sync and async in one unified system",
+  "version": "1.1.1",
+  "description": "A language for describing interactions between components — type-safe primitives that compose into interaction graphs with compile-time-checked contracts",
   "license": "MIT",
   "repository": {
     "type": "git",
