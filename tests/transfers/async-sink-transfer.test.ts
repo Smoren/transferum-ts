@@ -464,6 +464,40 @@ describe(
 );
 
 describe(
+  'AsyncSinkTransfer bufferSize=0 without onBufferOverflow silently drops test',
+  () => {
+    it('', async () => {
+      const received: number[] = [];
+      let resolveTask: () => void;
+      const taskPromise = new Promise<void>((resolve) => { resolveTask = resolve; });
+
+      const callback = async (n: number) => {
+        if (n === 1) await taskPromise;
+        received.push(n);
+      };
+      const transfer = new AsyncSinkTransfer<number>({
+        callback,
+        maxConcurrency: 1,
+        bufferSize: 0,
+        // no onBufferOverflow — data silently dropped
+      });
+
+      transfer.asyncPush(1);  // starts (blocked)
+      transfer.asyncPush(2);  // at capacity, buffer size 0 → silently dropped
+      transfer.asyncPush(3);  // silently dropped
+
+      resolveTask!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Only 1 processed, 2 and 3 dropped
+      expect(received).toEqual([1]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
   'AsyncSinkTransfer destroy clears buffer test',
   () => {
     it('', async () => {
