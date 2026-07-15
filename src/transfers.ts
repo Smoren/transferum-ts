@@ -2038,21 +2038,56 @@ export class AsyncSinkTransfer<T> extends BaseStateTransfer<T> implements AsyncP
 
   override readonly isAsyncPushable = true;
 
-  private readonly _callback: AsyncDataHandler<T>;
+  private readonly _callback: AsyncDataHandler<T> | DataHandler<T>;
   private readonly _onError?: ErrorHandler<AsyncSinkTransfer<T>>;
+  private readonly _maxConcurrency: number;
+  private readonly _bufferSize: number;
+  private readonly _onBufferOverflow?: DataHandler<T>;
+
+  private _activeCount: number = 0;
+  private _buffer: T[] = [];
 
   constructor(config: AsyncSinkTransferConfig<T>) {
     super({ ...config, initialValue: undefined });
     this._callback = config.callback;
     this._onError = config.onError;
+    this._maxConcurrency = config.maxConcurrency ?? Infinity;
+    this._bufferSize = config.bufferSize ?? Infinity;
+    this._onBufferOverflow = config.onBufferOverflow;
   }
 
   async asyncPush(data: T): Promise<void> {
+    if (this._activeCount < this._maxConcurrency) {
+      await this._process(data);
+    } else if (this._buffer.length < this._bufferSize) {
+      this._buffer.push(data);
+    } else {
+      this._onBufferOverflow?.(data);
+    }
+  }
+
+  private async _process(data: T): Promise<void> {
+    this._activeCount++;
     try {
       await this._callback(data);
     } catch (e) {
       handleError(e, this, this._onError);
+    } finally {
+      this._activeCount--;
+      this._dequeue();
     }
+  }
+
+  private _dequeue(): void {
+    if (this._buffer.length > 0 && this._activeCount < this._maxConcurrency) {
+      const next = this._buffer.shift() as T;
+      this._process(next);
+    }
+  }
+
+  override destroy() {
+    this._buffer = [];
+    super.destroy();
   }
 }
 
@@ -2816,21 +2851,30 @@ export class AsyncConvertTransfer<TInput, TOutput> extends BaseStateTransfer<TOu
   private readonly _subscription: SubscriptionManager<TOutput>;
   private readonly _operator: AsyncOperatorInterface<TInput, TOutput | undefined>;
   private readonly _onError?: ErrorHandler<AsyncConvertTransfer<TInput, TOutput>>;
+  private readonly _maxConcurrency: number;
+  private readonly _bufferSize: number;
+  private readonly _onBufferOverflow?: DataHandler<TInput>;
+
+  private _activeCount: number = 0;
+  private _buffer: TInput[] = [];
 
   constructor(config: AsyncConvertTransferConfig<TInput, TOutput>) {
     super();
     this._subscription = new SubscriptionManager(this._state);
     this._operator = config.operator;
     this._onError = config.onError;
+    this._maxConcurrency = config.maxConcurrency ?? Infinity;
+    this._bufferSize = config.bufferSize ?? Infinity;
+    this._onBufferOverflow = config.onBufferOverflow;
   }
 
   public async asyncPush(data: TInput): Promise<void> {
-    try {
-      this._state.value = await this._operator.apply(data);
-      this._subscription.sendState();
-      this._state.clear();
-    } catch (e) {
-      handleError(e, this, this._onError);
+    if (this._activeCount < this._maxConcurrency) {
+      await this._process(data);
+    } else if (this._buffer.length < this._bufferSize) {
+      this._buffer.push(data);
+    } else {
+      this._onBufferOverflow?.(data);
     }
   }
 
@@ -2839,8 +2883,30 @@ export class AsyncConvertTransfer<TInput, TOutput> extends BaseStateTransfer<TOu
   }
 
   public override destroy() {
+    this._buffer = [];
     this._subscription.destroy();
     super.destroy();
+  }
+
+  private async _process(data: TInput): Promise<void> {
+    this._activeCount++;
+    try {
+      this._state.value = await this._operator.apply(data);
+      this._subscription.sendState();
+      this._state.clear();
+    } catch (e) {
+      handleError(e, this, this._onError);
+    } finally {
+      this._activeCount--;
+      this._dequeue();
+    }
+  }
+
+  private _dequeue(): void {
+    if (this._buffer.length > 0 && this._activeCount < this._maxConcurrency) {
+      const next = this._buffer.shift() as TInput;
+      this._process(next);
+    }
   }
 }
 

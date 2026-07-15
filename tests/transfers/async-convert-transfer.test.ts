@@ -221,3 +221,272 @@ describe(
     });
   },
 );
+
+// ═══════════════════════════════════════════════════════════════
+// AsyncConvertTransfer Backpressure — maxConcurrency
+// ═══════════════════════════════════════════════════════════════
+
+describe(
+  'AsyncConvertTransfer maxConcurrency=1 processes sequentially when not awaited test',
+  () => {
+    it('', async () => {
+      const order: number[] = [];
+      let resolveFirst: () => void;
+      const firstPromise = new Promise<void>((resolve) => { resolveFirst = resolve; });
+
+      const operator = {
+        apply: async (n: number) => {
+          if (n === 1) await firstPromise;
+          order.push(n);
+          return n;
+        },
+      };
+      const transfer = new AsyncConvertTransfer<number, number>({
+        operator,
+        maxConcurrency: 1,
+      });
+      const handler = jest.fn();
+
+      transfer.subscribe(handler);
+
+      transfer.asyncPush(1);  // starts (blocked)
+      transfer.asyncPush(2);  // at capacity → buffered
+      transfer.asyncPush(3);  // at capacity → buffered
+
+      expect(order).toEqual([]);
+
+      resolveFirst!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(order).toEqual([1, 2, 3]);
+      expect(handler).toHaveBeenCalledTimes(3);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConvertTransfer maxConcurrency=2 processes in parallel test',
+  () => {
+    it('', async () => {
+      const order: string[] = [];
+      let resolveA: () => void;
+      let resolveB: () => void;
+      const promiseA = new Promise<void>((resolve) => { resolveA = resolve; });
+      const promiseB = new Promise<void>((resolve) => { resolveB = resolve; });
+
+      const operator = {
+        apply: async (n: number) => {
+          if (n === 1) { order.push('start-1'); await promiseA; order.push('end-1'); }
+          else if (n === 2) { order.push('start-2'); await promiseB; order.push('end-2'); }
+          else { order.push(`start-${n}`); order.push(`end-${n}`); }
+          return n;
+        },
+      };
+      const transfer = new AsyncConvertTransfer<number, number>({
+        operator,
+        maxConcurrency: 2,
+      });
+
+      transfer.asyncPush(1);  // starts (blocked on A)
+      transfer.asyncPush(2);  // starts (blocked on B) — parallel
+      transfer.asyncPush(3);  // at capacity → buffered
+
+      expect(order).toEqual(['start-1', 'start-2']);
+
+      resolveB!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(order).toEqual(['start-1', 'start-2', 'end-2', 'start-3', 'end-3']);
+
+      resolveA!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(order).toEqual(['start-1', 'start-2', 'end-2', 'start-3', 'end-3', 'end-1']);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConvertTransfer default maxConcurrency=Infinity processes all in parallel test',
+  () => {
+    it('', async () => {
+      const order: number[] = [];
+      let resolveAll: () => void;
+      const allPromise = new Promise<void>((resolve) => { resolveAll = resolve; });
+
+      const operator = {
+        apply: async (n: number) => {
+          await allPromise;
+          order.push(n);
+          return n;
+        },
+      };
+      const transfer = new AsyncConvertTransfer<number, number>({ operator });
+
+      transfer.asyncPush(1);
+      transfer.asyncPush(2);
+      transfer.asyncPush(3);
+
+      expect(order).toEqual([]);
+
+      resolveAll!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(order).toEqual([1, 2, 3]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+// ═══════════════════════════════════════════════════════════════
+// AsyncConvertTransfer Backpressure — bufferSize & onBufferOverflow
+// ═══════════════════════════════════════════════════════════════
+
+describe(
+  'AsyncConvertTransfer bufferSize=0 drops excess data test',
+  () => {
+    it('', async () => {
+      const overflowed: number[] = [];
+      let resolveTask: () => void;
+      const taskPromise = new Promise<void>((resolve) => { resolveTask = resolve; });
+
+      const operator = {
+        apply: async (n: number) => {
+          if (n === 1) await taskPromise;
+          return n;
+        },
+      };
+      const transfer = new AsyncConvertTransfer<number, number>({
+        operator,
+        maxConcurrency: 1,
+        bufferSize: 0,
+        onBufferOverflow: (data) => overflowed.push(data),
+      });
+
+      transfer.asyncPush(1);  // starts (blocked)
+      transfer.asyncPush(2);  // at capacity, buffer size 0 → dropped
+      transfer.asyncPush(3);  // dropped
+
+      expect(overflowed).toEqual([2, 3]);
+
+      resolveTask!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConvertTransfer bufferSize=1 drops when full test',
+  () => {
+    it('', async () => {
+      const overflowed: number[] = [];
+      let resolveTask: () => void;
+      const taskPromise = new Promise<void>((resolve) => { resolveTask = resolve; });
+
+      const operator = {
+        apply: async (n: number) => {
+          if (n === 1) await taskPromise;
+          return n;
+        },
+      };
+      const transfer = new AsyncConvertTransfer<number, number>({
+        operator,
+        maxConcurrency: 1,
+        bufferSize: 1,
+        onBufferOverflow: (data) => overflowed.push(data),
+      });
+
+      transfer.asyncPush(1);  // starts (blocked)
+      transfer.asyncPush(2);  // queued (buffer: [2])
+      transfer.asyncPush(3);  // buffer full → dropped
+
+      expect(overflowed).toEqual([3]);
+
+      resolveTask!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConvertTransfer error frees slot for next buffered item test',
+  () => {
+    it('', async () => {
+      const results: number[] = [];
+      let resolveTask: () => void;
+      const taskPromise = new Promise<void>((resolve) => { resolveTask = resolve; });
+
+      const operator = {
+        apply: async (n: number) => {
+          if (n === 1) { await taskPromise; throw new Error('fail'); }
+          results.push(n);
+          return n;
+        },
+      };
+      const transfer = new AsyncConvertTransfer<number, number>({
+        operator,
+        maxConcurrency: 1,
+        bufferSize: 1,
+        onError: () => {},
+      });
+
+      transfer.asyncPush(1);  // starts (blocked, will fail)
+      transfer.asyncPush(2);  // queued
+
+      resolveTask!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // 1 failed (error suppressed), 2 processed from buffer
+      expect(results).toEqual([2]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConvertTransfer destroy clears buffer test',
+  () => {
+    it('', async () => {
+      const results: number[] = [];
+      let resolveTask: () => void;
+      const taskPromise = new Promise<void>((resolve) => { resolveTask = resolve; });
+
+      const operator = {
+        apply: async (n: number) => {
+          if (n === 1) await taskPromise;
+          results.push(n);
+          return n;
+        },
+      };
+      const transfer = new AsyncConvertTransfer<number, number>({
+        operator,
+        maxConcurrency: 1,
+        bufferSize: 10,
+      });
+
+      transfer.asyncPush(1);  // starts (blocked)
+      transfer.asyncPush(2);  // queued
+      transfer.asyncPush(3);  // queued
+
+      transfer.destroy();
+
+      resolveTask!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // After destroy, buffered items should not be processed
+      expect(results).not.toContain(2);
+      expect(results).not.toContain(3);
+    });
+  },
+);
+
