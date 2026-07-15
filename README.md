@@ -10,9 +10,9 @@
 
 ![Transferum Logo](docs/images/transferum-logo.png)
 
-A reactive data processing pipeline system for TypeScript.
+A language for describing interactions between components.
 
-The library provides type-safe primitives for building data flows: **transfers** (flow nodes), **bridges** (connectors between flows), **builders** (chain constructors), and **operators** (data transformers).
+Type-safe primitives — **transfers** (nodes), **bridges** (edges), **builders** (chain constructors), and **operators** (data transformers) — compose into interaction graphs with compile-time-checked contracts.
 
 ---
 
@@ -32,11 +32,15 @@ The library provides type-safe primitives for building data flows: **transfers**
   - [Transferum vs RxJS](#transferum-vs-rxjs)
   - [Transferum vs Most.js](#transferum-vs-mostjs)
   - [Transferum vs Bacon.js / Kefir](#transferum-vs-baconjs--kefir)
+  - [Transferum vs Node Streams / WHATWG Streams](#transferum-vs-node-streams--whatwg-streams)
+  - [Transferum vs Callbag](#transferum-vs-callbag)
+  - [Transferum vs AsyncIterator](#transferum-vs-asynciterator)
   - [Quick Comparison Table](#quick-comparison-table)
   - [When to Choose Transferum](#when-to-choose-transferum)
   - [When to Consider Alternatives](#when-to-consider-alternatives)
 - [Installation & Import](#installation--import)
 - [Core Concepts](#core-concepts)
+  - [Architectural Invariants](#architectural-invariants)
   - [Capability Flags System](#capability-flags-system)
   - [Transfers](#transfers)
   - [Linking Transfers](#linking-transfers)
@@ -122,19 +126,31 @@ Transferum addresses the structural issues that emerge at scale:
 
 Transferum provides **composable, type-safe building blocks** with a uniform capability system. You declare *what* each stage does (push, pull, transform, filter, poll) — the library handles *how* data moves between stages, including sync/async bridging, flow control, and resource cleanup.
 
+> **Not a stream library — a data transfer graph library.** Unlike RxJS, where everything is an `Observable` and composition happens inside a single object, Transferum treats **transfers as nodes** and **bridges as edges** in a data transfer graph. `linkTransfers` connects nodes by inspecting their capability contracts — not their class names. Builders assemble subgraphs fluently. Operators are local graph transformations. This makes Transferum architecturally closer to dataflow systems and component graphs than to classical reactive stream libraries.
+
+```
+Transfer ──── Bridge ──── Transfer
+    \                      │
+     \                     │
+      ──────── Bridge ──── Transfer
+```
+
+This is a graph.
+
 ### Key Benefits
 
-| Benefit                                   | How                                                                                                                                                                                                                                                                                                                                                                                                           |
-|-------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Type-safe pipelines**                   | Each transfer and operator carries its input/output types. Builders enforce type compatibility at compile time — a mismatch is a compile error, not a runtime crash.                                                                                                                                                                                                                                          |
-| **Uniform capability model**              | Every transfer declares its capabilities via flags (`isPushable`, `isSubscribable`, `isGate`, …). `linkTransfers` automatically selects the correct wiring strategy — no manual glue code. Flags also define the transfer's TypeScript interface at compile time — methods like `push()` or `subscribe()` are type-guaranteed, not runtime-guessed (see [Capability Flags System](#capability-flags-system)). |
-| **Sync + async in one system**            | Sync and async transfers coexist. `linkTransfers` prefers sync when possible and falls back to async strategies when needed. No separate "async world."                                                                                                                                                                                                                                                       |
-| **Composable architecture**               | Transfers link into chains, bridges connect chains with gate control, builders assemble chains fluently, operators transform data — all orthogonal and reusable.                                                                                                                                                                                                                                              |
-| **Explicit lifecycle**                    | Every resource (transfer, bridge, subscription, ticker) supports `destroy()`. Builders track `owned` resources and clean them up in one call. No leaked timers or subscriptions.                                                                                                                                                                                                                              |
-| **Reactive by default, pull when needed** | Most transfers are subscribable (push-based reactivity). Polling transfers add pull-based data acquisition on the same foundation. Use the right model per stage without switching libraries.                                                                                                                                                                                                                 |
-| **Local, fail-safe error handling**       | Errors are local to each transfer — one stage's failure doesn't kill the pipeline. With `onError` — suppressed, stream continues. Without — visible (exception/rejection), and polling stops (no zombie tickers). Per-stage granularity (`onAcceptError`/`onEmitError`, `onDestroyError`). Typed `ErrorHandler<TSource>` passes the transfer instance. No silent swallowing.                                  |
-| **Undefined suppression**                 | `undefined` never propagates through the chain of transfers — it means "no data", not "empty value." Use `null` as an explicit empty marker when needed. This eliminates an entire class of null-check bugs in downstream consumers.                                                                                                                                                                          |
-| **Built-in backpressure**                 | Four async transfers (`AsyncSinkTransfer`, `AsyncWriteTransfer`, `AsyncConvertTransfer`, `AsyncConditionTransfer`) support optional `maxConcurrency`, `bufferSize`, and `onBufferOverflow` — limiting parallel async operations, queuing excess data, and handling overflow gracefully. Defaults are backward-compatible (unlimited). See [Backpressure](#backpressure).                                      |
+| Benefit                                   | How                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+|-------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Type-safe pipelines**                   | Each transfer and operator carries its input/output types. Builders enforce type compatibility at compile time — a mismatch is a compile error, not a runtime crash.                                                                                                                                                                                                                                                                    |
+| **Uniform capability model**              | Every transfer declares its capabilities via flags (`isPushable`, `isSubscribable`, `isGate`, …). `linkTransfers` automatically selects the correct wiring strategy — no manual glue code. Flags also define the transfer's TypeScript interface at compile time — methods like `push()` or `subscribe()` are type-guaranteed, not runtime-guessed (see [Capability Flags System](#capability-flags-system)).                           |
+| **Sync + async in one system**            | Sync and async transfers coexist. `linkTransfers` prefers sync when possible and falls back to async strategies when needed. No separate "async world."                                                                                                                                                                                                                                                                                 |
+| **Composable architecture**               | Transfers link into chains, bridges connect chains with gate control, builders assemble chains fluently, operators transform data — all orthogonal and reusable.                                                                                                                                                                                                                                                                        |
+| **Explicit lifecycle**                    | Every resource has an explicit cleanup method — `destroy()` for transfers, bridges, and subscription managers; `stop()` for tickers; `unsubscribe()` for subscriptions. Builders track `owned` resources and clean them up in one call. No leaked timers or subscriptions.                                                                                                                                                              |
+| **Reactive by default, pull when needed** | Most transfers are subscribable (push-based reactivity). Polling transfers add pull-based data acquisition on the same foundation. Use the right model per stage without switching libraries.                                                                                                                                                                                                                                           |
+| **Local, fail-safe error handling**       | Errors are local to each transfer — one stage's failure doesn't kill the pipeline. With `onError` — suppressed, stream continues. Without — visible (exception/rejection), and polling stops (no zombie tickers). Per-stage granularity (`onAcceptError`/`onEmitError`, `onDestroyError`). Typed `ErrorHandler<TSource>` passes the transfer instance. No silent swallowing.                                                            |
+| **Undefined suppression**                 | `undefined` never propagates through the chain of transfers — it means "no data", not "empty value." Use `null` as an explicit empty marker when needed. This eliminates an entire class of null-check bugs in downstream consumers.                                                                                                                                                                                                    |
+| **Built-in backpressure**                 | Four async transfers (`AsyncSinkTransfer`, `AsyncWriteTransfer`, `AsyncConvertTransfer`, `AsyncConditionTransfer`) support optional `maxConcurrency`, `bufferSize`, and `onBufferOverflow` — limiting parallel async operations, queuing excess data, and handling overflow gracefully. Defaults are backward-compatible (unlimited). See [Backpressure](#backpressure).                                                                |
+| **No god-objects, no utility sprawl**     | `BaseTransfer` stays minimal — only capability declarations, no logic. Each transfer class models exactly one behavioral concept (buffering, gating, merging, polling…). `helpers.ts` and `utils.ts` are small focused files (5 classes and 2 functions respectively), not dumping grounds. No central object knows about every other component. Complexity is concentrated in the type layer; runtime code stays compact and readable. |
 
 ### Use Cases
 
@@ -610,6 +626,7 @@ Transferum exists in a rich ecosystem of reactive and stream-processing librarie
 **Key differences:**
 
 - **Architecture:** RxJS uses `Observable` + `Operator` + `Subscription` model. Transferum uses `Transfer` + `Bridge` + `Builder` with capability flags.
+- **Models, not abstractions:** RxJS builds around a single abstraction (`Observable`) that serves as source, connection, and handler simultaneously. Transferum builds around distinct **models** — transfers are *nodes*, bridges are *edges*, operators are *transforms*. Each has a clear role; none tries to be all of them.
 - **Composability:** RxJS operators are functions that transform observables. Transferum transfers are objects that can be linked via `linkTransfers()` automatically.
 - **Error handling:** RxJS errors propagate through the stream and terminate it unless caught with `catchError()` / `retry()`. Transferum errors are **local to each transfer** — with `onError`, suppressed and the stream continues; without, the error is visible (exception/rejection) and polling stops (fail-safe). One stage's failure doesn't kill the pipeline. See [Error Handling](#error-handling).
 - **Scheduling:** RxJS has `Scheduler` abstraction (async, asyncSchedule, animationFrame). Transferum has `Ticker` (RAFTicker, IntervalTicker) for polling.
@@ -819,23 +836,74 @@ Transferum's capability flags provide more granularity than the two-type model, 
 
 ---
 
+### Transferum vs Node Streams / WHATWG Streams
+
+**Node Streams** and **WHATWG Streams** (the web standard) both address data piping through typed stream objects.
+
+| Aspect             | Transferum                                                              | Node Streams / WHATWG Streams                                                                                            |
+|--------------------|-------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
+| **Type system**    | Capabilities are composable — mix push + pull + gate + poll in one type | 4 fixed roles (`Readable` / `Writable` / `Duplex` / `Transform`) — no composition of capabilities within a single stream |
+| **Model**          | Capabilities, not stream types                                          | Fixed stream *types* — a new role means a new class                                                                      |
+| **Push + Pull**    | Both first-class — `isPushable` / `isPullable` as flags                 | Readable = pull-oriented, Writable = push-oriented                                                                       |
+| **Gate / Routing** | Built-in — `GateTransfer`, `BridgeSelector`                             | Manual — pipe chains, no routing primitive                                                                               |
+| **Error handling** | Local, non-fatal — per-transfer `onError`                               | Stream-level — errors propagate and can destroy stream                                                                   |
+| **Lifecycle**      | Explicit `destroy()` on every transfer                                  | `destroy()` / `cancel()` — inconsistent across impls                                                                     |
+| **TypeScript**     | First-class — computed interfaces from flags                            | Community typings (Node), limited generics (WHATWG)                                                                      |
+
+Node Streams and WHATWG Streams solve piping well, but they introduce a new **stream type** for each role (`Readable`, `Writable`, `Duplex`, `Transform`). Transferum introduces **capabilities** instead — a transfer declares what it can do via flags, and the type system computes the correct interface. Adding a new capability doesn't require a new stream class; it requires a new flag. This scales combinatorially better.
+
+---
+
+### Transferum vs Callbag
+
+**Callbag** is a minimal spec for push/pull stream communication via a single message-passing protocol.
+
+| Aspect             | Transferum                                                 | Callbag                                          |
+|--------------------|------------------------------------------------------------|--------------------------------------------------|
+| **Push + Pull**    | Both first-class — separate capability flags               | Both — unified through a single message protocol |
+| **Type safety**    | Compile-time — flags are type literals, methods guaranteed | Dynamic — protocol is untyped by design          |
+| **Model**          | Capabilities as metadata, contracts enforced by types      | Single callback protocol `(type, data) => void`  |
+| **Gate / Routing** | Built-in — `GateTransfer`, `BridgeSelector`                | Manual — compose with operator functions         |
+| **Bundle size**    | ~15 KB                                                     | ~0 (spec, not library)                           |
+
+Callbag is ideologically the closest existing approach — it also unifies push and pull. But it does so through a single message-passing protocol where everything is a callback. Transferum separates capabilities into distinct flags and lets the type system enforce them. This trades Callbag's minimalism for compile-time safety and explicit contracts.
+
+---
+
+### Transferum vs AsyncIterator
+
+**AsyncIterator** is a built-in JavaScript protocol for async sequential access (`for await…of`).
+
+| Aspect             | Transferum                                                    | AsyncIterator                                          |
+|--------------------|---------------------------------------------------------------|--------------------------------------------------------|
+| **Model**          | Multi-capability — push, pull, subscribe, gate, poll, trigger | Pull-only — `next()` returns `Promise<{value, done}>`  |
+| **Push**           | First-class — `isPushable`                                    | Not supported — pull only                              |
+| **Subscribe**      | First-class — `isSubscribable`                                | Not supported — must be wrapped                        |
+| **Gate / Routing** | Built-in — `GateTransfer`, `BridgeSelector`                   | Not supported                                          |
+| **Type safety**    | Compile-time capability guarantees                            | `AsyncIterator<T>` — type describes data, not behavior |
+
+AsyncIterator describes one model: pull. Transferum treats pull as a special case — one capability among many. A pullable transfer covers the same semantic ground as an async iterator (consumer-driven data access), but the library also supports push, subscribe, gate, poll, and trigger as equally first-class interaction modes.
+
+---
+
 ### Quick Comparison Table
 
-| Feature                    | Transferum                   | RxJS                                 | Most.js           | Bacon.js          | Kefir             |
-|----------------------------|------------------------------|--------------------------------------|-------------------|-------------------|-------------------|
-| **Bundle size (minified)** | ~15 KB                       | ~35 KB                               | ~7 KB             | ~12 KB            | ~8 KB             |
-| **Dependencies**           | 0                            | 0                                    | 0                 | 0                 | 0                 |
-| **Pull-based**             | ✓                            | ✗                                    | ✗                 | ✗                 | ✗                 |
-| **Sync/Async unify**       | ✓                            | Partial                              | Partial           | Partial           | Partial           |
-| **Built-in polling**       | ✓ (Ticker)                   | ✗ (manual)                           | ✗                 | ✗                 | ✗                 |
-| **Gate/Flow control**      | ✓ (GateTransfer, Bridge)     | Manual                               | Manual            | Manual            | Manual            |
-| **Error handling**         | Local, non-fatal, fail-safe  | Stream-level (`catchError`, `retry`) | Stream terminates | Stream terminates | Stream terminates |
-| **Undefined suppression**  | ✓                            | ✗                                    | ✗                 | ✗                 | ✗                 |
-| **Operators count**        | ~10 (pure transforms)        | 100+                                 | ~40               | ~60               | ~50               |
-| **Flow-control as nodes**  | ✓ (transfers with lifecycle) | ✗ (operators only)                   | ✗                 | ✗                 | ✗                 |
-| **TypeScript support**     | Excellent                    | Excellent                            | Good              | Fair              | Fair              |
-| **Community size**         | Small                        | Very large                           | Medium            | Small             | Small             |
-| **Maintenance status**     | Active                       | Active                               | Maintenance       | Maintenance       | Archived          |
+| Feature                    | Transferum                   | RxJS                                 | Most.js           | Bacon.js          | Kefir             | Node Streams       | WHATWG Streams     | Callbag        | AsyncIterator  |
+|----------------------------|------------------------------|--------------------------------------|-------------------|-------------------|-------------------|--------------------|--------------------|----------------|----------------|
+| **Bundle size (minified)** | ~15 KB                       | ~35 KB                               | ~7 KB             | ~12 KB            | ~8 KB             | Built-in           | Built-in           | ~0 (spec)      | Built-in       |
+| **Dependencies**           | 0                            | 0                                    | 0                 | 0                 | 0                 | 0                  | 0                  | 0              | 0              |
+| **Pull-based**             | ✓                            | ✗                                    | ✗                 | ✗                 | ✗                 | ✓ (Readable)       | ✓ (Readable)       | ✓              | ✓              |
+| **Push-based**             | ✓                            | ✓                                    | ✓                 | ✓                 | ✓                 | ✓ (Writable)       | ✓ (Writable)       | ✓              | ✗              |
+| **Sync/Async unify**       | ✓                            | Partial                              | Partial           | Partial           | Partial           | Partial            | Partial            | ✓              | Async only     |
+| **Built-in polling**       | ✓ (Ticker)                   | ✗ (manual)                           | ✗                 | ✗                 | ✗                 | ✗                  | ✗                  | ✗              | ✗              |
+| **Gate/Flow control**      | ✓ (GateTransfer, Bridge)     | Manual                               | Manual            | Manual            | Manual            | Manual             | Manual             | Manual         | ✗              |
+| **Error handling**         | Local, non-fatal, fail-safe  | Stream-level (`catchError`, `retry`) | Stream terminates | Stream terminates | Stream terminates | Stream-level       | Stream-level       | Protocol-level | Protocol-level |
+| **Undefined suppression**  | ✓                            | ✗                                    | ✗                 | ✗                 | ✗                 | ✗                  | ✗                  | ✗              | ✗              |
+| **Operators count**        | ~10 (pure transforms)        | 100+                                 | ~40               | ~60               | ~50               | ~15 (Transform)    | ~10 (Transform)    | ~30            | ✗              |
+| **Flow-control as nodes**  | ✓ (transfers with lifecycle) | ✗ (operators only)                   | ✗                 | ✗                 | ✗                 | ✗                  | ✗                  | ✗              | ✗              |
+| **TypeScript support**     | Excellent                    | Excellent                            | Good              | Fair              | Fair              | Fair               | Fair               | ✗ (untyped)    | Good           |
+| **Community size**         | Small                        | Very large                           | Medium            | Small             | Small             | Large              | Medium             | Small          | Large          |
+| **Maintenance status**     | Active                       | Active                               | Maintenance       | Maintenance       | Archived          | Active             | Active             | Inactive       | Active         |
 
 ---
 
@@ -851,6 +919,10 @@ Transferum's capability flags provide more granularity than the two-type model, 
 6. **Resilient error handling** — Local, non-fatal error handling: one stage's failure doesn't kill the pipeline, broken pollers stop (fail-safe), no silent swallowing. Per-stage granularity with typed `ErrorHandler<TSource>`.
 7. **Undefined-free data flow** — `undefined` never propagates through the chain — it means "no data," not "empty value," eliminating null-check defects in consumers.
 8. **Game development / IoT** — Frame-aligned tickers, idle polling, sensor aggregation.
+9. **Infrastructure libraries** — Where components interact in multiple ways (push, pull, polling, trigger, read, write) and the interaction contract matters more than the data format.
+10. **Integration layers** — Connecting heterogeneous components or services where a typed, capability-based contract is more valuable than a uniform stream interface.
+11. **Complex pipelines with heterogeneous nodes** — Where different stages have fundamentally different capabilities (some push-only, some pull-only, some gated, some polling) and these differences should be statically checked, not discovered at runtime.
+12. **Embedded DSLs** — Where the library serves as a language for describing an interaction graph with compile-time safety.
 
 **Example fit:** Real-time dashboard with API polling, debounced user input, conditional routing to multiple visualizations, and unified sync/async data flows.
 
@@ -875,6 +947,22 @@ Transferum's capability flags provide more granularity than the two-type model, 
 **Consider Bacon.js (or maintaining Kefir) only if:**
 
 - You are working on a legacy codebase already locked into these specific FRP abstractions.
+
+**Consider Node Streams / WHATWG Streams if:**
+
+- You need the web standard or Node.js native streaming protocol for interop.
+- Your pipeline is purely I/O-oriented (file, network, compression) and doesn't need push+pull+gate+poll in one system.
+- You don't need compile-time capability guarantees.
+
+**Consider Callbag if:**
+
+- You want the absolute minimum abstraction (a spec, not a library) and are comfortable with untyped protocols.
+- You need push+pull unification but don't need TypeScript to enforce which mode each node supports.
+
+**Consider AsyncIterator if:**
+
+- Your use case is purely pull-based sequential async access (`for await…of`).
+- You don't need push, subscribe, gate, or routing primitives.
 
 ---
 
@@ -994,6 +1082,45 @@ import {
 
 ## Core Concepts
 
+### Architectural Invariants
+
+Transferum is built on a single idea:
+
+> **Behavior can be described as a composition of independent capabilities that simultaneously determine the type, the implementation, and the rules of interaction.**
+
+Everything else — transfers, bridges, builders, operators — follows from this principle. They are its consequences, not the idea itself. The invariants below are the shape these consequences take in code.
+
+> **One idea, one direction.** A single concept — capability — flows through every layer of the library:
+>
+> ```
+> Capability flags
+>       ↓
+> Type system (computed interfaces)
+>       ↓
+> Transfer (declares capabilities, implements behavior)
+>       ↓
+> Bridge (inspects capabilities, wires transfers)
+>       ↓
+> Builder (assembles transfers, enforces type compatibility)
+> ```
+>
+> Operators are not a separate layer — they are stateless transforms used *inside* transfers. Adding a new capability propagates automatically through all layers. Adding a new transfer class requires only declaring its flags — the type system, `linkTransfers`, and builders adapt without changes.
+
+**The invariants:**
+
+| Invariant                                       | What it means                                                                                                                                                                                                                                                                       | Where enforced                                                                        |
+|-------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
+| **Transfers don't know their neighbors**        | A transfer defines its own behavior (push, pull, subscribe, gate…) but never references, imports, or checks the class of another transfer. It doesn't know what's upstream or downstream — it only fulfills its own contract.                                                       | `BaseTransfer` and all descendants — no cross-references between transfer classes     |
+| **Bridges don't know concrete implementations** | A bridge inspects capability flags, never class names. There is no `instanceof` chain, no RTTI, no class-name switching. Any transfer with the right capabilities is bridgeable — including ones that don't exist yet.                                                              | `linkTransfers`, `PassBridge`, `BridgeSelector`, all bridge classes                   |
+| **Capabilities define the contract**            | Flags are the single source of truth. They determine the TypeScript interface (compile-time), the available methods (runtime), the linking strategy (`linkTransfers`), and the builder type compatibility. One piece of metadata, many readers.                                     | `interfaces.ts`, `types.ts`, `linkTransfers`, builders                                |
+| **`BaseTransfer` is minimal**                   | The base class contains only capability declarations — no state, no logic. State lives in `BaseStateTransfer<T>` (one level down). This prevents the god-object pattern where a base accumulates knowledge of all descendants.                                                      | `BaseTransfer` class hierarchy                                                        |
+| **One class, one behavior**                     | Each transfer models exactly one behavioral concept. There are no combinatorial mega-classes (`BufferedStoredGateTransfer`). Complex behavior emerges from composition, not from inheritance depth.                                                                                 | All transfer classes                                                                  |
+| **Operators are stateless transforms**          | Operators transform data (`apply(input) → output`) and hold no pipeline state. They live *inside* transfers (`ConvertTransfer`, `TransformBridge`), not as standalone pipeline nodes. The transfer owns the behavioral contract; the operator owns the data transformation.         | `OperatorInterface`, `AsyncOperatorInterface`                                         |
+| **`destroy()` is universal**                    | Every resource has an explicit cleanup path — `destroy()` for transfers, bridges, and subscription managers; `stop()` for tickers; `unsubscribe()` for subscriptions. Builders track `owned` resources and clean them up in one `destroy()` call. No resource lacks a cleanup path. | `DisposableInterface`, all transfers, all bridges, builders; `TickerInterface.stop()` |
+| **`undefined` never propagates**                | `undefined` means "no data," not "empty value." It is suppressed at `SubscriptionManager.sendState()` — subscribers are never notified with `undefined`. Use `null` for explicit empty markers.                                                                                     | `SubscriptionManager`, all transfers                                                  |
+
+> **Why these matter.** A new transfer, bridge, or operator that respects these invariants integrates without touching existing code — the architecture stays coherent as it grows.
+
 ### Capability Flags System
 
 Each transfer implements `CommunicationContractInterface` — a set of boolean flags. Each flag is both a **runtime value** and a **compile-time guarantee**: when a flag is `true`, the corresponding method is part of the transfer's TypeScript type — TypeScript knows it exists without any casts or runtime checks.
@@ -1064,6 +1191,12 @@ This carries through to the type system in `types.ts`, where flags define entire
 
 Pipeline builders use these types to enforce capability compatibility at compile time — a mismatch (e.g., passing an output-only transfer where an input is required) is a type error.
 
+**Why flags instead of class proliferation?** Without capability flags, supporting every combination of push/pull/subscribe/read/write/gate would require a separate class for each combination (`PushTransfer`, `PullTransfer`, `PushPullTransfer`, `PushSubTransfer`, `PushPullSubTransfer`, …) — the class count grows combinatorially. Capability flags eliminate this explosion: one class declares its flags, and the type system computes the correct interface. This is the same principle behind Rust's `Send`/`Sync`/`Copy` traits and Go's small `Reader`/`Writer`/`Closer` interfaces — capabilities as composable metadata, not as inheritance branches.
+
+> **Beyond reactive: ECS and trait analogies.** The capability model has structural parallels outside reactive programming. In **Entity Component System (ECS)**, entities are bare containers, components are data tags, and systems operate on entities with specific components — capabilities resemble components, transfers resemble entities, bridges resemble systems. In **Rust**, traits (`Send`, `Sync`, `Clone`) constrain behavior without inheritance — Transferum's flags do the same: they describe *what a transfer can do* as composable metadata, not *what it is* in a class hierarchy.
+
+**Single source of truth — not an SRP violation.** Capability flags serve multiple consumers (type computation, interface narrowing, bridge strategy selection, operator dispatch). Yet they do not violate the Single Responsibility Principle: flags are **metadata** — they describe *what a transfer can do* and nothing else. The consumers that *act* on this metadata (type system, `linkTransfers`, builders) are separate subsystems. One piece of information, many readers — a single source of truth, not a single responsibility overload.
+
 **Sync priority over async:** If a transfer supports both sync and async operations (e.g., `UniversalCompositeTransfer` with `PushStoredChannelTransfer` inside), `linkTransfers` prefers sync linking. Async strategies are applied only when sync is not applicable.
 
 ### Transfers
@@ -1073,6 +1206,12 @@ A **transfer** is the fundamental building block of a pipeline. Each transfer:
 1. Accepts data (`push`), yields data (`pull`), notifies subscribers (`subscribe`) — depending on its flags.
 2. Manages internal state via `ProxyReference<T>`.
 3. Supports a lifecycle: creation → operation → `destroy()`.
+
+**One class, one behavior.** Each transfer models exactly one behavioral concept — `BufferTransfer` buffers, `GateTransfer` gates, `MergeTransfer` merges, `ConditionTransfer` filters. There is no `BufferedStoredGateTransfer` or other combinatorial mega-class. Complex behavior emerges from composition (linking, bridges, builders), not from inheritance depth.
+
+**Transfer ≠ State.** The inheritance hierarchy is intentionally two-level: `BaseTransfer` declares capabilities only — no state, no logic. `BaseStateTransfer<T>` adds `ProxyReference<T>` for transfers that need to hold data. This separation keeps the base class minimal and avoids the god-object pattern where a single base accumulates state, logic, and knowledge of all descendants.
+
+**Read/Write and Push/Pull are first-class distinctions, not implementation details.** In RxJS, `Observable` conflates source, connection, and handler into one object. Transferum separates them: `ReadTransfer` and `WriteTransfer` embody a CQRS-like split where reading and writing are distinct contracts. Similarly, `push` and `pull` are fundamental behavioral characteristics — not interchangeable mechanics. Pull-based transfers get backpressure virtually for free; push-based transfers require explicit flow control. This distinction shapes the entire capability system.
 
 Inheritance hierarchy:
 
@@ -1127,6 +1266,8 @@ The `linkTransfers(lhs, rhs)` function connects an output transfer (LHS) to an i
 > **Rejection handling** for `subscribable → asyncPushable`: `.catch()` is always called. If `options.onError` is provided — it is invoked with `(error, target)` via `handleError()` and the rejection is suppressed. Without `onError` — `handleError()` rethrows, resulting in an **unhandled promise rejection** (the source's subscription remains active). This is consistent with per-transfer error handling: without `onError`, errors are visible, not silently swallowed.
 >
 > **Ordering** for `subscribable → asyncPushable`: No ordering guarantee — fast sync notifications from LHS can overtake pending `asyncPush` calls. A serializer is a separate task.
+
+> **Contract-based linking, not class-based.** `linkTransfers` never asks "what class is this?" — it asks "what capabilities does it have?" There is no `instanceof` chain, no RTTI, no class-name switching. The function inspects capability flags and dispatches to the matching strategy. This is protocol-oriented design: any transfer that declares the right capabilities is linkable, including new ones you create — `linkTransfers` does not need to change. Adding a new transfer class requires only declaring its flags; the linking machinery adapts automatically. This is the practical payoff of the capability system: the same flags that guarantee compile-time method existence also drive runtime wiring.
 
 Returns `SubscriberInterface` for breaking the link.
 
@@ -1819,6 +1960,8 @@ composite.destroy(); // destroys all owned resources
 
 Async transfers provide asynchronous interfaces (`asyncPush`, `asyncPull`, `asyncTrigger`) for integration with asynchronous data sources (API, IndexedDB, fetch). **Subscription remains synchronous** in all async transfers — subscribers are notified synchronously, even if data is obtained via an async operation.
 
+> **Why separate async classes?** `Promise<T>` and `T` are different programming models — mixing them in one class blurs contracts and complicates error handling. Transferum keeps sync and async as distinct transfer families (e.g., `ConvertTransfer` vs. `AsyncConvertTransfer`, `ConditionTransfer` vs. `AsyncConditionTransfer`). This increases the class count but makes each transfer's contract unambiguous: a sync transfer's `push()` returns `void`, an async transfer's `asyncPush()` returns `Promise<void>`. The type system enforces the difference — you cannot accidentally call `await` on a sync transfer or forget `await` on an async one.
+
 ### AsyncSinkTransfer
 
 Async terminal sink — calls a callback on receiving data via `asyncPush`.
@@ -2073,6 +2216,8 @@ writer.asyncPush(2);
 
 Operators implement `OperatorInterface<TInput, TOutput>` with the method `apply(data: TInput): TOutput`.
 
+> **Operators are pure transforms — transfers carry the contract.** In RxJS, an operator transforms `Observable<A>` into `Observable<B>` — the container type stays the same. In Transferum, operators are stateless data transformers used *inside* transfers (`ConvertTransfer`, `TransformBridge`). The transfer's capability flags (pushable, subscribable, gate, etc.) are preserved through the transformation — a `ConvertTransfer` is still pushable and subscribable, just with different input/output types. This separation means operators focus purely on data transformation, while transfers own the behavioral contract.
+
 ### Operator Comparison Table
 
 | Operator                           | Input | Output                    | Behavior                                                                   |       Composition       | Use case                                      |
@@ -2298,6 +2443,8 @@ manager.destroy(); // unsubscribes all remaining subscribers
 ## Bridges
 
 Bridges implement `BridgeInterface` (active/activate/deactivate/toggle/destroy) and connect data flows with gate control.
+
+> **Bridge is a first-class entity, not a helper method.** In most libraries, connecting two nodes is a method call: `source.connect(target)` or `source.pipe(target)`. This forces every node to know about every other node type — coupling grows quadratically. Transferum makes connection a separate entity: `Transfer` is the **node** (defines behavior), `Bridge` is the **edge** (defines interaction). A bridge inspects capability flags, not class names — the same principle as separating nodes and edges in a graph, or TCP from applications in a network stack.
 
 ### Bridge Comparison Table
 
