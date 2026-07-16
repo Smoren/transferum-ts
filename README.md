@@ -33,8 +33,6 @@ Type-safe primitives — **transfers** (nodes), **bridges** (edges), **builders*
   - [Transferum vs Most.js](#transferum-vs-mostjs)
   - [Transferum vs Bacon.js / Kefir](#transferum-vs-baconjs--kefir)
   - [Transferum vs Node Streams / WHATWG Streams](#transferum-vs-node-streams--whatwg-streams)
-  - [Transferum vs Callbag](#transferum-vs-callbag)
-  - [Transferum vs AsyncIterator](#transferum-vs-asynciterator)
   - [Quick Comparison Table](#quick-comparison-table)
   - [When to Choose Transferum](#when-to-choose-transferum)
   - [When to Consider Alternatives](#when-to-consider-alternatives)
@@ -854,56 +852,24 @@ Node Streams and WHATWG Streams solve piping well, but they introduce a new **st
 
 ---
 
-### Transferum vs Callbag
-
-**Callbag** is a minimal spec for push/pull stream communication via a single message-passing protocol.
-
-| Aspect             | Transferum                                                 | Callbag                                          |
-|--------------------|------------------------------------------------------------|--------------------------------------------------|
-| **Push + Pull**    | Both first-class — separate capability flags               | Both — unified through a single message protocol |
-| **Type safety**    | Compile-time — flags are type literals, methods guaranteed | Dynamic — protocol is untyped by design          |
-| **Model**          | Capabilities as metadata, contracts enforced by types      | Single callback protocol `(type, data) => void`  |
-| **Gate / Routing** | Built-in — `GateTransfer`, `BridgeSelector`                | Manual — compose with operator functions         |
-| **Bundle size**    | ~15 KB                                                     | ~0 (spec, not library)                           |
-
-Callbag is ideologically the closest existing approach — it also unifies push and pull. But it does so through a single message-passing protocol where everything is a callback. Transferum separates capabilities into distinct flags and lets the type system enforce them. This trades Callbag's minimalism for compile-time safety and explicit contracts.
-
----
-
-### Transferum vs AsyncIterator
-
-**AsyncIterator** is a built-in JavaScript protocol for async sequential access (`for await…of`).
-
-| Aspect             | Transferum                                                    | AsyncIterator                                          |
-|--------------------|---------------------------------------------------------------|--------------------------------------------------------|
-| **Model**          | Multi-capability — push, pull, subscribe, gate, poll, trigger | Pull-only — `next()` returns `Promise<{value, done}>`  |
-| **Push**           | First-class — `isPushable`                                    | Not supported — pull only                              |
-| **Subscribe**      | First-class — `isSubscribable`                                | Not supported — must be wrapped                        |
-| **Gate / Routing** | Built-in — `GateTransfer`, `BridgeSelector`                   | Not supported                                          |
-| **Type safety**    | Compile-time capability guarantees                            | `AsyncIterator<T>` — type describes data, not behavior |
-
-AsyncIterator describes one model: pull. Transferum treats pull as a special case — one capability among many. A pullable transfer covers the same semantic ground as an async iterator (consumer-driven data access), but the library also supports push, subscribe, gate, poll, and trigger as equally first-class interaction modes.
-
----
-
 ### Quick Comparison Table
 
-| Feature                    | Transferum                   | RxJS                                 | Most.js           | Bacon.js          | Kefir             | Node Streams       | WHATWG Streams     | Callbag        | AsyncIterator  |
-|----------------------------|------------------------------|--------------------------------------|-------------------|-------------------|-------------------|--------------------|--------------------|----------------|----------------|
-| **Bundle size (minified)** | ~15 KB                       | ~35 KB                               | ~7 KB             | ~12 KB            | ~8 KB             | Built-in           | Built-in           | ~0 (spec)      | Built-in       |
-| **Dependencies**           | 0                            | 0                                    | 0                 | 0                 | 0                 | 0                  | 0                  | 0              | 0              |
-| **Pull-based**             | ✓                            | ✗                                    | ✗                 | ✗                 | ✗                 | ✓ (Readable)       | ✓ (Readable)       | ✓              | ✓              |
-| **Push-based**             | ✓                            | ✓                                    | ✓                 | ✓                 | ✓                 | ✓ (Writable)       | ✓ (Writable)       | ✓              | ✗              |
-| **Sync/Async unify**       | ✓                            | Partial                              | Partial           | Partial           | Partial           | Partial            | Partial            | ✓              | Async only     |
-| **Built-in polling**       | ✓ (Ticker)                   | ✗ (manual)                           | ✗                 | ✗                 | ✗                 | ✗                  | ✗                  | ✗              | ✗              |
-| **Gate/Flow control**      | ✓ (GateTransfer, Bridge)     | Manual                               | Manual            | Manual            | Manual            | Manual             | Manual             | Manual         | ✗              |
-| **Error handling**         | Local, non-fatal, fail-safe  | Stream-level (`catchError`, `retry`) | Stream terminates | Stream terminates | Stream terminates | Stream-level       | Stream-level       | Protocol-level | Protocol-level |
-| **Undefined suppression**  | ✓                            | ✗                                    | ✗                 | ✗                 | ✗                 | ✗                  | ✗                  | ✗              | ✗              |
-| **Operators count**        | ~10 (pure transforms)        | 100+                                 | ~40               | ~60               | ~50               | ~15 (Transform)    | ~10 (Transform)    | ~30            | ✗              |
-| **Flow-control as nodes**  | ✓ (transfers with lifecycle) | ✗ (operators only)                   | ✗                 | ✗                 | ✗                 | ✗                  | ✗                  | ✗              | ✗              |
-| **TypeScript support**     | Excellent                    | Excellent                            | Good              | Fair              | Fair              | Fair               | Fair               | ✗ (untyped)    | Good           |
-| **Community size**         | Small                        | Very large                           | Medium            | Small             | Small             | Large              | Medium             | Small          | Large          |
-| **Maintenance status**     | Active                       | Active                               | Maintenance       | Maintenance       | Archived          | Active             | Active             | Inactive       | Active         |
+| Feature                    | Transferum                   | RxJS                                 | Most.js           | Bacon.js          | Kefir             | Node Streams       | WHATWG Streams     |
+|----------------------------|------------------------------|--------------------------------------|-------------------|-------------------|-------------------|--------------------|--------------------|
+| **Bundle size (minified)** | ~15 KB                       | ~35 KB                               | ~7 KB             | ~12 KB            | ~8 KB             | Built-in           | Built-in           |
+| **Dependencies**           | 0                            | 0                                    | 0                 | 0                 | 0                 | 0                  | 0                  |
+| **Pull-based**             | ✓                            | ✗                                    | ✗                 | ✗                 | ✗                 | ✓ (Readable)       | ✓ (Readable)       |
+| **Push-based**             | ✓                            | ✓                                    | ✓                 | ✓                 | ✓                 | ✓ (Writable)       | ✓ (Writable)       |
+| **Sync/Async unify**       | ✓                            | Partial                              | Partial           | Partial           | Partial           | Partial            | Partial            |
+| **Built-in polling**       | ✓ (Ticker)                   | ✗ (manual)                           | ✗                 | ✗                 | ✗                 | ✗                  | ✗                  |
+| **Gate/Flow control**      | ✓ (GateTransfer, Bridge)     | Manual                               | Manual            | Manual            | Manual            | Manual             | Manual             |
+| **Error handling**         | Local, non-fatal, fail-safe  | Stream-level (`catchError`, `retry`) | Stream terminates | Stream terminates | Stream terminates | Stream-level       | Stream-level       |
+| **Undefined suppression**  | ✓                            | ✗                                    | ✗                 | ✗                 | ✗                 | ✗                  | ✗                  |
+| **Operators count**        | ~10 (pure transforms)        | 100+                                 | ~40               | ~60               | ~50               | ~15 (Transform)    | ~10 (Transform)    |
+| **Flow-control as nodes**  | ✓ (transfers with lifecycle) | ✗ (operators only)                   | ✗                 | ✗                 | ✗                 | ✗                  | ✗                  |
+| **TypeScript support**     | Excellent                    | Excellent                            | Good              | Fair              | Fair              | Fair               | Fair               |
+| **Community size**         | Small                        | Very large                           | Medium            | Small             | Small             | Large              | Medium             |
+| **Maintenance status**     | Active                       | Active                               | Maintenance       | Maintenance       | Archived          | Active             | Active             |
 
 ---
 
@@ -953,16 +919,6 @@ AsyncIterator describes one model: pull. Transferum treats pull as a special cas
 - You need the web standard or Node.js native streaming protocol for interop.
 - Your pipeline is purely I/O-oriented (file, network, compression) and doesn't need push+pull+gate+poll in one system.
 - You don't need compile-time capability guarantees.
-
-**Consider Callbag if:**
-
-- You want the absolute minimum abstraction (a spec, not a library) and are comfortable with untyped protocols.
-- You need push+pull unification but don't need TypeScript to enforce which mode each node supports.
-
-**Consider AsyncIterator if:**
-
-- Your use case is purely pull-based sequential async access (`for await…of`).
-- You don't need push, subscribe, gate, or routing primitives.
 
 ---
 
