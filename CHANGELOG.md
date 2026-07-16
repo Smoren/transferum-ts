@@ -1,5 +1,13 @@
 # Transferum Change Log
 
+## v1.1.2 - 2026-07-16
+
+### Documentation
+* **README — Comparison section:** Removed "Transferum vs Callbag" and "Transferum vs AsyncIterator" subsections, their table of contents entries, their columns from the Quick Comparison Table, and their entries from "When to Consider Alternatives." Neither Callbag (a spec, not a library) nor AsyncIterator (a built-in pull-only protocol) represents a realistic alternative for library selection.
+
+### Tests
+* No test changes. **100% coverage** maintained. Total tests: **1,957**.
+
 ## v1.1.1 - 2026-07-16
 
 ### Documentation
