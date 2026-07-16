@@ -635,9 +635,9 @@ export class ThrottleTransfer<T> extends BaseStateTransfer<T> implements Pushabl
 
   public push(data: T): void {
     if (this._timer === null) {
-    // Leading edge — emit immediately
-    this._emit(data);
-    this._startTimer();
+      // Leading edge — emit immediately
+      this._emit(data);
+      this._startTimer();
     } else {
       // Within the window — save as pending
       this._pendingValue = data;
