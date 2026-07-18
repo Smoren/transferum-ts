@@ -1,4 +1,4 @@
-import type { BridgeInterface } from '../../src';
+import type { BridgeInterface, DataHandler, GateInterface, SubscriberInterface } from '../../src';
 import { BridgeMultiSelector } from '../../src';
 import { describe, expect, it, jest } from '@jest/globals';
 
@@ -854,4 +854,443 @@ describe(
     });
   },
 );
+
+// ═══════════════════════════════════════════════════════════════
+// BridgeMultiSelector — syncWithChildren
+// ═══════════════════════════════════════════════════════════════
+
+describe(
+  'BridgeMultiSelector syncWithChildren: external bridge activation adds to selection test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+      const bridgeC = createStatefulMockBridge(false);
+
+      const selector = new BridgeMultiSelector({
+        bridges: { a: bridgeA, b: bridgeB, c: bridgeC },
+        initialKeys: ['a'],
+        activated: true,
+        owned: false,
+        syncWithChildren: true,
+      });
+
+      expect(selector.selectedKeys).toEqual(['a']);
+      expect(bridgeA.active).toBe(true);
+      expect(bridgeB.active).toBe(false);
+
+      // Externally activate bridge B → selector should check('b')
+      bridgeB.activate();
+
+      expect(selector.selectedKeys).toEqual(['a', 'b']);
+      expect(bridgeA.active).toBe(true);
+      expect(bridgeB.active).toBe(true);
+
+      selector.destroy();
+    });
+  },
+);
+
+describe(
+  'BridgeMultiSelector syncWithChildren: external bridge deactivation removes from selection test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+
+      const selector = new BridgeMultiSelector({
+        bridges: { a: bridgeA, b: bridgeB },
+        initialKeys: ['a', 'b'],
+        activated: true,
+        owned: false,
+        syncWithChildren: true,
+      });
+
+      expect(selector.selectedKeys).toEqual(['a', 'b']);
+      expect(bridgeA.active).toBe(true);
+      expect(bridgeB.active).toBe(true);
+
+      // Externally deactivate bridge A → selector should uncheck('a')
+      bridgeA.deactivate();
+
+      expect(selector.selectedKeys).toEqual(['b']);
+      expect(bridgeA.active).toBe(false);
+      expect(bridgeB.active).toBe(true);
+
+      selector.destroy();
+    });
+  },
+);
+
+describe(
+  'BridgeMultiSelector syncWithChildren: check does not cause feedback loop test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+
+      const selector = new BridgeMultiSelector({
+        bridges: { a: bridgeA, b: bridgeB },
+        initialKeys: ['a'],
+        activated: true,
+        owned: false,
+        syncWithChildren: true,
+      });
+
+      // check('b') internally activates bridgeB → onStateChange fires.
+      // Without _syncing guard, handler would see b.active && !selectedKeys.has('b')
+      // — but 'b' is already in selectedKeys by now, so it's a no-op.
+      // Still, verify no double-activation or state corruption.
+      selector.check('b');
+
+      expect(selector.selectedKeys).toEqual(['a', 'b']);
+      expect(bridgeA.active).toBe(true);
+      expect(bridgeB.active).toBe(true);
+
+      selector.destroy();
+    });
+  },
+);
+
+describe(
+  'BridgeMultiSelector syncWithChildren: uncheck does not cause feedback loop test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+
+      const selector = new BridgeMultiSelector({
+        bridges: { a: bridgeA, b: bridgeB },
+        initialKeys: ['a', 'b'],
+        activated: true,
+        owned: false,
+        syncWithChildren: true,
+      });
+
+      // uncheck('a') internally deactivates bridgeA → onStateChange fires.
+      // Without _syncing guard, handler would see !b.active && selectedKeys.has('a')
+      // — but 'a' is already removed by now, so it's a no-op.
+      // Still, verify no double-deactivation or state corruption.
+      selector.uncheck('a');
+
+      expect(selector.selectedKeys).toEqual(['b']);
+      expect(bridgeA.active).toBe(false);
+      expect(bridgeB.active).toBe(true);
+
+      selector.destroy();
+    });
+  },
+);
+
+describe(
+  'BridgeMultiSelector syncWithChildren: activate does not cause feedback loop test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+
+      const selector = new BridgeMultiSelector({
+        bridges: { a: bridgeA, b: bridgeB },
+        initialKeys: ['a', 'b'],
+        activated: false,
+        owned: false,
+        syncWithChildren: true,
+      });
+
+      // activate() internally deactivates all bridges then activates selected ones.
+      // Without _syncing guard, deactivating already-inactive bridges would fire
+      // handlers, and activating selected bridges would fire handlers too.
+      selector.activate();
+
+      expect(selector.active).toBe(true);
+      expect(bridgeA.active).toBe(true);
+      expect(bridgeB.active).toBe(true);
+
+      selector.destroy();
+    });
+  },
+);
+
+describe(
+  'BridgeMultiSelector syncWithChildren: deactivate does not cause feedback loop test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+
+      const selector = new BridgeMultiSelector({
+        bridges: { a: bridgeA, b: bridgeB },
+        initialKeys: ['a', 'b'],
+        activated: true,
+        owned: false,
+        syncWithChildren: true,
+      });
+
+      // deactivate() internally deactivates all selected bridges.
+      // Without _syncing guard, each deactivation would fire the handler
+      // → uncheck() → _gateState.notify() again.
+      selector.deactivate();
+
+      expect(selector.active).toBe(false);
+      expect(bridgeA.active).toBe(false);
+      expect(bridgeB.active).toBe(false);
+
+      selector.destroy();
+    });
+  },
+);
+
+describe(
+  'BridgeMultiSelector syncWithChildren: select does not cause feedback loop test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+      const bridgeC = createStatefulMockBridge(false);
+
+      const selector = new BridgeMultiSelector({
+        bridges: { a: bridgeA, b: bridgeB, c: bridgeC },
+        initialKeys: ['a', 'b'],
+        activated: true,
+        owned: false,
+        syncWithChildren: true,
+      });
+
+      // select(['c']) internally deactivates A and B, then activates C.
+      // Without _syncing guard, deactivating A and B would fire handlers
+      // → uncheck('a'), uncheck('b') — corrupting the new selection.
+      selector.select(['c']);
+
+      expect(selector.selectedKeys).toEqual(['c']);
+      expect(bridgeA.active).toBe(false);
+      expect(bridgeB.active).toBe(false);
+      expect(bridgeC.active).toBe(true);
+
+      selector.destroy();
+    });
+  },
+);
+
+describe(
+  'BridgeMultiSelector syncWithChildren disabled: external bridge activation does nothing test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+
+      const selector = new BridgeMultiSelector({
+        bridges: { a: bridgeA, b: bridgeB },
+        initialKeys: ['a'],
+        activated: true,
+        owned: false,
+        // syncWithChildren not set — defaults to false
+      });
+
+      bridgeB.activate();
+
+      expect(selector.selectedKeys).toEqual(['a']);
+      expect(bridgeB.active).toBe(true); // activated externally, selector didn't interfere
+
+      selector.destroy();
+    });
+  },
+);
+
+describe(
+  'BridgeMultiSelector syncWithChildren: external activation of already-selected bridge is no-op test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+
+      const selector = new BridgeMultiSelector({
+        bridges: { a: bridgeA, b: bridgeB },
+        initialKeys: ['a'],
+        activated: true,
+        owned: false,
+        syncWithChildren: true,
+      });
+
+      // bridgeA is already selected and active — activating it again should not trigger check()
+      bridgeA.activate();
+
+      expect(selector.selectedKeys).toEqual(['a']);
+      expect(bridgeA.active).toBe(true);
+
+      selector.destroy();
+    });
+  },
+);
+
+describe(
+  'BridgeMultiSelector syncWithChildren: external deactivation of non-selected bridge is no-op test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+
+      const selector = new BridgeMultiSelector({
+        bridges: { a: bridgeA, b: bridgeB },
+        initialKeys: ['a'],
+        activated: true,
+        owned: false,
+        syncWithChildren: true,
+      });
+
+      // bridgeB is not selected — deactivating it should not trigger anything
+      bridgeB.deactivate();
+
+      expect(selector.selectedKeys).toEqual(['a']);
+      expect(bridgeA.active).toBe(true);
+
+      selector.destroy();
+    });
+  },
+);
+
+describe(
+  'BridgeMultiSelector syncWithChildren: inactive selector adds key but stays inactive test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+
+      const selector = new BridgeMultiSelector({
+        bridges: {a: bridgeA, b: bridgeB},
+        initialKeys: ['a'],
+        activated: false,
+        owned: false,
+        syncWithChildren: true,
+      });
+
+      // Selector is inactive. External activation of bridgeB triggers check('b'),
+      // but _tryActivateBridge won't activate because selector is inactive.
+      // bridgeB is already active (externally), so no re-activation needed.
+      bridgeB.activate();
+
+      expect(selector.selectedKeys).toEqual(['a', 'b']);
+      expect(selector.active).toBe(false);
+
+      selector.destroy();
+    });
+  },
+);
+
+describe(
+  'BridgeMultiSelector syncWithChildren: destroy unsubscribes from child state changes test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+
+      const selector = new BridgeMultiSelector({
+        bridges: { a: bridgeA, b: bridgeB },
+        initialKeys: ['a'],
+        activated: true,
+        owned: false,
+        syncWithChildren: true,
+      });
+
+      selector.destroy();
+
+      // After destroy, activating/deactivating bridges should not throw
+      expect(() => {
+        bridgeB.activate();
+        bridgeA.deactivate();
+      }).not.toThrow();
+    });
+  },
+);
+
+describe(
+  'BridgeMultiSelector syncWithChildren: onStateChange fires on external bridge activation test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+
+      const selector = new BridgeMultiSelector({
+        bridges: {a: bridgeA, b: bridgeB},
+        initialKeys: ['a'],
+        activated: true,
+        owned: false,
+        syncWithChildren: true,
+      });
+      const handler = jest.fn();
+
+      selector.onStateChange(handler);
+
+      // External activation of bridgeB triggers check('b') → _gateState.notify()
+      bridgeB.activate();
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler).toHaveBeenCalledWith(selector);
+
+      selector.destroy();
+    });
+  },
+);
+
+describe(
+  'BridgeMultiSelector syncWithChildren: multiple external activations accumulate test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+      const bridgeC = createStatefulMockBridge(false);
+
+      const selector = new BridgeMultiSelector({
+        bridges: {a: bridgeA, b: bridgeB, c: bridgeC},
+        initialKeys: [],
+        activated: true,
+        owned: false,
+        syncWithChildren: true,
+      });
+
+      // Sequentially activate B and C externally
+      bridgeB.activate();
+      bridgeC.activate();
+
+      expect(selector.selectedKeys).toEqual(['b', 'c']);
+      expect(bridgeA.active).toBe(false);
+      expect(bridgeB.active).toBe(true);
+      expect(bridgeC.active).toBe(true);
+
+      // Now deactivate B externally
+      bridgeB.deactivate();
+
+      expect(selector.selectedKeys).toEqual(['c']);
+      expect(bridgeB.active).toBe(false);
+
+      selector.destroy();
+    });
+  },
+);
+
+// ═══════════════════════════════════════════════════════════════
+// Helper Functions (additional)
+// ═══════════════════════════════════════════════════════════════
+
+function createStatefulMockBridge(initialActive: boolean): BridgeInterface {
+  let active = initialActive;
+  const handlers = new Set<DataHandler<GateInterface>>();
+
+  const bridge = {
+    get active() { return active; },
+    activate: () => { active = true; handlers.forEach(h => h(bridge)); },
+    deactivate: () => { active = false; handlers.forEach(h => h(bridge)); },
+    toggle: () => {
+      active = !active;
+      handlers.forEach(h => h(bridge));
+      return active;
+    },
+    onStateChange: (handler: DataHandler<GateInterface>): SubscriberInterface => {
+      handlers.add(handler);
+      return { unsubscribe: () => { handlers.delete(handler); } } as SubscriberInterface;
+    },
+    destroy: () => { handlers.clear(); },
+  } as BridgeInterface;
+
+  return bridge;
+}
 
