@@ -344,6 +344,8 @@ export class BridgeSelector<TMap extends Record<BaseSelectorKey, BridgeInterface
   protected _active: boolean;
   protected readonly _owned: boolean;
   protected readonly _gateState: StateSubscriptionManager<GateInterface>;
+  protected _subscribers: SubscriberInterface[] = [];
+  protected _syncing = false;
 
   constructor(config: BridgeSelectorConfig<TMap>) {
     if (config.bridges[config.initialKey] === undefined) {
@@ -355,6 +357,24 @@ export class BridgeSelector<TMap extends Record<BaseSelectorKey, BridgeInterface
     this._bridges = config.bridges;
     this._selectedKey = config.initialKey;
     this._gateState = new StateSubscriptionManager<GateInterface>(this);
+
+    if (config.syncWithChildren) {
+      for (const key of Object.keys(this._bridges)) {
+        this._subscribers.push(this._bridges[key].onStateChange((b) => {
+          if (this._syncing) {
+            return;
+          }
+          if (b.active && this.selectedKey !== key) {
+            this.select(key);
+            return;
+          }
+          if (!b.active && this.selectedKey === key) {
+            this.deactivate();
+            return;
+          }
+        }));
+      }
+    }
 
     if (this._active) {
       this.activate();
@@ -368,16 +388,26 @@ export class BridgeSelector<TMap extends Record<BaseSelectorKey, BridgeInterface
   }
 
   public activate(): void {
-    this._active = true;
-    this._deactivateBridges();
-    this._tryActivateBridge(this._selectedKey);
-    this._gateState.notify();
+    this._syncing = true;
+    try {
+      this._active = true;
+      this._deactivateBridges();
+      this._tryActivateBridge(this._selectedKey);
+      this._gateState.notify();
+    } finally {
+      this._syncing = false;
+    }
   }
 
   public deactivate(): void {
-    this._active = false;
-    this._deactivateBridges();
-    this._gateState.notify();
+    this._syncing = true;
+    try {
+      this._active = false;
+      this._deactivateBridges();
+      this._gateState.notify();
+    } finally {
+      this._syncing = false;
+    }
   }
 
   public toggle(): boolean {
@@ -394,6 +424,8 @@ export class BridgeSelector<TMap extends Record<BaseSelectorKey, BridgeInterface
   }
 
   public destroy(): void {
+    this._subscribers.forEach((s) => s.unsubscribe());
+    this._subscribers = [];
     if (this._owned) {
       Object.values(this._bridges).forEach(b => b.destroy());
     }
@@ -406,10 +438,15 @@ export class BridgeSelector<TMap extends Record<BaseSelectorKey, BridgeInterface
       return;
     }
 
-    this._selectedKey = key;
-    this._deactivateBridges();
-    this._tryActivateBridge(key);
-    this._gateState.notify();
+    this._syncing = true;
+    try {
+      this._selectedKey = key;
+      this._deactivateBridges();
+      this._tryActivateBridge(key);
+      this._gateState.notify();
+    } finally {
+      this._syncing = false;
+    }
   }
 
   public get selectedKey(): SelectorKey<TMap> {
