@@ -1,4 +1,4 @@
-import type { BridgeInterface } from '../../src';
+import type { BridgeInterface, DataHandler, GateInterface, SubscriberInterface } from '../../src';
 import { BridgeSelector } from '../../src';
 import { describe, expect, it, jest } from '@jest/globals';
 
@@ -603,4 +603,349 @@ describe(
     });
   },
 );
+
+// ═══════════════════════════════════════════════════════════════
+// BridgeSelector — syncWithChildren
+// ═══════════════════════════════════════════════════════════════
+
+describe(
+  'BridgeSelector syncWithChildren: external bridge activation switches selection test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+
+      const selector = new BridgeSelector({
+        bridges: { a: bridgeA, b: bridgeB },
+        initialKey: 'a',
+        activated: true,
+        owned: false,
+        syncWithChildren: true,
+      });
+
+      expect(selector.selectedKey).toBe('a');
+      expect(bridgeA.active).toBe(true);
+      expect(bridgeB.active).toBe(false);
+
+      // Externally activate bridge B → selector should switch to B
+      bridgeB.activate();
+
+      expect(selector.selectedKey).toBe('b');
+      expect(selector.active).toBe(true);
+      expect(bridgeA.active).toBe(false);
+      expect(bridgeB.active).toBe(true);
+
+      selector.destroy();
+    });
+  },
+);
+
+describe(
+  'BridgeSelector syncWithChildren: external selected bridge deactivation deactivates selector test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+
+      const selector = new BridgeSelector({
+        bridges: { a: bridgeA, b: bridgeB },
+        initialKey: 'a',
+        activated: true,
+        owned: false,
+        syncWithChildren: true,
+      });
+
+      expect(selector.active).toBe(true);
+      expect(bridgeA.active).toBe(true);
+
+      // Externally deactivate the selected bridge → selector deactivates
+      bridgeA.deactivate();
+
+      expect(selector.active).toBe(false);
+      expect(bridgeA.active).toBe(false);
+      expect(bridgeB.active).toBe(false);
+
+      selector.destroy();
+    });
+  },
+);
+
+describe(
+  'BridgeSelector syncWithChildren: selector activate does not cause feedback loop test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+
+      const selector = new BridgeSelector({
+        bridges: { a: bridgeA, b: bridgeB },
+        initialKey: 'a',
+        activated: false,
+        owned: false,
+        syncWithChildren: true,
+      });
+
+      // activate() internally deactivates all bridges then activates selected.
+      // Without _syncing guard, deactivating an already-inactive bridge A
+      // would trigger the handler and potentially deactivate the selector.
+      selector.activate();
+
+      expect(selector.active).toBe(true);
+      expect(bridgeA.active).toBe(true);
+      expect(bridgeB.active).toBe(false);
+
+      selector.destroy();
+    });
+  },
+);
+
+describe(
+  'BridgeSelector syncWithChildren: selector select does not cause feedback loop test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+
+      const selector = new BridgeSelector({
+        bridges: { a: bridgeA, b: bridgeB },
+        initialKey: 'a',
+        activated: true,
+        owned: false,
+        syncWithChildren: true,
+      });
+
+      // select() internally deactivates bridgeA then activates bridgeB.
+      // Without _syncing guard, deactivating bridgeA would trigger the handler
+      // (selectedKey === 'a', !b.active) → deactivate(), killing the selector.
+      selector.select('b');
+
+      expect(selector.active).toBe(true);
+      expect(selector.selectedKey).toBe('b');
+      expect(bridgeA.active).toBe(false);
+      expect(bridgeB.active).toBe(true);
+
+      selector.destroy();
+    });
+  },
+);
+
+describe(
+  'BridgeSelector syncWithChildren: selector deactivate does not cause feedback loop test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+
+      const selector = new BridgeSelector({
+        bridges: { a: bridgeA, b: bridgeB },
+        initialKey: 'a',
+        activated: true,
+        owned: false,
+        syncWithChildren: true,
+      });
+
+      // deactivate() internally deactivates bridgeA.
+      // Without _syncing guard, this would trigger the handler
+      // (selectedKey === 'a', !b.active) → deactivate() again.
+      selector.deactivate();
+
+      expect(selector.active).toBe(false);
+      expect(bridgeA.active).toBe(false);
+      expect(bridgeB.active).toBe(false);
+
+      selector.destroy();
+    });
+  },
+);
+
+describe(
+  'BridgeSelector syncWithChildren disabled: external bridge activation does nothing test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+
+      const selector = new BridgeSelector({
+        bridges: { a: bridgeA, b: bridgeB },
+        initialKey: 'a',
+        activated: true,
+        owned: false,
+        // syncWithChildren not set — defaults to false
+      });
+
+      bridgeB.activate();
+
+      expect(selector.selectedKey).toBe('a');
+      expect(selector.active).toBe(true);
+      // bridgeB was activated externally, selector didn't interfere
+      expect(bridgeB.active).toBe(true);
+
+      selector.destroy();
+    });
+  },
+);
+
+describe(
+  'BridgeSelector syncWithChildren: external activation of already-selected bridge is no-op test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+
+      const selector = new BridgeSelector({
+        bridges: { a: bridgeA, b: bridgeB },
+        initialKey: 'a',
+        activated: true,
+        owned: false,
+        syncWithChildren: true,
+      });
+
+      // bridgeA is already selected and active — activating it again should not trigger select()
+      bridgeA.activate();
+
+      expect(selector.selectedKey).toBe('a');
+      expect(selector.active).toBe(true);
+
+      selector.destroy();
+    });
+  },
+);
+
+describe(
+  'BridgeSelector syncWithChildren: external deactivation of non-selected bridge is no-op test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+
+      const selector = new BridgeSelector({
+        bridges: { a: bridgeA, b: bridgeB },
+        initialKey: 'a',
+        activated: true,
+        owned: false,
+        syncWithChildren: true,
+      });
+
+      // bridgeB is not selected — deactivating it should not trigger anything
+      bridgeB.deactivate();
+
+      expect(selector.selectedKey).toBe('a');
+      expect(selector.active).toBe(true);
+      expect(bridgeA.active).toBe(true);
+
+      selector.destroy();
+    });
+  },
+);
+
+describe(
+  'BridgeSelector syncWithChildren: inactive selector switches key but stays inactive test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+
+      const selector = new BridgeSelector({
+        bridges: { a: bridgeA, b: bridgeB },
+        initialKey: 'a',
+        activated: false,
+        owned: false,
+        syncWithChildren: true,
+      });
+
+      // Selector is inactive. External activation of bridgeB triggers select('b'),
+      // but _tryActivateBridge won't activate because selector is inactive.
+      bridgeB.activate();
+
+      expect(selector.selectedKey).toBe('b');
+      expect(selector.active).toBe(false);
+      // bridgeB was deactivated by select()._deactivateBridges() during syncing
+      expect(bridgeB.active).toBe(false);
+
+      selector.destroy();
+    });
+  },
+);
+
+describe(
+  'BridgeSelector syncWithChildren: destroy unsubscribes from child state changes test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+
+      const selector = new BridgeSelector({
+        bridges: { a: bridgeA, b: bridgeB },
+        initialKey: 'a',
+        activated: true,
+        owned: false,
+        syncWithChildren: true,
+      });
+
+      selector.destroy();
+
+      // After destroy, activating bridges should not throw or affect anything
+      expect(() => {
+        bridgeB.activate();
+        bridgeA.deactivate();
+      }).not.toThrow();
+    });
+  },
+);
+
+describe(
+  'BridgeSelector syncWithChildren: onStateChange fires on external bridge activation test',
+  () => {
+    it('', () => {
+      const bridgeA = createStatefulMockBridge(false);
+      const bridgeB = createStatefulMockBridge(false);
+
+      const selector = new BridgeSelector({
+        bridges: { a: bridgeA, b: bridgeB },
+        initialKey: 'a',
+        activated: true,
+        owned: false,
+        syncWithChildren: true,
+      });
+      const handler = jest.fn();
+
+      selector.onStateChange(handler);
+
+      // External activation of bridgeB triggers select('b') → _gateState.notify()
+      bridgeB.activate();
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler).toHaveBeenCalledWith(selector);
+
+      selector.destroy();
+    });
+  },
+);
+
+// ═══════════════════════════════════════════════════════════════
+// Helper Functions (additional)
+// ═══════════════════════════════════════════════════════════════
+
+function createStatefulMockBridge(initialActive: boolean): BridgeInterface {
+  let active = initialActive;
+  const handlers = new Set<DataHandler<GateInterface>>();
+
+  const bridge = {
+    get active() { return active; },
+    activate: () => { active = true; handlers.forEach(h => h(bridge)); },
+    deactivate: () => { active = false; handlers.forEach(h => h(bridge)); },
+    toggle: () => {
+      active = !active;
+      handlers.forEach(h => h(bridge));
+      return active;
+    },
+    onStateChange: (handler: DataHandler<GateInterface>): SubscriberInterface => {
+      handlers.add(handler);
+      return { unsubscribe: () => { handlers.delete(handler); } } as SubscriberInterface;
+    },
+    destroy: () => { handlers.clear(); },
+  } as BridgeInterface;
+
+  return bridge;
+}
 
