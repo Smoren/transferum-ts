@@ -301,6 +301,7 @@ export type BridgeMultiSelectorConfig<TMap extends Record<BaseSelectorKey, Bridg
   readonly initialKeys: SelectorKey<TMap>[];
   readonly activated: boolean;
   readonly owned: boolean;
+  readonly syncWithChildren?: boolean;
 };
 
 /** Configuration for AsyncTransformBridge — source, target, async operator, gate state, and optional error handler. */
