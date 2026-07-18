@@ -292,6 +292,7 @@ export type BridgeSelectorConfig<TMap extends Record<BaseSelectorKey, BridgeInte
   readonly initialKey: SelectorKey<TMap>;
   readonly activated: boolean;
   readonly owned: boolean;
+  readonly syncWithChildren?: boolean;
 };
 
 /** Configuration for BridgeMultiSelector — bridge map, initial selected keys, gate state, and ownership flag. */
