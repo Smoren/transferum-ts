@@ -2416,7 +2416,7 @@ Bridges implement `BridgeInterface` (active/activate/deactivate/toggle/destroy) 
 
 > **Gate** — all bridges have an internal `GateTransfer` for flow control. `activate()` / `deactivate()` / `toggle()` delegate to the gate.
 > **Owned** — the `owned` parameter controls whether nested bridges are destroyed on `destroy()`.
-> **onStateChange()** — all bridges support state change subscription via `onStateChange()`. In `PassBridge`, `TransformBridge`, `TransferBridge` the notification fires on `activate()` / `deactivate()` / `toggle()`. In `BridgeAggregator` — on direct state changes (does not listen to children). In `BridgeSelector` — on `_active` or `_selectedKey` changes (including `select()`). In `BridgeMultiSelector` — on `_active` or `_selectedKeys` changes (including `select()`, `check()`, `uncheck()`).
+> **onStateChange()** — all bridges support state change subscription via `onStateChange()`. In `PassBridge`, `TransformBridge`, `TransferBridge` the notification fires on `activate()` / `deactivate()` / `toggle()`. In `BridgeAggregator` — on direct state changes (does not listen to children). In `BridgeSelector` — on `_active` or `_selectedKey` changes (including `select()`). In `BridgeMultiSelector` — on `_active` or `_selectedKeys` changes (including `select()`, `check()`, `uncheck()`). When `syncWithChildren` is enabled, `BridgeSelector` and `BridgeMultiSelector` also fire `onStateChange()` when a child bridge's state changes externally — the selector reacts by updating its selection and notifying its own subscribers.
 
 **Comparison by flow structure:**
 
@@ -2431,15 +2431,16 @@ Bridges implement `BridgeInterface` (active/activate/deactivate/toggle/destroy) 
 
 **Comparison of selectors and aggregator:**
 
-| Characteristic |        `BridgeAggregator`         |        `BridgeSelector`         |             `BridgeMultiSelector`              |
-|----------------|:---------------------------------:|:-------------------------------:|:----------------------------------------------:|
-| Active bridges |        All simultaneously         |         One (selected)          |               Several (selected)               |
-| `active`       | `true` if ALL bridges are active  |       Controlled by flag        |               Controlled by flag               |
-| Selection      |                 —                 |          `select(key)`          | `select(keys[])`, `check(key)`, `uncheck(key)` |
-| Switching      | `activate()` / `deactivate()` all |     `select(key)` switches      |       `check()` / `uncheck()` add/remove       |
-| Extraction     |                 —                 | `selectedKey`, `selectedBridge` |       `selectedKeys`, `selectedBridges`        |
-| `owned`        |  Controls destroy of all bridges  | Controls destroy of all bridges |        Controls destroy of all bridges         |
-| `toggle()`     |     Activates/deactivates all     |       Toggles common flag       |              Toggles common flag               |
+| Characteristic     |        `BridgeAggregator`         |        `BridgeSelector`         |             `BridgeMultiSelector`              |
+|--------------------|:---------------------------------:|:-------------------------------:|:----------------------------------------------:|
+| Active bridges     |        All simultaneously         |         One (selected)          |               Several (selected)               |
+| `active`           | `true` if ALL bridges are active  |       Controlled by flag        |               Controlled by flag               |
+| Selection          |                 —                 |          `select(key)`          | `select(keys[])`, `check(key)`, `uncheck(key)` |
+| Switching          | `activate()` / `deactivate()` all |     `select(key)` switches      |       `check()` / `uncheck()` add/remove       |
+| Extraction         |                 —                 | `selectedKey`, `selectedBridge` |       `selectedKeys`, `selectedBridges`        |
+| `owned`            |  Controls destroy of all bridges  | Controls destroy of all bridges |        Controls destroy of all bridges         |
+| `syncWithChildren` |                 —                 |  ✓ (optional, default `false`)  |         ✓ (optional, default `false`)          |
+| `toggle()`         |     Activates/deactivates all     |       Toggles common flag       |              Toggles common flag               |
 
 **Choosing a bridge:**
 
@@ -2491,6 +2492,27 @@ const selector = createBridgeSelector({
 selector.select('slow'); // switch to the second bridge
 ```
 
+**`syncWithChildren`** (optional, default `false`): when enabled, the selector subscribes to `onStateChange()` of all child bridges and reacts to their external state changes:
+
+- A child bridge activated externally → the selector switches selection to that bridge (`select()`).
+- The selected bridge deactivated externally → the selector deactivates itself (`deactivate()`).
+- State changes of non-selected bridges (when deactivated) or already-selected bridges (when activated) are ignored.
+
+This enables **bidirectional gate synchronization**: the selector controls its children, and the children can control the selector. An internal `_syncing` guard prevents feedback loops — when the selector itself activates/deactivates/selects, child state-change notifications are suppressed.
+
+```typescript
+const selector = createBridgeSelector({
+  bridges,
+  initialKey: 'fast',
+  activated: true,
+  syncWithChildren: true,
+});
+
+// External activation of 'slow' bridge → selector automatically switches to 'slow'
+bridges.slow.activate();
+console.log(selector.selectedKey); // 'slow'
+```
+
 ### BridgeMultiSelector
 
 ```typescript
@@ -2504,6 +2526,31 @@ const selector = createBridgeMultiSelector({
 
 selector.check('slow');   // adds bridge to active
 selector.uncheck('fast'); // removes bridge from active
+```
+
+**`syncWithChildren`** (optional, default `false`): when enabled, the selector subscribes to `onStateChange()` of all child bridges and reacts to their external state changes:
+
+- A child bridge activated externally → the selector adds it to the selection (`check()`).
+- A selected child bridge deactivated externally → the selector removes it from the selection (`uncheck()`).
+- State changes of already-selected bridges (when activated) or non-selected bridges (when deactivated) are ignored.
+
+This enables **bidirectional gate synchronization**: the selector controls its children, and the children can control the selector. An internal `_syncing` guard prevents feedback loops — when the selector itself activates/deactivates/selects/checks/unchecks, child state-change notifications are suppressed.
+
+```typescript
+const selector = createBridgeMultiSelector({
+  bridges,
+  initialKeys: ['fast'],
+  activated: true,
+  syncWithChildren: true,
+});
+
+// External activation of 'slow' bridge → selector automatically adds it to selection
+bridges.slow.activate();
+console.log(selector.selectedKeys); // ['fast', 'slow']
+
+// External deactivation of 'fast' bridge → selector automatically removes it
+bridges.fast.deactivate();
+console.log(selector.selectedKeys); // ['slow']
 ```
 
 ### AsyncTransformBridge
@@ -2811,8 +2858,8 @@ Configs are defined in `configs.ts`. All configs are types (not classes), passed
 | `TransformBridgeConfig<TIn, TOut>`    | `TransformBridge`            | `source`, `target`, `operator`, `activated`                   |
 | `TransferBridgeConfig<TIn, TOut>`     | `TransferBridge`             | `source`, `target`, `middle`, `middleOwned`, `activated`      |
 | `BridgeAggregatorConfig`              | `BridgeAggregator`           | `bridges`, `activated`, `owned`                               |
-| `BridgeSelectorConfig<TMap>`          | `BridgeSelector`             | `bridges`, `initialKey`, `activated`, `owned`                 |
-| `BridgeMultiSelectorConfig<TMap>`     | `BridgeMultiSelector`        | `bridges`, `initialKeys`, `activated`, `owned`                |
+| `BridgeSelectorConfig<TMap>`          | `BridgeSelector`             | `bridges`, `initialKey`, `activated`, `owned`, `syncWithChildren?`  |
+| `BridgeMultiSelectorConfig<TMap>`     | `BridgeMultiSelector`        | `bridges`, `initialKeys`, `activated`, `owned`, `syncWithChildren?` |
 
 **Async configs:**
 

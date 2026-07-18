@@ -1,5 +1,20 @@
 # Transferum Change Log
 
+## v1.2.0 - 2026-07-18
+
+### syncWithChildren for BridgeSelector and BridgeMultiSelector
+* **New optional config field:** `syncWithChildren?: boolean` added to `BridgeSelectorConfig` and `BridgeMultiSelectorConfig` (default `false`).
+* **`BridgeSelector`:** when enabled, the selector subscribes to `onStateChange()` of all child bridges. External activation of a child bridge switches selection to it (`select()`). External deactivation of the selected bridge deactivates the selector (`deactivate()`).
+* **`BridgeMultiSelector`:** when enabled, the selector subscribes to `onStateChange()` of all child bridges. External activation of a child bridge adds it to the selection (`check()`). External deactivation of a selected child bridge removes it from the selection (`uncheck()`).
+* **Feedback loop prevention:** an internal `_syncing` guard suppresses child state-change notifications while the selector is performing its own `activate()` / `deactivate()` / `select()` / `check()` / `uncheck()`, preventing recursive re-entry.
+* **Cleanup:** `destroy()` unsubscribes from all child state-change subscriptions before destroying owned bridges.
+* **Backward-compatible:** `syncWithChildren` defaults to `false` — existing code behaves exactly as before.
+
+### Tests
+* Added 11 tests for `BridgeSelector` `syncWithChildren` (external activation/deactivation, feedback loop prevention on activate/deactivate/select, disabled mode, no-op cases, inactive selector, destroy unsubscribe, onStateChange notification).
+* Added 14 tests for `BridgeMultiSelector` `syncWithChildren` (external activation/deactivation, feedback loop prevention on activate/deactivate/select/check/uncheck, disabled mode, no-op cases, inactive selector, destroy unsubscribe, onStateChange notification, multiple external activations accumulation).
+* **Coverage:** Maintained **100% test coverage** (statements, branches, functions, lines) across all 11 source files. Total tests: **1,982**.
+
 ## v1.1.2 - 2026-07-16
 
 ### Documentation
