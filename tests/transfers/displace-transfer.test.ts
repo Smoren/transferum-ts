@@ -974,3 +974,259 @@ describe(
     });
   },
 );
+
+// ═══════════════════════════════════════════════════════════════
+// DisplaceTransfer onDisplace
+// ═══════════════════════════════════════════════════════════════
+
+describe(
+  'DisplaceTransfer onDisplace called with previous inner on new push test',
+  () => {
+    it('', () => {
+      const displacedInners: number[] = [];
+      let factoryCall = 0;
+      const transfer = new DisplaceTransfer<number, string>({
+        factory: () => {
+          factoryCall++;
+          return new StreamChannelTransfer<number, string>({
+            setup: () => {},
+            destroy: () => {},
+          });
+        },
+        onDisplace: (displaced) => {
+          displacedInners.push(factoryCall - 1);
+          expect(displaced.isAsyncPushable).toBe(true);
+          expect(displaced.isSubscribable).toBe(true);
+        },
+      });
+
+      transfer.push(1);
+      transfer.push(2);
+
+      expect(displacedInners).toEqual([1]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'DisplaceTransfer onDisplace not called on first push test',
+  () => {
+    it('', () => {
+      const onDisplace = jest.fn();
+      const transfer = new DisplaceTransfer<number, string>({
+        factory: () => new StreamChannelTransfer<number, string>({
+          setup: () => {},
+          destroy: () => {},
+        }),
+        onDisplace,
+      });
+
+      transfer.push(42);
+
+      expect(onDisplace).not.toHaveBeenCalled();
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'DisplaceTransfer onDisplace not called on destroy test',
+  () => {
+    it('', () => {
+      const onDisplace = jest.fn();
+      const transfer = new DisplaceTransfer<number, string>({
+        factory: () => new StreamChannelTransfer<number, string>({
+          setup: () => {},
+          destroy: () => {},
+        }),
+        onDisplace,
+      });
+
+      transfer.push(42);
+      transfer.destroy();
+
+      expect(onDisplace).not.toHaveBeenCalled();
+    });
+  },
+);
+
+describe(
+  'DisplaceTransfer onDisplace called before inner is destroyed test',
+  () => {
+    it('', () => {
+      const destroyOrder: string[] = [];
+      let factoryCall = 0;
+      const transfer = new DisplaceTransfer<number, string>({
+        factory: () => {
+          factoryCall++;
+          const callIdx = factoryCall;
+          return new StreamChannelTransfer<number, string>({
+            setup: () => {},
+            destroy: () => { destroyOrder.push(`destroy:${callIdx}`); },
+          });
+        },
+        onDisplace: () => { destroyOrder.push('onDisplace'); },
+      });
+
+      transfer.push(1);
+      transfer.push(2);
+
+      expect(destroyOrder).toEqual(['onDisplace', 'destroy:1']);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'DisplaceTransfer onDisplace called for each rapid push test',
+  () => {
+    it('', () => {
+      const displacedCount: number[] = [];
+      let factoryCall = 0;
+      const transfer = new DisplaceTransfer<number, string>({
+        factory: () => {
+          factoryCall++;
+          return new StreamChannelTransfer<number, string>({
+            setup: () => {},
+            destroy: () => {},
+          });
+        },
+        onDisplace: () => { displacedCount.push(factoryCall - 1); },
+      });
+
+      transfer.push(1);
+      transfer.push(2);
+      transfer.push(3);
+      transfer.push(4);
+
+      expect(displacedCount).toEqual([1, 2, 3]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'DisplaceTransfer onDisplace can access inner for custom cleanup test',
+  () => {
+    it('', () => {
+      const aborted: number[] = [];
+      let factoryCall = 0;
+
+      class AbortableInner extends BaseStateTransfer<string> implements AsyncPushableTransferInterface<number>, SubscribableTransferInterface<string> {
+        override readonly isInput = true;
+        override readonly isOutput = true;
+        override readonly isDuplex = true;
+        override readonly isAsyncPushable = true;
+        override readonly isSubscribable = true;
+
+        private readonly _subscription: SubscriptionManager<string>;
+        private readonly _callIdx: number;
+        private _aborted = false;
+
+        constructor(callIdx: number) {
+          super();
+          this._subscription = new SubscriptionManager(this._state);
+          this._callIdx = callIdx;
+        }
+
+        get callIdx() { return this._callIdx; }
+
+        async asyncPush(_data: number): Promise<void> {}
+
+        subscribe(handler: DataHandler<string>): SubscriberInterface {
+          return this._subscription.subscribe(handler);
+        }
+
+        abort() { this._aborted = true; }
+        get aborted() { return this._aborted; }
+
+        override destroy() {
+          this._subscription.destroy();
+          super.destroy();
+        }
+      }
+
+      const transfer = new DisplaceTransfer<number, string, AbortableInner>({
+        factory: () => {
+          factoryCall++;
+          return new AbortableInner(factoryCall);
+        },
+        onDisplace: (displaced) => {
+          displaced.abort();
+          aborted.push(displaced.callIdx);
+        },
+      });
+
+      transfer.push(1);
+      transfer.push(2);
+      transfer.push(3);
+
+      expect(aborted).toEqual([1, 2]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'DisplaceTransfer onDisplace without callback works as before test',
+  () => {
+    it('', () => {
+      const destroyed: number[] = [];
+      let factoryCall = 0;
+      const transfer = new DisplaceTransfer<number, string>({
+        factory: () => {
+          factoryCall++;
+          const callIdx = factoryCall;
+          return new StreamChannelTransfer<number, string>({
+            setup: () => {},
+            destroy: () => { destroyed.push(callIdx); },
+          });
+        },
+      });
+
+      transfer.push(1);
+      transfer.push(2);
+      transfer.push(3);
+
+      expect(destroyed).toEqual([1, 2]);
+
+      transfer.destroy();
+      expect(destroyed).toEqual([1, 2, 3]);
+    });
+  },
+);
+
+describe(
+  'DisplaceTransfer onDisplace exception rethrown but inner still destroyed test',
+  () => {
+    it('', () => {
+      const destroyed: number[] = [];
+      let factoryCall = 0;
+      const transfer = new DisplaceTransfer<number, string>({
+        factory: () => {
+          factoryCall++;
+          const callIdx = factoryCall;
+          return new StreamChannelTransfer<number, string>({
+            setup: () => {},
+            destroy: () => { destroyed.push(callIdx); },
+          });
+        },
+        onDisplace: () => { throw new Error('onDisplace error'); },
+      });
+
+      transfer.push(1);
+
+      expect(() => transfer.push(2)).toThrow('onDisplace error');
+
+      expect(destroyed).toEqual([1]);
+
+      transfer.destroy();
+    });
+  },
+);

@@ -168,8 +168,13 @@ export type ConditionTransferConfig<T> = {
 }
 
 /** Configuration for DisplaceTransfer — factory that creates a new inner async-pushable + subscribable transfer per input value. */
-export type DisplaceTransferConfig<TInput, TOutput> = ErrorHandlingConfig<DisplaceTransfer<TInput, TOutput>> & {
-  readonly factory: () => Transfer<TInput, TOutput, [AsyncPushable, Subscribable]>;
+export type DisplaceTransferConfig<
+  TInput,
+  TOutput,
+  TInner extends Transfer<TInput, TOutput, [AsyncPushable, Subscribable]>
+> = ErrorHandlingConfig<DisplaceTransfer<TInput, TOutput, TInner>> & {
+  readonly factory: () => TInner;
+  readonly onDisplace?: (displaced: TInner) => void;
 }
 
 /** Configuration for PollingFlowTransfer — polling proxy config plus an output flow source. */
