@@ -1,5 +1,23 @@
 # Transferum Change Log
 
+## v1.3.0 - 2026-07-19
+
+### DisplaceTransfer — switch-map transfer with onDisplace callback
+* **New transfer:** `DisplaceTransfer<TInput, TOutput, TInner>` — for each input value, creates a new inner async-pushable + subscribable transfer via a factory function, pushes the value into it via `asyncPush()`, and forwards the inner's emissions to outer subscribers. On each new `push()`, the previous inner is unsubscribed and destroyed — only the latest inner's emissions pass through. **RxJS equivalent:** `switchMap`.
+* **New factory:** `createDisplaceTransfer<TInput, TOutput, TInner>()`.
+
+### Documentation
+* **README — DisplaceTransfer section:** New subsection with capabilities, configuration (including `onDisplace`), RxJS equivalent, code example, and `onDisplace` usage example with a custom `FetchTransfer` (abort pattern).
+* **README — Comparison tables:** `DisplaceTransfer` added to Transfer Comparison Table, Transformation category, operator-equivalent coverage (`switchMap`→`DisplaceTransfer`), and Gate/Flow control row.
+* **README — Debounced search example:** Updated to use `DisplaceTransfer` instead of `AsyncConvertTransfer` directly, demonstrating switch-map semantics.
+* **JSDoc:** `DisplaceTransfer` class and `createDisplaceTransfer` factory fully documented with mechanics, error handling, configuration, and use cases.
+
+### Tests
+* **DisplaceTransfer test suite:** 37 tests covering capability flags, basic push & subscribe, displace behavior (cancel previous inner), destroy (dispose inner, clean up subscriptions, idempotent), error handling (factory error with/without `onError`, previous inner kept active on factory error), real-world scenarios (fetch, WebSocket, readFile, search-as-you-type), async inner transfers (`AsyncConvertTransfer`, `AsyncConditionTransfer`), and `onDisplace` (called with previous inner, not called on first push/destroy, called before destroy, rapid push, custom cleanup, backward-compatible without callback, exception rethrown but inner still destroyed).
+* **Factory tests:** 8 tests for `createDisplaceTransfer` (type, push, displace, destroy, error handling, async inner).
+* **Use-case tests:** Updated debounced search test to use `DisplaceTransfer`; added displacement scenario test (slow query cancelled by fast query).
+* **Coverage:** Maintained **100% test coverage** (statements, branches, functions, lines) across all 11 source files. Total tests: **2,029**.
+
 ## v1.2.0 - 2026-07-18
 
 ### syncWithChildren for BridgeSelector and BridgeMultiSelector
