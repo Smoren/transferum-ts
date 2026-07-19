@@ -15,9 +15,6 @@ import {
   createPollingProxyTransfer,
   createPollingFlowTransfer,
   createIdlePollingTransfer,
-  IntervalTicker,
-  LatestStorage,
-  MapOperator,
   createChannelTransfer,
   createStoredChannelTransfer,
   createSinkTransfer,
@@ -25,6 +22,12 @@ import {
   createReadTransfer,
   createConvertTransfer,
   createConditionTransfer,
+  createDisplaceTransfer,
+  createAsyncConvertTransfer,
+  createAsyncMapOperator,
+  IntervalTicker,
+  LatestStorage,
+  MapOperator,
 } from '../../src';
 import { describe, expect, it, jest } from '@jest/globals';
 
@@ -1620,3 +1623,234 @@ describe(
   },
 );
 
+// ═══════════════════════════════════════════════════════════════
+// createDisplaceTransfer
+// ═══════════════════════════════════════════════════════════════
+
+describe(
+  'createDisplaceTransfer returns correct type test',
+  () => {
+    it('', () => {
+      const transfer = createDisplaceTransfer<number, string>({
+        factory: () => createAsyncConvertTransfer<number, string>({
+          operator: createAsyncMapOperator(async (n) => n.toString()),
+        }),
+      });
+
+      expect(transfer).toBeDefined();
+      expect(transfer.isPushable).toBe(true);
+      expect(transfer.isSubscribable).toBe(true);
+      expect(transfer.isInput).toBe(true);
+      expect(transfer.isOutput).toBe(true);
+      expect(transfer.isDuplex).toBe(true);
+      expect(transfer.isPullable).toBe(false);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'createDisplaceTransfer push creates inner and forwards emissions test',
+  () => {
+    it('', async () => {
+      const transfer = createDisplaceTransfer<number, string>({
+        factory: () => createAsyncConvertTransfer<number, string>({
+          operator: createAsyncMapOperator(async (n) => `hello:${n}`),
+        }),
+      });
+      const handler = jest.fn();
+
+      transfer.subscribe(handler);
+      transfer.push(42);
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler).toHaveBeenCalledWith('hello:42');
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'createDisplaceTransfer new push displaces previous inner test',
+  () => {
+    it('', async () => {
+      const transfer = createDisplaceTransfer<number, string>({
+        factory: () => createAsyncConvertTransfer<number, string>({
+          operator: createAsyncMapOperator(async (n) => {
+            await new Promise((r) => setTimeout(r, 50));
+            return `result:${n}`;
+          }),
+        }),
+      });
+      const handler = jest.fn();
+
+      transfer.subscribe(handler);
+
+      transfer.push(1);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      transfer.push(2);
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler).toHaveBeenCalledWith('result:2');
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'createDisplaceTransfer destroy disposes current inner test',
+  () => {
+    it('', () => {
+      const transfer = createDisplaceTransfer<number, string>({
+        factory: () => createAsyncConvertTransfer<number, string>({
+          operator: createAsyncMapOperator(async (n) => n.toString()),
+        }),
+      });
+
+      transfer.push(42);
+
+      expect(() => transfer.destroy()).not.toThrow();
+    });
+  },
+);
+
+describe(
+  'createDisplaceTransfer factory error with onError suppresses test',
+  () => {
+    it('', () => {
+      const onError = jest.fn();
+      const transfer = createDisplaceTransfer<number, string>({
+        factory: () => { throw new Error('factory error'); },
+        onError,
+      });
+      const handler = jest.fn();
+
+      transfer.subscribe(handler);
+
+      expect(() => transfer.push(42)).not.toThrow();
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(handler).not.toHaveBeenCalled();
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'createDisplaceTransfer factory error without onError rethrows test',
+  () => {
+    it('', () => {
+      const transfer = createDisplaceTransfer<number, string>({
+        factory: () => {
+          throw new Error('factory error');
+        },
+      });
+
+      expect(() => transfer.push(42)).toThrow('factory error');
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'createDisplaceTransfer factory error keeps previous inner active test',
+  () => {
+    it('', async () => {
+      let factoryCall = 0;
+
+      const transfer = createDisplaceTransfer<number, string>({
+        factory: () => {
+          factoryCall++;
+          if (factoryCall === 1) {
+            return createAsyncConvertTransfer<number, string>({
+              operator: createAsyncMapOperator(async (n) => `first:${n}`),
+            });
+          }
+          throw new Error('factory error');
+        },
+        onError: () => {},
+      });
+      const handler = jest.fn();
+
+      transfer.subscribe(handler);
+      transfer.push(1);
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      // Factory throws on second push — suppressed, previous inner already completed
+      transfer.push(2);
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler).toHaveBeenCalledWith('first:1');
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'createDisplaceTransfer with AsyncConvertTransfer inner forwards async emission test',
+  () => {
+    it('', async () => {
+      const transfer = createDisplaceTransfer<string, string>({
+        factory: () => createAsyncConvertTransfer<string, string>({
+          operator: createAsyncMapOperator(async (url) => {
+            await new Promise((r) => setTimeout(r, 10));
+            return `response:${url}`;
+          }),
+        }),
+      });
+      const handler = jest.fn();
+
+      transfer.subscribe(handler);
+      transfer.push('https://api.example.com/data');
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler).toHaveBeenCalledWith('response:https://api.example.com/data');
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'createDisplaceTransfer rapid push only latest inner wins test',
+  () => {
+    it('', async () => {
+      const transfer = createDisplaceTransfer<string, string>({
+        factory: () => createAsyncConvertTransfer<string, string>({
+          operator: createAsyncMapOperator(async (query) => {
+            const delay = query.length * 10;
+            await new Promise((r) => setTimeout(r, delay));
+            return `result:${query}`;
+          }),
+        }),
+      });
+      const handler = jest.fn();
+
+      transfer.subscribe(handler);
+
+      transfer.push('h');
+      transfer.push('he');
+      transfer.push('hel');
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler).toHaveBeenCalledWith('result:hel');
+
+      transfer.destroy();
+    });
+  },
+);

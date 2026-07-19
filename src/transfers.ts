@@ -36,6 +36,9 @@ import type {
   AsyncDataHandler,
   ErrorHandler,
   TickerFactory,
+  Transfer,
+  AsyncPushable,
+  Subscribable,
 } from "./types";
 import type {
   PollingSourceTransferConfig,
@@ -56,6 +59,7 @@ import type {
   ConditionTransferConfig,
   PollingFlowTransferConfig,
   IdlePollingTransferConfig,
+  DisplaceTransferConfig,
   CompositeTransferConfig,
   AsyncSinkTransferConfig,
   AsyncWriteTransferConfig,
@@ -2005,6 +2009,121 @@ export class ConditionTransfer<T> extends BaseStateTransfer<T> implements Pushab
   public override destroy() {
     this._subscription.destroy();
     super.destroy();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DisplaceTransfer
+// ═══════════════════════════════════════════════════════════════
+/**
+ * Displace transfer: for each input value, creates a new inner
+ * async-pushable + subscribable transfer via a factory function,
+ * subscribes to it, pushes the value into it via asyncPush(), and
+ * forwards the inner's emissions to outer subscribers.
+ *
+ * On each new push(), the previous inner subscription is unsubscribed
+ * and the previous inner transfer is destroyed — the new inner
+ * displaces the previous one. Only the latest inner transfer's
+ * emissions reach the outer subscribers.
+ *
+ * The factory receives no arguments — the input value is delivered to
+ * the inner transfer via asyncPush(data), not passed to the factory.
+ * This keeps the factory purely declarative: it creates a transfer,
+ * DisplaceTransfer handles data delivery.
+ *
+ * The outer push() is synchronous: it creates the inner, disposes the
+ * previous one, subscribes, and calls inner.asyncPush(data) fire-and-
+ * forget. The async work happens inside the inner transfer — its
+ * results arrive via subscription callbacks.
+ *
+ * Capabilities: isInput, isOutput, isPushable, isSubscribable
+ *
+ * Mechanics:
+ * 1. push(data) — calls factory() to create a new inner transfer,
+ *    then disposes the previous inner (unsubscribe + destroy),
+ *    then subscribes to the new inner (forwarding emissions to outer subscribers),
+ *    then calls inner.asyncPush(data) to deliver the value (fire-and-forget)
+ * 2. subscribe(handler) — subscribes to the outer output
+ * 3. destroy() — disposes the current inner transfer, unsubscribes outer subscribers
+ *
+ * Error handling:
+ * - If factory() throws an exception, onError is called.
+ * - With onError provided, the exception is suppressed (previous inner remains active).
+ * - Without onError, the exception is rethrown.
+ * - If inner.asyncPush(data) rejects, the rejection is unhandled (fire-and-forget).
+ *   Provide onError on the inner transfer to suppress internal errors.
+ *
+ * Configuration (DisplaceTransferConfig):
+ * - factory: () => Transfer<TInput, TOutput, [AsyncPushable, Subscribable]>
+ *   — creates inner transfer per input (no arguments; data is pushed via asyncPush)
+ * - onError?: ErrorHandler — factory error handler
+ *
+ * Use cases:
+ * - switchMap semantics: displace previous inner stream on new input
+ * - Search-as-you-type: debounce → displace(factory) → latest result wins
+ * - Per-value async operations (fetch, readFile) where only the latest result matters
+ * - Per-value WebSocket/stream subscriptions with automatic cleanup
+ */
+export class DisplaceTransfer<TInput, TOutput> extends BaseStateTransfer<TOutput> implements PushableTransferInterface<TInput>, SubscribableTransferInterface<TOutput> {
+  override readonly isInput = true;
+  override readonly isOutput = true;
+  override readonly isDuplex = true;
+
+  override readonly isPushable = true;
+  override readonly isSubscribable = true;
+
+  private readonly _subscription: SubscriptionManager<TOutput>;
+  private readonly _factory: () => Transfer<TInput, TOutput, [AsyncPushable, Subscribable]>;
+  private readonly _onError?: ErrorHandler<DisplaceTransfer<TInput, TOutput>>;
+
+  private _innerSubscription: SubscriberInterface | null = null;
+  private _innerTransfer: Transfer<TInput, TOutput, [AsyncPushable, Subscribable]> | null = null;
+
+  constructor(config: DisplaceTransferConfig<TInput, TOutput>) {
+    super();
+    this._subscription = new SubscriptionManager(this._state);
+    this._factory = config.factory;
+    this._onError = config.onError;
+  }
+
+  public push(data: TInput): void {
+    let newInner: Transfer<TInput, TOutput, [AsyncPushable, Subscribable]>;
+    try {
+      newInner = this._factory();
+    } catch (e) {
+      handleError(e, this, this._onError);
+      return;
+    }
+
+    this._disposeInner();
+    this._innerTransfer = newInner;
+    this._innerSubscription = newInner.subscribe((value: TOutput) => {
+      this._state.value = value;
+      this._subscription.sendState();
+      this._state.clear();
+    });
+    newInner.asyncPush(data);
+  }
+
+  public subscribe(handler: DataHandler<TOutput>): SubscriberInterface {
+    return this._subscription.subscribe(handler);
+  }
+
+  public override destroy(): void {
+    this._disposeInner();
+    this._subscription.destroy();
+    super.destroy();
+  }
+
+  private _disposeInner(): void {
+    if (this._innerSubscription !== null) {
+      this._innerSubscription.unsubscribe();
+      this._innerSubscription = null;
+    }
+    if (this._innerTransfer !== null) {
+      this._innerTransfer.destroy();
+      this._innerTransfer = null;
+    }
   }
 }
 
