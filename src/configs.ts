@@ -27,6 +27,9 @@ import type {
   AsyncDataFetcher,
   TickerCallback,
   TickerFactory,
+  Transfer,
+  AsyncPushable,
+  Subscribable,
 } from "./types";
 import type {
   AsyncConditionTransfer,
@@ -49,6 +52,7 @@ import type {
   ReadTransfer,
   SinkTransfer,
   StoredChannelTransfer,
+  DisplaceTransfer,
   WriteTransfer,
 } from "./transfers";
 
@@ -161,6 +165,11 @@ export type ConditionTransferConfig<T> = {
   readonly shouldEmit?: (currentState: T | undefined) => boolean;
   readonly onAcceptError?: ErrorHandler<ConditionTransfer<T>>;
   readonly onEmitError?: ErrorHandler<ConditionTransfer<T>>;
+}
+
+/** Configuration for DisplaceTransfer — factory that creates a new inner async-pushable + subscribable transfer per input value. */
+export type DisplaceTransferConfig<TInput, TOutput> = ErrorHandlingConfig<DisplaceTransfer<TInput, TOutput>> & {
+  readonly factory: () => Transfer<TInput, TOutput, [AsyncPushable, Subscribable]>;
 }
 
 /** Configuration for PollingFlowTransfer — polling proxy config plus an output flow source. */

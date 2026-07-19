@@ -1,6 +1,7 @@
 import {
   RAFTicker,
   OutputPipelineBuilder,
+  InputPipelineBuilder,
   AsyncInputPipelineBuilder,
   AsyncDuplexPipelineBuilder,
   linkTransfers,
@@ -14,6 +15,7 @@ import {
   createAsyncMapOperator,
   createAsyncSinkTransfer,
   createConditionTransfer,
+  createDisplaceTransfer,
   createMergeTransfer,
   createSinkTransfer,
   createBridgeSelector,
@@ -82,7 +84,7 @@ describe('README Use Cases: Real-time UI updates from API polling', () => {
 // ═══════════════════════════════════════════════════════════════
 
 describe('README Use Cases: Debounced search with error handling and empty-result suppression', () => {
-  it('debounces, filters, async-converts with onError, suppresses empty results', async () => {
+  it('debounces, filters, displaces with error handling, suppresses empty results', async () => {
     const input = createDebounceTransfer<string>({ delay: 50 });
 
     const rendered: SearchResult[][] = [];
@@ -97,12 +99,14 @@ describe('README Use Cases: Debounced search with error handling and empty-resul
       return [{ id: 1, title: q }];
     });
 
-    const pipeline = AsyncInputPipelineBuilder
+    const pipeline = InputPipelineBuilder
       .start(input)
       .to(createConditionTransfer<string>({ shouldAccept: q => q.length >= 3 }))
-      .to(createAsyncConvertTransfer<string, SearchResult[]>({
-        operator: createAsyncMapOperator(async q => await searchAPI(q)),
-        onError: (e) => errors.push(e),
+      .to(createDisplaceTransfer<string, SearchResult[]>({
+        factory: () => createAsyncConvertTransfer<string, SearchResult[]>({
+          operator: createAsyncMapOperator(async (query) => await searchAPI(query)),
+          onError: (e) => errors.push(e),
+        }),
       }))
       .to(createConditionTransfer<SearchResult[]>({ shouldAccept: results => results.length > 0 }))
       .finish(createSinkTransfer<SearchResult[]>({
@@ -134,6 +138,57 @@ describe('README Use Cases: Debounced search with error handling and empty-resul
     input.push('test');
     await wait(100);
     expect(rendered).toEqual([[{ id: 1, title: 'hello' }]]); // still no new render
+
+    pipeline.destroy();
+  });
+
+  it('displaces previous in-flight request when new query arrives', async () => {
+    const input = createDebounceTransfer<string>({ delay: 50 });
+
+    const rendered: SearchResult[][] = [];
+
+    // Delayed API: resolves after `delay` ms
+    const searchAPI = (q: string, delay: number): Promise<SearchResult[]> => {
+      return new Promise((resolve) => {
+        setTimeout(() => resolve([{ id: 1, title: q }]), delay);
+      });
+    };
+
+    const pipeline = InputPipelineBuilder
+      .start(input)
+      .to(createConditionTransfer<string>({ shouldAccept: q => q.length >= 3 }))
+      .to(createDisplaceTransfer<string, SearchResult[]>({
+        factory: () => createAsyncConvertTransfer<string, SearchResult[]>({
+          operator: createAsyncMapOperator(async (query) => {
+            // First query is slow (100ms), second is fast (10ms)
+            const delay = query === 'first' ? 100 : 10;
+            return await searchAPI(query, delay);
+          }),
+        }),
+      }))
+      .to(createConditionTransfer<SearchResult[]>({ shouldAccept: results => results.length > 0 }))
+      .finish(createSinkTransfer<SearchResult[]>({
+        callback: results => rendered.push(results),
+      }), { owned: true });
+
+    // Push 'first' — after debounce (50ms), inner A starts with 100ms API delay
+    input.push('first');
+
+    // Wait for debounce + small margin so inner A is created
+    await wait(60);
+
+    // Push 'second' — displaces inner A before its API responds
+    input.push('second');
+
+    // Wait for debounce (50ms) + fast API (10ms) = 60ms
+    await wait(80);
+
+    // Only 'second' result should arrive — 'first' was displaced
+    expect(rendered).toEqual([[{ id: 1, title: 'second' }]]);
+
+    // Wait past the original 'first' API delay to confirm it never arrives
+    await wait(60);
+    expect(rendered).toEqual([[{ id: 1, title: 'second' }]]);
 
     pipeline.destroy();
   });

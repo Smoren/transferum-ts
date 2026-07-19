@@ -42,6 +42,7 @@ import type {
   AsyncConditionTransferConfig,
   AsyncStoredChannelTransferConfig,
   AsyncTransformBridgeConfig,
+  DisplaceTransferConfig,
   PassBridgeConfig,
   TransformBridgeConfig,
   TransferBridgeConfig,
@@ -83,6 +84,7 @@ import {
   AsyncConvertTransfer,
   AsyncConditionTransfer,
   AsyncStoredChannelTransfer,
+  DisplaceTransfer,
 } from "./transfers";
 import {
   PassBridge,
@@ -529,6 +531,38 @@ export function createConvertTransfer<TInput, TOutput>(
  */
 export function createConditionTransfer<T>(config: ConditionTransferConfig<T>): Transfer<T, [Pushable, Subscribable]> {
   return new ConditionTransfer<T>(config);
+}
+
+/**
+ * Creates a DisplaceTransfer — a transfer that creates a new inner
+ * async-pushable + subscribable transfer per input value, pushes the
+ * value into it via asyncPush(), and forwards its emissions to outer
+ * subscribers.
+ *
+ * On each new push(), the previous inner transfer is unsubscribed
+ * and destroyed — the new inner displaces the previous one. Only the
+ * latest inner transfer's emissions reach subscribers.
+ *
+ * The factory receives no arguments — the input value is delivered to
+ * the inner transfer via asyncPush(data), not passed to the factory.
+ *
+ * Capabilities: Pushable, Subscribable
+ *
+ * @param config — configuration (factory, onError)
+ * @example
+ * const displace = createDisplaceTransfer<string, SearchResult>({
+ *   factory: () => createAsyncConvertTransfer<string, SearchResult>({
+ *     operator: createAsyncMapOperator(async (query) => await searchApi(query)),
+ *   }),
+ * });
+ * displace.subscribe(result => render(result));
+ * displace.push('hello'); // creates inner, pushes 'hello' into it
+ * displace.push('world'); // displaces previous inner, creates new one
+ */
+export function createDisplaceTransfer<TInput, TOutput>(
+  config: DisplaceTransferConfig<TInput, TOutput>,
+): Transfer<TInput, TOutput, [Pushable, Subscribable]> {
+  return new DisplaceTransfer<TInput, TOutput>(config);
 }
 
 // ═══════════════════════════════════════════════════════════════

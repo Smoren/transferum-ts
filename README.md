@@ -777,18 +777,21 @@ fromEvent(searchInput, 'input')
 ```typescript
 // Transferum
 import {
-  AsyncInputPipelineBuilder, createDebounceTransfer, createConditionTransfer,
-  createAsyncConvertTransfer, createSinkTransfer, createAsyncMapOperator,
+  InputPipelineBuilder, createPushChannelTransfer, createDebounceTransfer, createConditionTransfer,
+  createDisplaceTransfer, createAsyncConvertTransfer, createAsyncMapOperator, createSinkTransfer,
 } from 'transferum';
 
-const input = createDebounceTransfer<string>({ delay: 300 });
+const input = createPushChannelTransfer<string>();
 
-const pipeline = AsyncInputPipelineBuilder
+const pipeline = InputPipelineBuilder
   .start(input)
+  .to(createDebounceTransfer<string>({ delay: 300 }))
   .to(createConditionTransfer<string>({ shouldAccept: q => q.length >= 3 }))
-  .to(createAsyncConvertTransfer<string, SearchResult[]>({
-    operator: createAsyncMapOperator(async q => await searchAPI(q)),
-    onError: (e) => console.error(e),
+  .to(createDisplaceTransfer<string, SearchResult[]>({
+    factory: () => createAsyncConvertTransfer<string, SearchResult[]>({
+      operator: createAsyncMapOperator(async (query) => await searchAPI(query)),
+      onError: (e) => console.error(e),
+    }),
   }))
   .to(createConditionTransfer<SearchResult[]>({ shouldAccept: results => results.length > 0 }))
   .finish(createSinkTransfer<SearchResult[]>({
@@ -955,6 +958,7 @@ import {
   ReadTransfer,
   ConvertTransfer,
   ConditionTransfer,
+  DisplaceTransfer,
   UniversalCompositeTransfer,
 
   // Async transfers
@@ -1192,7 +1196,8 @@ BaseTransfer (abstract)
 │   ├── StoredChannelTransfer
 │   ├── SinkTransfer
 │   ├── ConvertTransfer
-│   └── ConditionTransfer
+│   ├── ConditionTransfer
+│   └── DisplaceTransfer
 ├── SplitTransfer
 ├── WriteTransfer
 └── ReadTransfer
@@ -1357,6 +1362,7 @@ When linking a `Subscribable` source to an `AsyncPushable` target, `asyncPush()`
 | ReadTransfer               |  —   |  ✓   |  —  |  —   |  —   |    —    | —  |  ✓  | Read from `OutputFlowInterface` (Storage)           |
 | ConvertTransfer            |  ✓   |  —   |  ✓  |  —   |  —   |    —    | ✓  |  ✓  | Transform via `Operator`                            |
 | ConditionTransfer          |  ✓   |  —   |  ✓  |  —   |  —   |    —    | ✓  |  ✓  | Conditional filtering (`shouldAccept`/`shouldEmit`) |
+| DisplaceTransfer           |  ✓   |  —   |  ✓  |  —   |  —   |    —    | ✓  |  ✓  | Switch-map: new inner per value, previous displaced |
 
 > **Legend:** Push = `isPushable`, Pull = `isPullable`, Sub = `isSubscribable`, Trig = `isTriggerable`, Gate = `isGate`, Poll = polling (`Src` = `isPollingSource`, `Prx` = `isPollingProxy`), In = `isInput`, Out = `isOutput`.
 
@@ -1390,7 +1396,7 @@ When linking a `Subscribable` source to an `AsyncPushable` target, `asyncPush()`
 | Controlled flows       | ManualFlowTransfer, GateTransfer                                                                               | Control of emission timing or condition                |
 | Polling                | PollingSourceTransfer, PollingProxyTransfer, PollingFlowTransfer, IdlePollingTransfer                          | Periodic source polling                                |
 | Adapters               | SinkTransfer, WriteTransfer, ReadTransfer                                                                      | Integration with external flows and storages           |
-| Transformation         | ConvertTransfer, ConditionTransfer                                                                             | Data processing and filtering in the flow              |
+| Transformation         | ConvertTransfer, ConditionTransfer, DisplaceTransfer                                                           | Data processing, filtering, and switch-mapping         |
 | Aggregation            | MergeTransfer, SplitTransfer                                                                                   | Merging and splitting flows                            |
 | External sources       | ChannelTransfer, StoredChannelTransfer                                                                         | Integration via `setup`/`destroy` callbacks            |
 | Composition            | UniversalCompositeTransfer                                                                                     | Combining input + output into a single interface       |
@@ -1863,6 +1869,42 @@ condition.push(-5);  // rejected by shouldAccept
 condition.push(50);  // passed both filters → 50
 condition.push(150); // passed shouldAccept, rejected by shouldEmit
 ```
+
+### DisplaceTransfer
+
+Switch-map transfer: for each input value, creates a new inner async-pushable + subscribable transfer via a factory function, pushes the value into it via `asyncPush()`, and forwards the inner's emissions to outer subscribers. On each new `push()`, the previous inner subscription is unsubscribed and the previous inner transfer is destroyed — only the latest inner's emissions pass through.
+
+The outer `push()` is **synchronous**. The factory receives **no arguments** — it is purely declarative. `DisplaceTransfer` handles data delivery by calling `inner.asyncPush(data)` internally (fire-and-forget). The async work happens inside the inner transfer; results arrive via subscription callbacks.
+
+**Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`
+
+**Configuration:**
+- `factory: () => Transfer<TInput, TOutput, [AsyncPushable, Subscribable]>` — creates a new inner transfer per input value (no arguments; data is pushed via `asyncPush`)
+- `onError?: ErrorHandler<DisplaceTransfer>` — suppresses factory errors; without it, factory errors are rethrown
+
+**RxJS equivalent:** `switchMap`
+
+```typescript
+import {
+  createDisplaceTransfer, createAsyncConvertTransfer, createAsyncMapOperator,
+} from 'transferum';
+
+const displace = createDisplaceTransfer<string, SearchResult>({
+  factory: () => createAsyncConvertTransfer<string, SearchResult>({
+    operator: createAsyncMapOperator(async (query) => await searchApi(query)),
+  }),
+});
+
+displace.subscribe((results) => render(results));
+
+displace.push('hello'); // creates inner, pushes 'hello' via asyncPush
+displace.push('world'); // displaces previous inner, creates new one
+```
+
+**Use cases:**
+- Search-as-you-type: debounce → displace(factory) → latest result wins
+- Per-value async operations (fetch, readFile) where only the latest result matters
+- Per-value WebSocket/stream subscriptions with automatic cleanup
 
 ### UniversalCompositeTransfer
 
@@ -2754,7 +2796,7 @@ Full list of factories:
 | Polling                     | `createPollingSourceTransfer`, `createPollingProxyTransfer`, `createPollingFlowTransfer`, `createIdlePollingTransfer`                                  |
 | Externally-managed channels | `createChannelTransfer`, `createStoredChannelTransfer`                                                                                                 |
 | Sink / Flow                 | `createSinkTransfer`, `createWriteTransfer`, `createReadTransfer`                                                                                      |
-| Transformation              | `createConvertTransfer`, `createConditionTransfer`                                                                                                     |
+| Transformation              | `createConvertTransfer`, `createConditionTransfer`, `createDisplaceTransfer`                                                            |
 | Bridges                     | `createPassBridge`, `createTransformBridge`, `createTransferBridge`, `createBridgeAggregator`, `createBridgeSelector`, `createBridgeMultiSelector`     |
 | Operators                   | `createTransparentOperator`, `createMapOperator`, `createFilterOperator`, `createReducerOperator`, `createGuardOperator`, `createPipelineOperator`     |
 | Storages                    | `createLatestStorage`, `createQueueStorage`, `createStackStorage`                                                                                      |
