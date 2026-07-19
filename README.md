@@ -1882,6 +1882,7 @@ The outer `push()` is **synchronous**. The factory receives **no arguments** —
 **Configuration:**
 - `factory: () => Transfer<TInput, TOutput, [AsyncPushable, Subscribable]>` — creates a new inner transfer per input value (no arguments; data is pushed via `asyncPush`)
 - `onError?: ErrorHandler<DisplaceTransfer>` — suppresses factory errors; without it, factory errors are rethrown
+- `onDisplace?: (displaced: Transfer<TInput, TOutput, [AsyncPushable, Subscribable]>) => void` — called with the previous inner transfer **before** it is unsubscribed and destroyed on displacement by a new `push()`. Use for custom cleanup that must happen before destruction (e.g., aborting an in-flight request, closing a WebSocket, cancelling a timer). Not called on `destroy()` — only on displacement by a new `push()`. Not called for the first `push()` (no previous inner exists).
 
 **RxJS equivalent:** `switchMap`
 
@@ -1902,10 +1903,50 @@ displace.push('hello'); // creates inner, pushes 'hello' via asyncPush
 displace.push('world'); // displaces previous inner, creates new one
 ```
 
+**`onDisplace` — custom cancellation before inner is destroyed:**
+
+The `onDisplace` callback receives the previous inner transfer typed as the exact type returned by `factory`, so to abort an in-flight request you need a custom inner transfer that exposes an `abort()` method (a plain `AsyncConvertTransfer` doesn't have one).
+
+```typescript
+import {
+  createDisplaceTransfer, createAsyncConvertTransfer, createAsyncMapOperator,
+  type Transfer,
+} from 'transferum';
+
+// Custom inner transfer: wraps AsyncConvertTransfer and exposes abort()
+class FetchTransfer implements Transfer<string, SearchResult, [AsyncPushable, Subscribable]> {
+  private readonly _controller = new AbortController();
+  private readonly _inner = createAsyncConvertTransfer<string, SearchResult>({
+    operator: createAsyncMapOperator(async (query) => {
+      return await fetch(`/api/search?q=${query}`, { signal: this._controller.signal });
+    }),
+  });
+
+  abort() { this._controller.abort(); }
+  asyncPush(data: string) { return this._inner.asyncPush(data); }
+  subscribe(handler: (data: SearchResult) => void) { return this._inner.subscribe(handler); }
+  destroy() { this._inner.destroy(); }
+  // ...delegate remaining capability flags/methods
+}
+
+const displace = createDisplaceTransfer<string, SearchResult, FetchTransfer>({
+  factory: () => new FetchTransfer(),
+  onDisplace: (displaced) => {
+    // displaced is typed as FetchTransfer — no cast needed.
+    // Abort the in-flight fetch so it doesn't waste resources.
+    displaced.abort();
+  },
+});
+
+displace.push('hello'); // starts fetch
+displace.push('world'); // onDisplace aborts 'hello' fetch, then destroys the inner
+```
+
 **Use cases:**
 - Search-as-you-type: debounce → displace(factory) → latest result wins
 - Per-value async operations (fetch, readFile) where only the latest result matters
 - Per-value WebSocket/stream subscriptions with automatic cleanup
+- Custom cancellation via `onDisplace` (abort requests, close connections) before inner is destroyed
 
 ### UniversalCompositeTransfer
 

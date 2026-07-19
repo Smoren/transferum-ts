@@ -2057,14 +2057,25 @@ export class ConditionTransfer<T> extends BaseStateTransfer<T> implements Pushab
  * - factory: () => Transfer<TInput, TOutput, [AsyncPushable, Subscribable]>
  *   — creates inner transfer per input (no arguments; data is pushed via asyncPush)
  * - onError?: ErrorHandler — factory error handler
+ * - onDisplace?: (displaced: Transfer<TInput, TOutput, [AsyncPushable, Subscribable]>) => void
+ *   — called with the previous inner transfer before it is unsubscribed and destroyed.
+ *   Use for cleanup that must happen before destruction (e.g., aborting an in-flight request,
+ *   closing a WebSocket, cancelling a timer). If the callback throws, the exception is
+ *   rethrown (the inner is still destroyed). Not called on destroy() — only on displacement
+ *   by a new push(). Not called for the first push() (no previous inner exists).
  *
  * Use cases:
  * - switchMap semantics: displace previous inner stream on new input
  * - Search-as-you-type: debounce → displace(factory) → latest result wins
  * - Per-value async operations (fetch, readFile) where only the latest result matters
  * - Per-value WebSocket/stream subscriptions with automatic cleanup
+ * - Custom cancellation logic via onDisplace (abort, close, cancel) before inner is destroyed
  */
-export class DisplaceTransfer<TInput, TOutput> extends BaseStateTransfer<TOutput> implements PushableTransferInterface<TInput>, SubscribableTransferInterface<TOutput> {
+export class DisplaceTransfer<
+  TInput,
+  TOutput,
+  TInner extends Transfer<TInput, TOutput, [AsyncPushable, Subscribable]> = Transfer<TInput, TOutput, [AsyncPushable, Subscribable]>
+> extends BaseStateTransfer<TOutput> implements PushableTransferInterface<TInput>, SubscribableTransferInterface<TOutput> {
   override readonly isInput = true;
   override readonly isOutput = true;
   override readonly isDuplex = true;
@@ -2073,21 +2084,23 @@ export class DisplaceTransfer<TInput, TOutput> extends BaseStateTransfer<TOutput
   override readonly isSubscribable = true;
 
   private readonly _subscription: SubscriptionManager<TOutput>;
-  private readonly _factory: () => Transfer<TInput, TOutput, [AsyncPushable, Subscribable]>;
-  private readonly _onError?: ErrorHandler<DisplaceTransfer<TInput, TOutput>>;
+  private readonly _factory: () => TInner;
+  private readonly _onError?: ErrorHandler<DisplaceTransfer<TInput, TOutput, TInner>>;
+  private readonly _onDisplace?: (displaced: TInner) => void;
 
   private _innerSubscription: SubscriberInterface | null = null;
-  private _innerTransfer: Transfer<TInput, TOutput, [AsyncPushable, Subscribable]> | null = null;
+  private _innerTransfer: TInner | null = null;
 
-  constructor(config: DisplaceTransferConfig<TInput, TOutput>) {
+  constructor(config: DisplaceTransferConfig<TInput, TOutput, TInner>) {
     super();
     this._subscription = new SubscriptionManager(this._state);
     this._factory = config.factory;
     this._onError = config.onError;
+    this._onDisplace = config.onDisplace;
   }
 
   public push(data: TInput): void {
-    let newInner: Transfer<TInput, TOutput, [AsyncPushable, Subscribable]>;
+    let newInner: TInner;
     try {
       newInner = this._factory();
     } catch (e) {
@@ -2095,7 +2108,7 @@ export class DisplaceTransfer<TInput, TOutput> extends BaseStateTransfer<TOutput
       return;
     }
 
-    this._disposeInner();
+    this._disposeInner(true);
     this._innerTransfer = newInner;
     this._innerSubscription = newInner.subscribe((value: TOutput) => {
       this._state.value = value;
@@ -2110,18 +2123,26 @@ export class DisplaceTransfer<TInput, TOutput> extends BaseStateTransfer<TOutput
   }
 
   public override destroy(): void {
-    this._disposeInner();
+    this._disposeInner(false);
     this._subscription.destroy();
     super.destroy();
   }
 
-  private _disposeInner(): void {
+  private _disposeInner(notifyDisplace: boolean): void {
     if (this._innerSubscription !== null) {
       this._innerSubscription.unsubscribe();
       this._innerSubscription = null;
     }
     if (this._innerTransfer !== null) {
-      this._innerTransfer.destroy();
+      if (notifyDisplace && this._onDisplace !== undefined) {
+        try {
+          this._onDisplace(this._innerTransfer);
+        } finally {
+          this._innerTransfer.destroy();
+        }
+      } else {
+        this._innerTransfer.destroy();
+      }
       this._innerTransfer = null;
     }
   }

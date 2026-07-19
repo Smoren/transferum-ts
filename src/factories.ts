@@ -539,16 +539,12 @@ export function createConditionTransfer<T>(config: ConditionTransferConfig<T>): 
  * value into it via asyncPush(), and forwards its emissions to outer
  * subscribers.
  *
- * On each new push(), the previous inner transfer is unsubscribed
- * and destroyed — the new inner displaces the previous one. Only the
- * latest inner transfer's emissions reach subscribers.
+ * On each new push(), the previous inner subscription is unsubscribed
+ * and the previous inner transfer is destroyed — the new inner
+ * displaces the previous one. Only the latest inner transfer's
+ * emissions reach the outer subscribers.
  *
- * The factory receives no arguments — the input value is delivered to
- * the inner transfer via asyncPush(data), not passed to the factory.
- *
- * Capabilities: Pushable, Subscribable
- *
- * @param config — configuration (factory, onError)
+ * @param config — configuration (factory, onError, onDisplace)
  * @example
  * const displace = createDisplaceTransfer<string, SearchResult>({
  *   factory: () => createAsyncConvertTransfer<string, SearchResult>({
@@ -559,10 +555,14 @@ export function createConditionTransfer<T>(config: ConditionTransferConfig<T>): 
  * displace.push('hello'); // creates inner, pushes 'hello' into it
  * displace.push('world'); // displaces previous inner, creates new one
  */
-export function createDisplaceTransfer<TInput, TOutput>(
-  config: DisplaceTransferConfig<TInput, TOutput>,
+export function createDisplaceTransfer<
+  TInput,
+  TOutput,
+  TInner extends Transfer<TInput, TOutput, [AsyncPushable, Subscribable]> = Transfer<TInput, TOutput, [AsyncPushable, Subscribable]>
+>(
+  config: DisplaceTransferConfig<TInput, TOutput, TInner>,
 ): Transfer<TInput, TOutput, [Pushable, Subscribable]> {
-  return new DisplaceTransfer<TInput, TOutput>(config);
+  return new DisplaceTransfer<TInput, TOutput, TInner>(config);
 }
 
 // ═══════════════════════════════════════════════════════════════
