@@ -26,7 +26,8 @@
     "jest": "jest",
     "format": "ts-scripts format",
     "lint": "ts-scripts lint",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "docs": "typedoc src/index.ts --navigation.includeCategories --out docs/api"
   },
   "files": [
     "es",
@@ -70,6 +71,7 @@
     "rimraf": "^6.1.3",
     "ts-expect": "^1.3.0",
     "ts-jest": "^29.4.11",
+    "typedoc": "^0.28.20",
     "typescript": "^6.0.3"
   },
   "types": "./lib/index.d.ts",
