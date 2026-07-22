@@ -518,8 +518,8 @@ const metricsChannel = createPushStoredChannelTransfer<Metric>();
 
 const destinations = createBridgeMultiSelector({
   bridges: {
-    prometheus: createPassBridge({ source: metricsChannel, target: prometheusWriter, activated: true }),
-    elk: createPassBridge({ source: metricsChannel, target: elkWriter, activated: true }),
+    prometheus: createPassBridge({ source: metricsChannel, target: prometheusWriter, activated: false }),
+    elk: createPassBridge({ source: metricsChannel, target: elkWriter, activated: false }),
     sentry: createPassBridge({ source: metricsChannel, target: sentryWriter, activated: false }),
   },
   initialKeys: ['prometheus', 'elk'],
