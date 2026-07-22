@@ -268,8 +268,8 @@ describe('README Domain-Specific: Monitoring - Metrics Collection', () => {
 
     const destinations = createBridgeMultiSelector({
       bridges: {
-        prometheus: createPassBridge({ source: metricsChannel, target: createSinkTransfer<Metric>({ callback: (m) => prometheusTarget.push(m) }), activated: true }),
-        elk: createPassBridge({ source: metricsChannel, target: createSinkTransfer<Metric>({ callback: (m) => elkTarget.push(m) }), activated: true }),
+        prometheus: createPassBridge({ source: metricsChannel, target: createSinkTransfer<Metric>({ callback: (m) => prometheusTarget.push(m) }), activated: false }),
+        elk: createPassBridge({ source: metricsChannel, target: createSinkTransfer<Metric>({ callback: (m) => elkTarget.push(m) }), activated: false }),
         sentry: createPassBridge({ source: metricsChannel, target: createSinkTransfer<Metric>({ callback: (m) => sentryTarget.push(m) }), activated: false }),
       },
       initialKeys: ['prometheus', 'elk'],
