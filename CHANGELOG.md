@@ -1,5 +1,37 @@
 # Transferum Change Log
 
+## v1.4.0 - 2026-07-25
+
+### Sequence Guard for AsyncConvertTransfer and AsyncConditionTransfer
+* **Bug fix (issue #7):** Race condition on `_state.value` when `maxConcurrency > 1`. Parallel async operations shared a single `ProxyReference<T>`, so a faster operation could overwrite or clear `_state.value` before a slower one emitted — subscribers received stale or `undefined` values, and emissions arrived out of order.
+* **Sequence Guard:** When `maxConcurrency > 1`, each operation receives a monotonic sequence number. Results are placed into an internal `PendingResultQueue` and emitted to subscribers strictly in data-arrival order. A faster result waits in the queue until all preceding operations have emitted. When `maxConcurrency <= 1`, the guard is inactive (zero overhead, backward-compatible).
+* **`AsyncConditionTransfer.shouldEmit`** now receives the operation's local `data: T` instead of the shared `_state.value`, eliminating cross-operation data leakage. The `_state` is written only at emission time inside the guarded `_drain()`.
+* **`AsyncConditionTransfer.shouldEmit`** signature narrowed from `(currentState: T | undefined) => Promise<boolean> | boolean` to `(data: T) => Promise<boolean> | boolean` — `undefined` is no longer possible at runtime. Backward-compatible via contravariance (a function accepting `T | undefined` is assignable to a parameter expecting `T`).
+* **`AsyncConvertTransfer`** and **`AsyncConditionTransfer`** `destroy()` now clears the pending result queue.
+* **New helper classes** (`src/helpers.ts`): `PendingResultQueue<T>` (ordered result queue with `nextSeq()`/`submit()`/`drain()`/`clear()`) and `OrderedExecutor` (sequential async task executor with `submit()`/`reset()`).
+
+### Ordered execution for AsyncSinkTransfer and AsyncWriteTransfer
+* **New config option `ordered?: boolean`** added to `AsyncSinkTransferConfig` and `AsyncWriteTransferConfig` (default: `false`, backward-compatible). When enabled, `callback` / `flow.write()` invocations are executed sequentially in data-arrival order via an internal `OrderedExecutor` (promise chain). The chain catches errors per-task so a throwing task does not block subsequent tasks; the error is still propagated to the `asyncPush` caller.
+* `destroy()` on both transfers now resets the executor.
+
+### ConditionTransfer cleanup
+* **`trigger()` method removed** from `ConditionTransfer`. It was not part of any implemented interface (`isTriggerable` was never set to `true`), and its existence created a race condition: `shouldEmit` could receive `undefined` from `_state.value` after `_state.clear()` in a prior `push()`. The `push()` method now inlines the `shouldEmit` check directly with the incoming `data: T`, making `undefined` impossible.
+* **`ConditionTransferConfig.shouldEmit`** signature narrowed from `(currentState: T | undefined) => boolean` to `(data: T) => boolean` — `undefined` is no longer possible at runtime. Backward-compatible via contravariance.
+* **README:** Removed `!== undefined` guards from `shouldEmit` examples for both `ConditionTransfer` and `AsyncConditionTransfer`.
+
+### Infrastructure
+* **API docs generator:** `typedoc` added as devDependency; `npm run docs` script generates API reference to `docs/api`.
+* **GitHub Actions:** `deploy-docs.yml` workflow added — generates and deploys API docs to GitHub Pages on push to `master`.
+* **`.gitignore`:** `docs` directory added.
+* **`interfaces.ts`:** Unused `OutputTransfer` import removed.
+
+### Tests
+* **Sequence Guard tests:** Added race-condition regression tests for `AsyncConvertTransfer` (287 tests) and `AsyncConditionTransfer` (459 tests) — covering parallel ordered emission, stale-result prevention, failed-operation queue advancement, and `destroy()` queue cleanup.
+* **Ordered execution tests:** Added tests for `AsyncSinkTransfer` (264 tests) and `AsyncWriteTransfer` (284 tests) covering ordered callback/write execution, error isolation, and `destroy()` reset.
+* **Helper tests:** Added `PendingResultQueue` (237 tests) and `OrderedExecutor` (355 tests) test suites.
+* **ConditionTransfer tests:** Removed 3 tests that used `trigger()` manually; renamed 2 tests from "trigger" to "shouldEmit" naming; removed `!== undefined` guards from `shouldEmit` predicates.
+* **Coverage:** Maintained **100% test coverage** (statements, branches, functions, lines) across all 11 source files. Total tests: **2,086**.
+
 ## v1.3.0 - 2026-07-19
 
 ### DisplaceTransfer — switch-map transfer with onDisplace callback
