@@ -167,7 +167,7 @@ describe.each([
   (input: number, expected: number | undefined) => {
     it('', async () => {
       const transfer = new AsyncConditionTransfer<number>({
-        shouldEmit: (state) => state !== undefined && state < 100,
+        shouldEmit: (state) => state < 100,
       });
       const received: (number | undefined)[] = [];
       transfer.subscribe((data) => { received.push(data); });
@@ -208,7 +208,7 @@ describe.each([
   (input: number, expected: number | undefined) => {
     it('', async () => {
       const transfer = new AsyncConditionTransfer<number>({
-        shouldEmit: async (state) => Promise.resolve(state !== undefined && state < 100),
+        shouldEmit: async (state) => Promise.resolve(state < 100),
       });
       const received: (number | undefined)[] = [];
       transfer.subscribe((data) => { received.push(data); });

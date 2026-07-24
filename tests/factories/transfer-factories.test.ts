@@ -1111,7 +1111,7 @@ describe(
     it('', () => {
       const condition = createConditionTransfer<number>({
         shouldAccept: () => true,
-        shouldEmit: (n) => n !== undefined && n < 100,
+        shouldEmit: (n) => n < 100,
       });
 
       const handler = jest.fn();
@@ -1136,7 +1136,7 @@ describe(
     it('', () => {
       const condition = createConditionTransfer<number>({
         shouldAccept: (n) => n > 0,
-        shouldEmit: (n) => n !== undefined && n < 100,
+        shouldEmit: (n) => n < 100,
       });
 
       const handler = jest.fn();

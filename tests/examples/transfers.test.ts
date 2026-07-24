@@ -443,7 +443,7 @@ describe('README Transfers: ConditionTransfer', () => {
   it('filters data with shouldAccept and shouldEmit', () => {
     const condition = createConditionTransfer<number>({
       shouldAccept: (n) => n > 0,
-      shouldEmit: (n) => n !== undefined && n < 100,
+      shouldEmit: (n) => n < 100,
     });
 
     const received: number[] = [];
