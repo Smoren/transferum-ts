@@ -149,6 +149,7 @@ This is a graph.
 | **Local, fail-safe error handling**       | Errors are local to each transfer — one stage's failure doesn't kill the pipeline. With `onError` — suppressed, stream continues. Without — visible (exception/rejection), and polling stops (no zombie tickers). Per-stage granularity (`onAcceptError`/`onEmitError`, `onDestroyError`). Typed `ErrorHandler<TSource>` passes the transfer instance. No silent swallowing.                                  |
 | **Undefined suppression**                 | `undefined` never propagates through the chain of transfers — it means "no data", not "empty value." Use `null` as an explicit empty marker when needed. This eliminates an entire class of null-check bugs in downstream consumers.                                                                                                                                                                          |
 | **Built-in backpressure**                 | Four async transfers (`AsyncSinkTransfer`, `AsyncWriteTransfer`, `AsyncConvertTransfer`, `AsyncConditionTransfer`) support optional `maxConcurrency`, `bufferSize`, and `onBufferOverflow` — limiting parallel async operations, queuing excess data, and handling overflow gracefully. Defaults are backward-compatible (unlimited). See [Backpressure](#backpressure).                                      |
+| **Ordered async execution**               | `AsyncSinkTransfer` and `AsyncWriteTransfer` support optional `ordered: true` — callback/write invocations are executed sequentially in data-arrival order, regardless of their async duration. `AsyncConvertTransfer` and `AsyncConditionTransfer` automatically enforce ordered emission when `maxConcurrency > 1` via an internal Sequence Guard (no config needed). See [Backpressure](#backpressure).    |
 | **No god-objects, no utility sprawl**     | `BaseTransfer` stays minimal — only capability declarations, no logic. Each transfer class models exactly one behavioral concept (buffering, gating, merging, polling...). No central object knows about every other component. Complexity is concentrated in the type layer; runtime code stays compact and readable.                                                                                        |
 
 ### Use Cases
@@ -2010,6 +2011,8 @@ Async terminal sink — calls a callback on receiving data via `asyncPush`.
 
 **Backpressure:** Optional `maxConcurrency`, `bufferSize`, `onBufferOverflow` (see [Backpressure](#backpressure)).
 
+**Ordered execution:** Optional `ordered: true` — callback invocations are executed sequentially in data-arrival order, regardless of their async duration. Default: `false` (unordered, backward-compatible).
+
 **Error handling:** If `callback()` throws, `onError` is called. With `onError` provided, the exception is suppressed. Without `onError` — rethrown.
 
 ```typescript
@@ -2030,6 +2033,8 @@ Async write adapter for `AsyncInputFlowInterface` (or synchronous `InputFlowInte
 **Capabilities:** `isInput`, `isAsyncPushable`
 
 **Backpressure:** Optional `maxConcurrency`, `bufferSize`, `onBufferOverflow` (see [Backpressure](#backpressure)).
+
+**Ordered execution:** Optional `ordered: true` — `flow.write()` invocations are executed sequentially in data-arrival order, regardless of their async duration. Default: `false` (unordered, backward-compatible).
 
 ```typescript
 import { createAsyncWriteTransfer } from 'transferum';
@@ -2061,6 +2066,8 @@ Async converter transfer: transforms input data via an `AsyncOperator` and sends
 
 **Backpressure:** Optional `maxConcurrency`, `bufferSize`, `onBufferOverflow` (see [Backpressure](#backpressure)).
 
+**Sequence Guard (active when `maxConcurrency > 1`):** Multiple `operator.apply()` calls run in parallel, but results are emitted to subscribers strictly in data-arrival order. A faster result waits in an internal pending queue until all preceding operations have emitted. This prevents a stale result from overwriting a fresh one. When `maxConcurrency <= 1`, the guard is inactive (no overhead).
+
 ```typescript
 import { createAsyncConvertTransfer, createAsyncMapOperator } from 'transferum';
 
@@ -2079,6 +2086,8 @@ Transfer with asynchronous conditional filtering. The `shouldAccept` and `should
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isAsyncPushable`, `isSubscribable`
 
 **Backpressure:** Optional `maxConcurrency`, `bufferSize`, `onBufferOverflow` (see [Backpressure](#backpressure)).
+
+**Sequence Guard (active when `maxConcurrency > 1`):** Multiple `shouldAccept`/`shouldEmit` checks run in parallel, but emissions to subscribers happen strictly in data-arrival order. `shouldEmit` receives the operation's local `data: T`, not a shared state value. When `maxConcurrency <= 1`, the guard is inactive (no overhead).
 
 ```typescript
 import { createAsyncConditionTransfer } from 'transferum';
@@ -2233,6 +2242,10 @@ Four async transfers — `AsyncSinkTransfer`, `AsyncWriteTransfer`, `AsyncConver
 5. `destroy()` clears the buffer — queued items are discarded.
 
 All defaults are `Infinity`, so **existing code is fully backward-compatible** — without backpressure config, all four transfers behave exactly as before (unlimited parallel processing, no buffering).
+
+**Ordered execution:**
+- `AsyncSinkTransfer` and `AsyncWriteTransfer`: optional `ordered: true` — callback/write invocations are executed sequentially in data-arrival order via an internal `OrderedExecutor`. Default: `false` (unordered, backward-compatible).
+- `AsyncConvertTransfer` and `AsyncConditionTransfer`: automatic Sequence Guard when `maxConcurrency > 1` — results are emitted to subscribers strictly in data-arrival order, even though operations run in parallel. No config needed. When `maxConcurrency <= 1`, the guard is inactive (zero overhead).
 
 ```typescript
 import { createAsyncWriteTransfer } from 'transferum';
@@ -2838,7 +2851,7 @@ Full list of factories:
 | Polling                     | `createPollingSourceTransfer`, `createPollingProxyTransfer`, `createPollingFlowTransfer`, `createIdlePollingTransfer`                                  |
 | Externally-managed channels | `createChannelTransfer`, `createStoredChannelTransfer`                                                                                                 |
 | Sink / Flow                 | `createSinkTransfer`, `createWriteTransfer`, `createReadTransfer`                                                                                      |
-| Transformation              | `createConvertTransfer`, `createConditionTransfer`, `createDisplaceTransfer`                                                            |
+| Transformation              | `createConvertTransfer`, `createConditionTransfer`, `createDisplaceTransfer`                                                                           |
 | Bridges                     | `createPassBridge`, `createTransformBridge`, `createTransferBridge`, `createBridgeAggregator`, `createBridgeSelector`, `createBridgeMultiSelector`     |
 | Operators                   | `createTransparentOperator`, `createMapOperator`, `createFilterOperator`, `createReducerOperator`, `createGuardOperator`, `createPipelineOperator`     |
 | Storages                    | `createLatestStorage`, `createQueueStorage`, `createStackStorage`                                                                                      |
@@ -2918,30 +2931,30 @@ Key types are defined in `types.ts`:
 
 Configs are defined in `configs.ts`. All configs are types (not classes), passed to transfer and bridge constructors.
 
-| Config                                | For                          | Required fields                                               |
-|---------------------------------------|------------------------------|---------------------------------------------------------------|
-| `GateTransferConfig`                  | `GateTransfer`               | `activated`                                                   |
-| `DelayedPushChannelTransferConfig<T>` | `DelayedPushChannelTransfer` | `delay`                                                       |
-| `DebounceTransferConfig`              | `DebounceTransfer`           | `delay`                                                       |
-| `ThrottleTransferConfig`              | `ThrottleTransfer`           | `interval`                                                    |
-| `MergeTransferConfig<T>`              | `MergeTransfer`              | `sources`                                                     |
-| `SplitTransferConfig<T>`              | `SplitTransfer`              | `targets`                                                     |
-| `PollingSourceTransferConfig<T>`      | `PollingSourceTransfer`      | `fetcher`, `interval`, `activated`                            |
-| `PollingProxyTransferConfig`          | `PollingProxyTransfer`       | `interval`, `activated`                                       |
-| `PollingFlowTransferConfig<T>`        | `PollingFlowTransfer`        | `flow`, `interval`, `activated`                               |
-| `IdlePollingTransferConfig<T>`        | `IdlePollingTransfer`        | `fetcher`, `timeout`, `interval`, `activated`                 |
-| `ChannelTransferConfig<T>`            | `ChannelTransfer`            | `setup`, `destroy`, `onError?`, `onDestroyError?`             |
-| `StoredChannelTransferConfig<T>`      | `StoredChannelTransfer`      | `setup`, `destroy`, `onError?`, `onDestroyError?`             |
-| `SinkTransferConfig<T>`               | `SinkTransfer`               | `callback`, `onError?`                                        |
-| `WriteTransferConfig<T>`              | `WriteTransfer`              | `flow`                                                        |
-| `ReadTransferConfig<T>`               | `ReadTransfer`               | `flow`                                                        |
-| `ConvertTransferConfig<TIn, TOut>`    | `ConvertTransfer`            | `operator`                                                    |
-| `ConditionTransferConfig<T>`          | `ConditionTransfer`          | — (predicates are optional), `onAcceptError?`, `onEmitError?` |
-| `CompositeTransferConfig<TIn, TOut>`  | `UniversalCompositeTransfer` | `input`, `output`                                             |
-| `PassBridgeConfig<T>`                 | `PassBridge`                 | `source`, `target`, `activated`                               |
-| `TransformBridgeConfig<TIn, TOut>`    | `TransformBridge`            | `source`, `target`, `operator`, `activated`                   |
-| `TransferBridgeConfig<TIn, TOut>`     | `TransferBridge`             | `source`, `target`, `middle`, `middleOwned`, `activated`      |
-| `BridgeAggregatorConfig`              | `BridgeAggregator`           | `bridges`, `activated`, `owned`                               |
+| Config                                | For                          | Required fields                                                     |
+|---------------------------------------|------------------------------|---------------------------------------------------------------------|
+| `GateTransferConfig`                  | `GateTransfer`               | `activated`                                                         |
+| `DelayedPushChannelTransferConfig<T>` | `DelayedPushChannelTransfer` | `delay`                                                             |
+| `DebounceTransferConfig`              | `DebounceTransfer`           | `delay`                                                             |
+| `ThrottleTransferConfig`              | `ThrottleTransfer`           | `interval`                                                          |
+| `MergeTransferConfig<T>`              | `MergeTransfer`              | `sources`                                                           |
+| `SplitTransferConfig<T>`              | `SplitTransfer`              | `targets`                                                           |
+| `PollingSourceTransferConfig<T>`      | `PollingSourceTransfer`      | `fetcher`, `interval`, `activated`                                  |
+| `PollingProxyTransferConfig`          | `PollingProxyTransfer`       | `interval`, `activated`                                             |
+| `PollingFlowTransferConfig<T>`        | `PollingFlowTransfer`        | `flow`, `interval`, `activated`                                     |
+| `IdlePollingTransferConfig<T>`        | `IdlePollingTransfer`        | `fetcher`, `timeout`, `interval`, `activated`                       |
+| `ChannelTransferConfig<T>`            | `ChannelTransfer`            | `setup`, `destroy`, `onError?`, `onDestroyError?`                   |
+| `StoredChannelTransferConfig<T>`      | `StoredChannelTransfer`      | `setup`, `destroy`, `onError?`, `onDestroyError?`                   |
+| `SinkTransferConfig<T>`               | `SinkTransfer`               | `callback`, `onError?`                                              |
+| `WriteTransferConfig<T>`              | `WriteTransfer`              | `flow`                                                              |
+| `ReadTransferConfig<T>`               | `ReadTransfer`               | `flow`                                                              |
+| `ConvertTransferConfig<TIn, TOut>`    | `ConvertTransfer`            | `operator`                                                          |
+| `ConditionTransferConfig<T>`          | `ConditionTransfer`          | — (predicates are optional), `onAcceptError?`, `onEmitError?`       |
+| `CompositeTransferConfig<TIn, TOut>`  | `UniversalCompositeTransfer` | `input`, `output`                                                   |
+| `PassBridgeConfig<T>`                 | `PassBridge`                 | `source`, `target`, `activated`                                     |
+| `TransformBridgeConfig<TIn, TOut>`    | `TransformBridge`            | `source`, `target`, `operator`, `activated`                         |
+| `TransferBridgeConfig<TIn, TOut>`     | `TransferBridge`             | `source`, `target`, `middle`, `middleOwned`, `activated`            |
+| `BridgeAggregatorConfig`              | `BridgeAggregator`           | `bridges`, `activated`, `owned`                                     |
 | `BridgeSelectorConfig<TMap>`          | `BridgeSelector`             | `bridges`, `initialKey`, `activated`, `owned`, `syncWithChildren?`  |
 | `BridgeMultiSelectorConfig<TMap>`     | `BridgeMultiSelector`        | `bridges`, `initialKeys`, `activated`, `owned`, `syncWithChildren?` |
 
@@ -2953,8 +2966,8 @@ Configs are defined in `configs.ts`. All configs are types (not classes), passed
 | `AsyncPollingSourceTransferConfig<T>`   | `AsyncPollingSourceTransfer`       | `fetcher`, `interval`, `activated`                                                                                                  |
 | `AsyncPollingFlowTransferConfig<T>`     | `AsyncPollingFlowTransfer`         | `flow`, `interval`, `activated`                                                                                                     |
 | `AsyncIdlePollingTransferConfig<T>`     | `AsyncIdlePollingTransfer`         | `fetcher`, `timeout`, `interval`, `activated`                                                                                       |
-| `AsyncSinkTransferConfig<T>`            | `AsyncSinkTransfer`                | `callback`, `onError?`, `maxConcurrency?`, `bufferSize?`, `onBufferOverflow?`                                                       |
-| `AsyncWriteTransferConfig<T>`           | `AsyncWriteTransfer`               | `flow`, `onError?`, `maxConcurrency?`, `bufferSize?`, `onBufferOverflow?`                                                           |
+| `AsyncSinkTransferConfig<T>`            | `AsyncSinkTransfer`                | `callback`, `onError?`, `ordered?`, `maxConcurrency?`, `bufferSize?`, `onBufferOverflow?`                                           |
+| `AsyncWriteTransferConfig<T>`           | `AsyncWriteTransfer`               | `flow`, `onError?`, `ordered?`, `maxConcurrency?`, `bufferSize?`, `onBufferOverflow?`                                               |
 | `AsyncReadTransferConfig<T>`            | `AsyncReadTransfer`                | `flow`                                                                                                                              |
 | `AsyncConvertTransferConfig<TIn, TOut>` | `AsyncConvertTransfer`             | `operator` (AsyncOperatorInterface), `onError?`, `maxConcurrency?`, `bufferSize?`, `onBufferOverflow?`                              |
 | `AsyncConditionTransferConfig<T>`       | `AsyncConditionTransfer`           | — (predicates are optional, sync or async), `onAcceptError?`, `onEmitError?`, `maxConcurrency?`, `bufferSize?`, `onBufferOverflow?` |
