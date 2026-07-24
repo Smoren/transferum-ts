@@ -529,3 +529,290 @@ describe(
   },
 );
 
+// ═══════════════════════════════════════════════════════════════
+// AsyncConvertTransfer Sequence Guard (maxConcurrency > 1)
+// ═══════════════════════════════════════════════════════════════
+// When maxConcurrency > 1 (and finite), parallel operations run
+// concurrently but results are emitted to subscribers strictly in
+// data-arrival order via an internal PendingResultQueue.
+
+describe(
+  'AsyncConvertTransfer Sequence Guard emits results in arrival order test',
+  () => {
+    it('', async () => {
+      const emitted: number[] = [];
+      let resolveA: () => void;
+      let resolveB: () => void;
+      const promiseA = new Promise<void>((resolve) => { resolveA = resolve; });
+      const promiseB = new Promise<void>((resolve) => { resolveB = resolve; });
+
+      const operator = {
+        apply: async (n: number) => {
+          if (n === 1) { await promiseA; }
+          else if (n === 2) { await promiseB; }
+          return n;
+        },
+      };
+      const transfer = new AsyncConvertTransfer<number, number>({
+        operator,
+        maxConcurrency: 2,
+      });
+
+      transfer.subscribe((value) => emitted.push(value));
+
+      transfer.asyncPush(1);  // slow — blocked on promiseA
+      transfer.asyncPush(2);  // fast — blocked on promiseB
+
+      // B completes first, but must not emit before A
+      resolveB!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(emitted).toEqual([]);
+
+      // A completes — now both emit in order
+      resolveA!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(emitted).toEqual([1, 2]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConvertTransfer Sequence Guard handles three out-of-order results test',
+  () => {
+    it('', async () => {
+      const emitted: number[] = [];
+      const resolvers: Array<() => void> = [];
+      const promises = [1, 2, 3].map(() => new Promise<void>((resolve) => { resolvers.push(resolve); }));
+
+      const operator = {
+        apply: async (n: number) => {
+          await promises[n - 1];
+          return n;
+        },
+      };
+      const transfer = new AsyncConvertTransfer<number, number>({
+        operator,
+        maxConcurrency: 3,
+      });
+
+      transfer.subscribe((value) => emitted.push(value));
+
+      transfer.asyncPush(1);
+      transfer.asyncPush(2);
+      transfer.asyncPush(3);
+
+      // Complete in reverse order: 3, 2, 1
+      resolvers[2]!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(emitted).toEqual([]);
+
+      resolvers[1]!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(emitted).toEqual([]);
+
+      resolvers[0]!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(emitted).toEqual([1, 2, 3]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConvertTransfer Sequence Guard undefined result does not block queue test',
+  () => {
+    it('', async () => {
+      const emitted: (number | undefined)[] = [];
+      let resolveA: () => void;
+      const promiseA = new Promise<void>((resolve) => { resolveA = resolve; });
+
+      const operator = {
+        apply: async (n: number) => {
+          if (n === 1) { await promiseA; return undefined; }
+          return n;
+        },
+      };
+      const transfer = new AsyncConvertTransfer<number, number | undefined>({
+        operator,
+        maxConcurrency: 2,
+      });
+
+      transfer.subscribe((value) => emitted.push(value));
+
+      transfer.asyncPush(1);  // slow, returns undefined
+      transfer.asyncPush(2);  // fast, returns 2
+
+      // 2 completes first but must wait for 1
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(emitted).toEqual([]);
+
+      resolveA!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // undefined is suppressed (not emitted), 2 is emitted
+      expect(emitted).toEqual([2]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConvertTransfer Sequence Guard error with onError does not block queue test',
+  () => {
+    it('', async () => {
+      const emitted: number[] = [];
+      const onError = jest.fn();
+      let resolveA: () => void;
+      const promiseA = new Promise<void>((resolve) => { resolveA = resolve; });
+
+      const operator = {
+        apply: async (n: number) => {
+          if (n === 1) { await promiseA; throw new Error('boom'); }
+          return n;
+        },
+      };
+      const transfer = new AsyncConvertTransfer<number, number>({
+        operator,
+        maxConcurrency: 2,
+        onError,
+      });
+
+      transfer.subscribe((value) => emitted.push(value));
+
+      transfer.asyncPush(1);  // slow, throws
+      transfer.asyncPush(2);  // fast, returns 2
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(emitted).toEqual([]);
+
+      resolveA!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      // Error suppressed, 2 emitted
+      expect(emitted).toEqual([2]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConvertTransfer Sequence Guard active when maxConcurrency=Infinity — ordered emission test',
+  () => {
+    it('', async () => {
+      const emitted: number[] = [];
+      let resolveA: () => void;
+      let resolveB: () => void;
+      const promiseA = new Promise<void>((resolve) => { resolveA = resolve; });
+      const promiseB = new Promise<void>((resolve) => { resolveB = resolve; });
+
+      const operator = {
+        apply: async (n: number) => {
+          if (n === 1) { await promiseA; }
+          else if (n === 2) { await promiseB; }
+          return n;
+        },
+      };
+      const transfer = new AsyncConvertTransfer<number, number>({ operator });
+
+      transfer.subscribe((value) => emitted.push(value));
+
+      transfer.asyncPush(1);  // slow
+      transfer.asyncPush(2);  // fast
+
+      // B completes first, but guard prevents emission before A
+      resolveB!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(emitted).toEqual([]);
+
+      // A completes — both emit in arrival order
+      resolveA!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(emitted).toEqual([1, 2]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConvertTransfer Sequence Guard inactive when maxConcurrency=1 test',
+  () => {
+    it('', async () => {
+      const emitted: number[] = [];
+      let resolveA: () => void;
+      const promiseA = new Promise<void>((resolve) => { resolveA = resolve; });
+
+      const operator = {
+        apply: async (n: number) => {
+          if (n === 1) await promiseA;
+          return n;
+        },
+      };
+      const transfer = new AsyncConvertTransfer<number, number>({
+        operator,
+        maxConcurrency: 1,
+      });
+
+      transfer.subscribe((value) => emitted.push(value));
+
+      transfer.asyncPush(1);  // starts (blocked)
+      transfer.asyncPush(2);  // queued
+
+      resolveA!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Sequential — no guard needed, results in order
+      expect(emitted).toEqual([1, 2]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConvertTransfer Sequence Guard error without onError does not block queue test',
+  () => {
+    it('', async () => {
+      const emitted: number[] = [];
+      let resolveA: () => void;
+      const promiseA = new Promise<void>((resolve) => { resolveA = resolve; });
+
+      const operator = {
+        apply: async (n: number) => {
+          if (n === 1) { await promiseA; throw new Error('boom'); }
+          return n;
+        },
+      };
+      const transfer = new AsyncConvertTransfer<number, number>({
+        operator,
+        maxConcurrency: 3,
+      });
+
+      transfer.subscribe((value) => emitted.push(value));
+
+      // asyncPush(1) will reject (no onError), but must not block the queue
+      const p1 = transfer.asyncPush(1).catch(() => {});
+      transfer.asyncPush(2);  // should still emit after 1 fails
+
+      // Let 2 complete first — it waits in queue for 1
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(emitted).toEqual([]);
+
+      // 1 fails — queue should advance, 2 emits
+      resolveA!();
+      await p1;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(emitted).toEqual([2]);
+
+      transfer.destroy();
+    });
+  },
+);
+

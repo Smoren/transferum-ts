@@ -7,7 +7,6 @@ import type {
   First,
   Last,
   InputTransfer,
-  OutputTransfer,
   SelectorKey,
   CompositeDuplexTransfer,
   CompositeInputTransfer,

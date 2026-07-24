@@ -466,3 +466,287 @@ describe(
   },
 );
 
+// ═══════════════════════════════════════════════════════════════
+// AsyncWriteTransfer Ordered Execution (config.ordered: true)
+// ═══════════════════════════════════════════════════════════════
+// When ordered: true, flow.write() invocations are executed sequentially
+// in data-arrival order, regardless of their async duration.
+
+describe(
+  'AsyncWriteTransfer ordered=true executes writes in arrival order test',
+  () => {
+    it('', async () => {
+      const written: number[] = [];
+      let resolveA: () => void;
+      let resolveB: () => void;
+      const promiseA = new Promise<void>((resolve) => { resolveA = resolve; });
+      const promiseB = new Promise<void>((resolve) => { resolveB = resolve; });
+
+      const flow = {
+        write: async (n: number) => {
+          if (n === 1) { await promiseA; }
+          else if (n === 2) { await promiseB; }
+          written.push(n);
+        },
+      };
+      const transfer = new AsyncWriteTransfer<number>({
+        flow,
+        ordered: true,
+        maxConcurrency: 3,
+      });
+
+      transfer.asyncPush(1);  // slow — blocked on promiseA
+      transfer.asyncPush(2);  // fast — blocked on promiseB
+      transfer.asyncPush(3);  // queued behind 2
+
+      // Let the executor start
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // B resolves but must not write — A is still running
+      resolveB!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(written).toEqual([]);
+
+      // A resolves — then B writes, then 3
+      resolveA!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(written).toEqual([1, 2, 3]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncWriteTransfer ordered=false default executes writes in parallel test',
+  () => {
+    it('', async () => {
+      const written: number[] = [];
+      let resolveA: () => void;
+      let resolveB: () => void;
+      const promiseA = new Promise<void>((resolve) => { resolveA = resolve; });
+      const promiseB = new Promise<void>((resolve) => { resolveB = resolve; });
+
+      const flow = {
+        write: async (n: number) => {
+          if (n === 1) { await promiseA; }
+          else if (n === 2) { await promiseB; }
+          written.push(n);
+        },
+      };
+      const transfer = new AsyncWriteTransfer<number>({
+        flow,
+        maxConcurrency: 3,
+      });
+
+      transfer.asyncPush(1);  // slow
+      transfer.asyncPush(2);  // fast
+
+      // Both start in parallel (unordered)
+      resolveB!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      // B completes first — out of arrival order
+      expect(written).toEqual([2]);
+
+      resolveA!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(written).toEqual([2, 1]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncWriteTransfer ordered=true error with onError continues chain test',
+  () => {
+    it('', async () => {
+      const written: number[] = [];
+      const onError = jest.fn();
+
+      const flow = {
+        write: async (n: number) => {
+          if (n === 1) throw new Error('write boom');
+          written.push(n);
+        },
+      };
+      const transfer = new AsyncWriteTransfer<number>({
+        flow,
+        onError,
+        ordered: true,
+        maxConcurrency: 3,
+      });
+
+      transfer.asyncPush(1);  // throws
+      transfer.asyncPush(2);  // should still write
+      transfer.asyncPush(3);  // should still write
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(written).toEqual([2, 3]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncWriteTransfer ordered=true error without onError continues chain test',
+  () => {
+    it('', async () => {
+      const written: number[] = [];
+
+      const flow = {
+        write: async (n: number) => {
+          if (n === 1) throw new Error('write boom');
+          written.push(n);
+        },
+      };
+      const transfer = new AsyncWriteTransfer<number>({
+        flow,
+        ordered: true,
+        maxConcurrency: 3,
+      });
+
+      transfer.asyncPush(1).catch(() => {});  // throws — no onError
+      transfer.asyncPush(2);  // should still write
+      transfer.asyncPush(3);  // should still write
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Chain continues despite unhandled error in write 1
+      expect(written).toEqual([2, 3]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncWriteTransfer ordered=true with maxConcurrency=1 and buffer test',
+  () => {
+    it('', async () => {
+      const written: number[] = [];
+      let resolveFirst: () => void;
+      const promiseFirst = new Promise<void>((resolve) => { resolveFirst = resolve; });
+
+      const flow = {
+        write: async (n: number) => {
+          if (n === 1) await promiseFirst;
+          written.push(n);
+        },
+      };
+      const transfer = new AsyncWriteTransfer<number>({
+        flow,
+        ordered: true,
+        maxConcurrency: 1,
+        bufferSize: 10,
+      });
+
+      transfer.asyncPush(1);  // starts (blocked)
+      transfer.asyncPush(2);  // buffered
+      transfer.asyncPush(3);  // buffered
+
+      resolveFirst!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(written).toEqual([1, 2, 3]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncWriteTransfer ordered=true destroy stops pending writes test',
+  () => {
+    it('', async () => {
+      const written: number[] = [];
+      let resolveFirst: () => void;
+      const promiseFirst = new Promise<void>((resolve) => { resolveFirst = resolve; });
+
+      const flow = {
+        write: async (n: number) => {
+          if (n === 1) await promiseFirst;
+          written.push(n);
+        },
+      };
+      const transfer = new AsyncWriteTransfer<number>({
+        flow,
+        ordered: true,
+        maxConcurrency: 3,
+      });
+
+      transfer.asyncPush(1);  // starts (blocked)
+      transfer.asyncPush(2);  // queued in executor
+      transfer.asyncPush(3);  // queued in executor
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      transfer.destroy();
+
+      resolveFirst!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // 1 completes (was already running), 2 and 3 never write
+      expect(written).toEqual([1]);
+    });
+  },
+);
+
+describe(
+  'AsyncWriteTransfer ordered=true asyncPush awaits write completion test',
+  () => {
+    it('', async () => {
+      let writeDone = false;
+      let resolveWrite: () => void;
+      const promiseWrite = new Promise<void>((resolve) => { resolveWrite = resolve; });
+
+      const flow = {
+        write: async (_n: number) => {
+          await promiseWrite;
+          writeDone = true;
+        },
+      };
+      const transfer = new AsyncWriteTransfer<number>({
+        flow,
+        ordered: true,
+        maxConcurrency: 3,
+      });
+
+      // asyncPush should not resolve until write completes
+      const p = transfer.asyncPush(1);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(writeDone).toBe(false);
+
+      resolveWrite!();
+      await p;
+
+      expect(writeDone).toBe(true);
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncWriteTransfer ordered=true error without onError propagates to caller test',
+  () => {
+    it('', async () => {
+      const flow = {
+        write: async () => { throw new Error('write boom'); },
+      };
+      const transfer = new AsyncWriteTransfer<number>({
+        flow,
+        ordered: true,
+        maxConcurrency: 3,
+      });
+
+      // Error should propagate to asyncPush caller
+      await expect(transfer.asyncPush(1)).rejects.toThrow('write boom');
+
+      transfer.destroy();
+    });
+  },
+);
+
