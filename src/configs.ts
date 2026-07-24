@@ -162,7 +162,7 @@ export type ConvertTransferConfig<TInput, TOutput> = ErrorHandlingConfig<Convert
 /** Configuration for ConditionTransfer — optional input/output predicates and per-stage error handlers. */
 export type ConditionTransferConfig<T> = {
   readonly shouldAccept?: (incomingData: T) => boolean;
-  readonly shouldEmit?: (currentState: T | undefined) => boolean;
+  readonly shouldEmit?: (data: T) => boolean;
   readonly onAcceptError?: ErrorHandler<ConditionTransfer<T>>;
   readonly onEmitError?: ErrorHandler<ConditionTransfer<T>>;
 }
@@ -259,7 +259,7 @@ export type AsyncConvertTransferConfig<TInput, TOutput> = ErrorHandlingConfig<As
 /** Configuration for AsyncConditionTransfer — optional sync/async input/output predicates, per-stage error handlers and backpressure. */
 export type AsyncConditionTransferConfig<T> = BackpressureConfig<T> & {
   readonly shouldAccept?: (incomingData: T) => Promise<boolean> | boolean;
-  readonly shouldEmit?: (currentState: T | undefined) => Promise<boolean> | boolean;
+  readonly shouldEmit?: (data: T) => Promise<boolean> | boolean;
   readonly onAcceptError?: ErrorHandler<AsyncConditionTransfer<T>>;
   readonly onEmitError?: ErrorHandler<AsyncConditionTransfer<T>>;
 }

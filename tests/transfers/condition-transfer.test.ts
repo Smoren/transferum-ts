@@ -194,33 +194,6 @@ function dataProviderForConditionEmit(): Array<unknown> {
   ];
 }
 
-describe(
-  'ConditionTransfer trigger manually emits test',
-  () => {
-    it('', () => {
-      const transfer = new ConditionTransfer<number>({
-        shouldAccept: () => true,
-        shouldEmit: () => false, // never emit automatically
-      });
-      const handler = jest.fn();
-
-      transfer.subscribe(handler);
-      transfer.push(42);
-
-      expect(handler).not.toHaveBeenCalled();
-
-      // Override shouldEmit for manual trigger
-      (transfer as any)._shouldEmit = () => true;
-      transfer.trigger();
-
-      expect(handler).toHaveBeenCalledTimes(1);
-      expect(handler).toHaveBeenCalledWith(42);
-
-      transfer.destroy();
-    });
-  },
-);
-
 // ═══════════════════════════════════════════════════════════════
 // ConditionTransfer Destroy
 // ═══════════════════════════════════════════════════════════════
@@ -310,7 +283,7 @@ describe(
 );
 
 describe(
-  'ConditionTransfer trigger with shouldEmit error without onEmitError rethrows test',
+  'ConditionTransfer shouldEmit error without onEmitError rethrows test',
   () => {
     it('', () => {
       const transfer = new ConditionTransfer<number>({
@@ -324,9 +297,6 @@ describe(
       // Error is rethrown when onEmitError is not provided
       expect(() => transfer.push(42)).toThrow('shouldEmit error');
 
-      // Error is rethrown when onEmitError is not provided
-      expect(() => transfer.trigger()).toThrow('shouldEmit error');
-
       expect(handler).not.toHaveBeenCalled();
 
       transfer.destroy();
@@ -335,7 +305,7 @@ describe(
 );
 
 describe(
-  'ConditionTransfer trigger with shouldEmit error and onEmitError suppresses test',
+  'ConditionTransfer shouldEmit error and onEmitError suppresses test',
   () => {
     it('', () => {
       const error = new Error('shouldEmit error');

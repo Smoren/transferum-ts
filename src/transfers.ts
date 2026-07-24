@@ -1923,11 +1923,11 @@ export class ConvertTransfer<TInput, TOutput> extends BaseStateTransfer<TOutput>
  * Mechanics:
  * 1. The constructor accepts config with two predicates:
  *    - shouldAccept(data) — input filter (if false, data is ignored)
- *    - shouldEmit(state) — output filter (if false, data remains in state)
- * 2. push(data) — checks shouldAccept, if true — writes to state, calls trigger()
- * 3. trigger() — checks shouldEmit, if true — notifies subscribers and clears state
- * 4. subscribe(handler) — subscribes to notifications
- * 5. destroy() — unsubscribes subscribers, clears state
+ *    - shouldEmit(data) — output filter (if false, data is ignored)
+ * 2. push(data) — checks shouldAccept, if true — checks shouldEmit,
+ *    if true — notifies subscribers and clears state
+ * 3. subscribe(handler) — subscribes to notifications
+ * 4. destroy() — unsubscribes subscribers, clears state
  *
  * Error handling:
  * - If shouldAccept throws an exception, onAcceptError is called.
@@ -1936,7 +1936,7 @@ export class ConvertTransfer<TInput, TOutput> extends BaseStateTransfer<TOutput>
  *
  * Configuration (ConditionTransferConfig):
  * - shouldAccept?: (data: T) => boolean — input filter (default: always true)
- * - shouldEmit?: (state: T | undefined) => boolean — output filter (default: always true)
+ * - shouldEmit?: (data: T) => boolean — output filter (default: always true)
  * - onAcceptError?: ErrorHandler — shouldAccept error handler
  * - onEmitError?: ErrorHandler — shouldEmit error handler
  *
@@ -1956,7 +1956,7 @@ export class ConditionTransfer<T> extends BaseStateTransfer<T> implements Pushab
 
   private readonly _subscription: SubscriptionManager<T>;
   private readonly _shouldAccept: (incomingData: T) => boolean;
-  private readonly _shouldEmit: (currentState: T | undefined) => boolean;
+  private readonly _shouldEmit: (data: T) => boolean;
   private readonly _onAcceptError?: ErrorHandler<ConditionTransfer<T>>;
   private readonly _onEmitError?: ErrorHandler<ConditionTransfer<T>>;
 
@@ -1980,17 +1980,9 @@ export class ConditionTransfer<T> extends BaseStateTransfer<T> implements Pushab
       return;
     }
 
-    // Save data to state
-    this._state.value = data;
-
-    // Try to forward
-    this.trigger();
-  }
-
-  public trigger(): void {
     try {
-      // If the output condition is not met, data stays inside
-      if (!this._shouldEmit(this._state.value)) {
+      // If the output condition is not met, data is ignored
+      if (!this._shouldEmit(data)) {
         return;
       }
     } catch (e) {
@@ -1998,7 +1990,8 @@ export class ConditionTransfer<T> extends BaseStateTransfer<T> implements Pushab
       return;
     }
 
-    // Notify subscribers and clear state
+    // Save data to state, notify subscribers and clear state
+    this._state.value = data;
     this._subscription.sendState();
     this._state.clear();
   }
@@ -3312,7 +3305,7 @@ export class AsyncConditionTransfer<T> extends BaseStateTransfer<T> implements A
 
   private readonly _subscription: SubscriptionManager<T>;
   private readonly _shouldAccept: (incomingData: T) => Promise<boolean> | boolean;
-  private readonly _shouldEmit: (currentState: T | undefined) => Promise<boolean> | boolean;
+  private readonly _shouldEmit: (data: T) => Promise<boolean> | boolean;
   private readonly _onAcceptError?: ErrorHandler<AsyncConditionTransfer<T>>;
   private readonly _onEmitError?: ErrorHandler<AsyncConditionTransfer<T>>;
 

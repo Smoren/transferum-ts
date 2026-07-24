@@ -1862,7 +1862,7 @@ import { createConditionTransfer } from 'transferum';
 
 const condition = createConditionTransfer<number>({
   shouldAccept: (n) => n > 0,        // input filter
-  shouldEmit: (n) => n !== undefined && n < 100, // output filter
+  shouldEmit: (n) => n < 100, // output filter
 });
 
 condition.subscribe((data) => console.log(data));
@@ -2085,7 +2085,7 @@ import { createAsyncConditionTransfer } from 'transferum';
 
 const condition = createAsyncConditionTransfer<number>({
   shouldAccept: async (n) => (await check(n)).valid,
-  shouldEmit: (n) => n !== undefined && n < 100,
+  shouldEmit: (n) => n < 100,
 });
 
 condition.subscribe((data) => console.log(data));
