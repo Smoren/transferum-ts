@@ -75,6 +75,7 @@ import type {
 import { ProxyReference, SubscriptionManager, StateSubscriptionManager } from "./helpers";
 import { RAFTicker } from "./tickers";
 import { handleError } from "./utils";
+import { PendingResultQueue, OrderedExecutor } from "./helpers";
 
 // ═══════════════════════════════════════════════════════════════
 // BaseTransfer
@@ -2240,13 +2241,24 @@ export class AsyncStoredChannelTransfer<T> extends BaseStateTransfer<T> implemen
  * 2. asyncPush(data) — calls await callback(data)
  * 3. destroy() — inherited from BaseStateTransfer, clears _state
  *
+ * Ordered execution (config.ordered: true):
+ * - When enabled, callback invocations are executed sequentially in
+ *   data-arrival order, regardless of their async duration.
+ * - Uses an internal OrderedExecutor (promise chain).
+ * - Default: false (unordered, backward-compatible).
+ *
  * Error handling:
  * - If callback() throws an exception, onError is called.
  * - With onError provided, the exception is suppressed. Without onError — rethrown.
+ * - When ordered: true, the executor chain catches errors so that a throwing
+ *   callback does not block subsequent callbacks. The error is still propagated
+ *   to the asyncPush caller via the awaited executor promise.
  *
  * Configuration (AsyncSinkTransferConfig):
  * - callback: AsyncDataHandler<T> — incoming data handler (sync or async)
  * - onError?: ErrorHandler — error handler
+ * - ordered?: boolean — ordered callback execution (default: false)
+ * - maxConcurrency?, bufferSize?, onBufferOverflow? (BackpressureConfig)
  *
  * Use cases:
  * - Asynchronous logging to file/database
@@ -2263,6 +2275,8 @@ export class AsyncSinkTransfer<T> extends BaseStateTransfer<T> implements AsyncP
   private readonly _maxConcurrency: number;
   private readonly _bufferSize: number;
   private readonly _onBufferOverflow?: DataHandler<T>;
+  private readonly _ordered: boolean;
+  private readonly _executor: OrderedExecutor;
 
   private _activeCount: number = 0;
   private _buffer: T[] = [];
@@ -2275,6 +2289,8 @@ export class AsyncSinkTransfer<T> extends BaseStateTransfer<T> implements AsyncP
     this._maxConcurrency = config.maxConcurrency ?? Infinity;
     this._bufferSize = config.bufferSize ?? Infinity;
     this._onBufferOverflow = config.onBufferOverflow;
+    this._ordered = config.ordered ?? false;
+    this._executor = new OrderedExecutor();
   }
 
   async asyncPush(data: T): Promise<void> {
@@ -2289,13 +2305,26 @@ export class AsyncSinkTransfer<T> extends BaseStateTransfer<T> implements AsyncP
 
   private async _process(data: T): Promise<void> {
     this._activeCount++;
-    try {
-      await this._callback(data);
-    } catch (e) {
-      handleError(e, this, this._onError);
-    } finally {
-      this._activeCount--;
-      this._dequeue();
+    if (this._ordered) {
+      await this._executor.submit(async () => {
+        try {
+          await this._callback(data);
+        } catch (e) {
+          handleError(e, this, this._onError);
+        } finally {
+          this._activeCount--;
+          this._dequeue();
+        }
+      });
+    } else {
+      try {
+        await this._callback(data);
+      } catch (e) {
+        handleError(e, this, this._onError);
+      } finally {
+        this._activeCount--;
+        this._dequeue();
+      }
     }
   }
 
@@ -2308,6 +2337,7 @@ export class AsyncSinkTransfer<T> extends BaseStateTransfer<T> implements AsyncP
 
   override destroy() {
     this._buffer = [];
+    this._executor.reset();
     super.destroy();
   }
 }
@@ -2325,13 +2355,24 @@ export class AsyncSinkTransfer<T> extends BaseStateTransfer<T> implements AsyncP
  * 2. asyncPush(data) — calls await flow.write(data)
  * 3. destroy() — does nothing (does not own the flow)
  *
+ * Ordered execution (config.ordered: true):
+ * - When enabled, flow.write() invocations are executed sequentially in
+ *   data-arrival order, regardless of their async duration.
+ * - Uses an internal OrderedExecutor (promise chain).
+ * - Default: false (unordered, backward-compatible).
+ *
  * Error handling:
  * - If flow.write() throws an exception, onError is called.
  * - With onError provided, the exception is suppressed. Without onError — rethrown.
+ * - When ordered: true, the executor chain catches errors so that a throwing
+ *   write does not block subsequent writes. The error is still propagated
+ *   to the asyncPush caller via the awaited executor promise.
  *
  * Configuration (AsyncWriteTransferConfig):
  * - flow: AsyncInputFlowInterface<T> — target flow with async write()
  * - onError?: ErrorHandler — error handler
+ * - ordered?: boolean — ordered write execution (default: false)
+ * - maxConcurrency?, bufferSize?, onBufferOverflow? (BackpressureConfig)
  *
  * Use cases:
  * - Writing data to async storage (IndexedDB, API)
@@ -2348,6 +2389,8 @@ export class AsyncWriteTransfer<T> extends BaseTransfer implements AsyncPushable
   private readonly _maxConcurrency: number;
   private readonly _bufferSize: number;
   private readonly _onBufferOverflow?: DataHandler<T>;
+  private readonly _ordered: boolean;
+  private readonly _executor: OrderedExecutor;
 
   private _activeCount: number = 0;
   private _buffer: T[] = [];
@@ -2360,6 +2403,8 @@ export class AsyncWriteTransfer<T> extends BaseTransfer implements AsyncPushable
     this._maxConcurrency = config.maxConcurrency ?? Infinity;
     this._bufferSize = config.bufferSize ?? Infinity;
     this._onBufferOverflow = config.onBufferOverflow;
+    this._ordered = config.ordered ?? false;
+    this._executor = new OrderedExecutor();
   }
 
   public async asyncPush(data: T): Promise<void> {
@@ -2374,17 +2419,31 @@ export class AsyncWriteTransfer<T> extends BaseTransfer implements AsyncPushable
 
   public override destroy() {
     this._buffer = [];
+    this._executor.reset();
   }
 
   private async _process(data: T): Promise<void> {
     this._activeCount++;
-    try {
-      await this._flow.write(data);
-    } catch (e) {
-      handleError(e, this, this._onError);
-    } finally {
-      this._activeCount--;
-      this._dequeue();
+    if (this._ordered) {
+      await this._executor.submit(async () => {
+        try {
+          await this._flow.write(data);
+        } catch (e) {
+          handleError(e, this, this._onError);
+        } finally {
+          this._activeCount--;
+          this._dequeue();
+        }
+      });
+    } else {
+      try {
+        await this._flow.write(data);
+      } catch (e) {
+        handleError(e, this, this._onError);
+      } finally {
+        this._activeCount--;
+        this._dequeue();
+      }
     }
   }
 
@@ -3085,13 +3144,24 @@ export class AsyncIdlePollingTransfer<T> extends BaseStateTransfer<T> implements
  * 3. subscribe(handler) — subscribes to transformed data (sync)
  * 4. If the operator returns undefined — subscribers are not notified
  *
+ * Sequence Guard (active when maxConcurrency > 1):
+ * - Multiple operator.apply() calls run in parallel (up to maxConcurrency).
+ * - Results are emitted to subscribers strictly in data-arrival order.
+ * - A faster operation that completes before an older one waits in an
+ *   internal pending queue until its predecessor is emitted.
+ * - This prevents a stale result from overwriting a fresh one in _state.value.
+ * - When maxConcurrency <= 1, the guard is inactive (no overhead).
+ *
  * Error handling:
  * - If operator.apply() throws an exception, onError is called.
  * - With onError provided, the exception is suppressed. Without onError — rethrown.
+ * - When the guard is active, a failed operation submits undefined to the
+ *   queue so that subsequent results are not blocked.
  *
  * Configuration (AsyncConvertTransferConfig):
  * - operator: AsyncOperatorInterface<TInput, TOutput | undefined>
  * - onError?: ErrorHandler
+ * - maxConcurrency?, bufferSize?, onBufferOverflow? (BackpressureConfig)
  */
 export class AsyncConvertTransfer<TInput, TOutput> extends BaseStateTransfer<TOutput> implements AsyncPushableTransferInterface<TInput>, SubscribableTransferInterface<TOutput> {
   override readonly isInput = true;
@@ -3108,6 +3178,8 @@ export class AsyncConvertTransfer<TInput, TOutput> extends BaseStateTransfer<TOu
   private readonly _maxConcurrency: number;
   private readonly _bufferSize: number;
   private readonly _onBufferOverflow?: DataHandler<TInput>;
+  private readonly _guardActive: boolean;
+  private readonly _queue: PendingResultQueue<TOutput | undefined>;
 
   private _activeCount: number = 0;
   private _buffer: TInput[] = [];
@@ -3121,6 +3193,9 @@ export class AsyncConvertTransfer<TInput, TOutput> extends BaseStateTransfer<TOu
     this._maxConcurrency = config.maxConcurrency ?? Infinity;
     this._bufferSize = config.bufferSize ?? Infinity;
     this._onBufferOverflow = config.onBufferOverflow;
+
+    this._guardActive = this._maxConcurrency > 1;
+    this._queue = new PendingResultQueue<TOutput | undefined>();
   }
 
   public async asyncPush(data: TInput): Promise<void> {
@@ -3139,22 +3214,49 @@ export class AsyncConvertTransfer<TInput, TOutput> extends BaseStateTransfer<TOu
 
   public override destroy() {
     this._buffer = [];
+    this._queue.clear();
     this._subscription.destroy();
     super.destroy();
   }
 
   private async _process(data: TInput): Promise<void> {
     this._activeCount++;
-    try {
-      this._state.value = await this._operator.apply(data);
-      this._subscription.sendState();
-      this._state.clear();
-    } catch (e) {
-      handleError(e, this, this._onError);
-    } finally {
-      this._activeCount--;
-      this._dequeue();
+    if (this._guardActive) {
+      const seq = this._queue.nextSeq();
+      try {
+        const result = await this._operator.apply(data);
+        this._queue.submit(seq, result);
+      } catch (e) {
+        // Advance the queue past this failed operation before rethrowing
+        this._queue.submit(seq, undefined);
+        handleError(e, this, this._onError);
+      } finally {
+        this._drain();
+        this._activeCount--;
+        this._dequeue();
+      }
+    } else {
+      try {
+        this._state.value = await this._operator.apply(data);
+        this._subscription.sendState();
+        this._state.clear();
+      } catch (e) {
+        handleError(e, this, this._onError);
+      } finally {
+        this._activeCount--;
+        this._dequeue();
+      }
     }
+  }
+
+  private _drain(): void {
+    this._queue.drain((value) => {
+      if (value !== undefined) {
+        this._state.value = value;
+        this._subscription.sendState();
+        this._state.clear();
+      }
+    });
   }
 
   private _dequeue(): void {
@@ -3175,20 +3277,30 @@ export class AsyncConvertTransfer<TInput, TOutput> extends BaseStateTransfer<TOu
  *
  * Mechanics:
  * 1. shouldAccept(data) — async input filter (if false, data is ignored)
- * 2. shouldEmit(state) — async output filter (if false, data remains in state)
- * 3. asyncPush(data) — await shouldAccept → write → await shouldEmit → sendState + clear
+ * 2. shouldEmit(data) — async output filter (if false, data is not emitted)
+ * 3. asyncPush(data) — await shouldAccept → await shouldEmit → sendState + clear
  * 4. Predicates can be sync or async (return Promise<boolean> | boolean)
+ *
+ * Sequence Guard (active when maxConcurrency > 1):
+ * - Multiple shouldAccept/shouldEmit checks run in parallel (up to maxConcurrency).
+ * - Emissions to subscribers happen strictly in data-arrival order.
+ * - shouldEmit receives the operation's local data, not a shared _state.value,
+ *   so it cannot accidentally inspect another operation's data.
+ * - When maxConcurrency <= 1, the guard is inactive (no overhead).
  *
  * Error handling:
  * - If shouldAccept throws an exception, onAcceptError is called.
  * - If shouldEmit throws an exception, onEmitError is called.
  * - With the corresponding handler provided, the exception is suppressed.
+ * - When the guard is active, a failed/skipped operation submits a no-emit
+ *   marker to the queue so that subsequent results are not blocked.
  *
  * Configuration (AsyncConditionTransferConfig):
  * - shouldAccept?: (data: T) => Promise<boolean> | boolean
- * - shouldEmit?: (state: T | undefined) => Promise<boolean> | boolean
+ * - shouldEmit?: (data: T) => Promise<boolean> | boolean
  * - onAcceptError?: ErrorHandler
  * - onEmitError?: ErrorHandler
+ * - maxConcurrency?, bufferSize?, onBufferOverflow? (BackpressureConfig)
  */
 export class AsyncConditionTransfer<T> extends BaseStateTransfer<T> implements AsyncPushableTransferInterface<T>, SubscribableTransferInterface<T> {
   override readonly isInput = true;
@@ -3207,6 +3319,8 @@ export class AsyncConditionTransfer<T> extends BaseStateTransfer<T> implements A
   private readonly _maxConcurrency: number;
   private readonly _bufferSize: number;
   private readonly _onBufferOverflow?: DataHandler<T>;
+  private readonly _guardActive: boolean;
+  private readonly _queue: PendingResultQueue<{ emit: boolean; data: T }>;
 
   private _activeCount: number = 0;
   private _buffer: T[] = [];
@@ -3222,6 +3336,9 @@ export class AsyncConditionTransfer<T> extends BaseStateTransfer<T> implements A
     this._maxConcurrency = config.maxConcurrency ?? Infinity;
     this._bufferSize = config.bufferSize ?? Infinity;
     this._onBufferOverflow = config.onBufferOverflow;
+
+    this._guardActive = this._maxConcurrency > 1;
+    this._queue = new PendingResultQueue<{ emit: boolean; data: T }>();
   }
 
   public async asyncPush(data: T): Promise<void> {
@@ -3240,39 +3357,83 @@ export class AsyncConditionTransfer<T> extends BaseStateTransfer<T> implements A
 
   public override destroy() {
     this._buffer = [];
+    this._queue.clear();
     this._subscription.destroy();
     super.destroy();
   }
 
   private async _process(data: T): Promise<void> {
     this._activeCount++;
-    try {
+    if (this._guardActive) {
+      const seq = this._queue.nextSeq();
+      let emit = false;
       try {
-        if (!await this._shouldAccept(data)) {
+        try {
+          if (!await this._shouldAccept(data)) {
+            this._queue.submit(seq, { emit: false, data });
+            return;
+          }
+        } catch (e) {
+          // Advance the queue past this failed operation before rethrowing
+          this._queue.submit(seq, { emit: false, data });
+          handleError(e, this, this._onAcceptError);
           return;
         }
-      } catch (e) {
-        handleError(e, this, this._onAcceptError);
-        return;
-      }
 
-      this._state.value = data;
-
-      try {
-        if (!await this._shouldEmit(this._state.value)) {
+        try {
+          emit = await this._shouldEmit(data);
+        } catch (e) {
+          // Advance the queue past this failed operation before rethrowing
+          this._queue.submit(seq, { emit: false, data });
+          handleError(e, this, this._onEmitError);
           return;
         }
-      } catch (e) {
-        handleError(e, this, this._onEmitError);
-        return;
-      }
 
-      this._subscription.sendState();
-      this._state.clear();
-    } finally {
-      this._activeCount--;
-      this._dequeue();
+        this._queue.submit(seq, { emit, data });
+      } finally {
+        this._drain();
+        this._activeCount--;
+        this._dequeue();
+      }
+    } else {
+      try {
+        try {
+          if (!await this._shouldAccept(data)) {
+            return;
+          }
+        } catch (e) {
+          handleError(e, this, this._onAcceptError);
+          return;
+        }
+
+        this._state.value = data;
+
+        try {
+          if (!await this._shouldEmit(data)) {
+            return;
+          }
+        } catch (e) {
+          handleError(e, this, this._onEmitError);
+          return;
+        }
+
+        this._subscription.sendState();
+        this._state.clear();
+      } finally {
+        this._activeCount--;
+        this._dequeue();
+      }
     }
+  }
+
+  private _drain(): void {
+    this._queue.drain((entry) => {
+      if (entry.emit) {
+        this._state.value = entry.data;
+        this._subscription.sendState();
+        this._state.clear();
+      }
+    });
   }
 
   private _dequeue(): void {

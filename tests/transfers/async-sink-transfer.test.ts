@@ -532,3 +532,267 @@ describe(
   },
 );
 
+// ═══════════════════════════════════════════════════════════════
+// AsyncSinkTransfer Ordered Execution (config.ordered: true)
+// ═══════════════════════════════════════════════════════════════
+// When ordered: true, callback invocations are executed sequentially
+// in data-arrival order, regardless of their async duration.
+
+describe(
+  'AsyncSinkTransfer ordered=true executes callbacks in arrival order test',
+  () => {
+    it('', async () => {
+      const order: string[] = [];
+      let resolveA: () => void;
+      let resolveB: () => void;
+      const promiseA = new Promise<void>((resolve) => { resolveA = resolve; });
+      const promiseB = new Promise<void>((resolve) => { resolveB = resolve; });
+
+      const transfer = new AsyncSinkTransfer<number>({
+        callback: async (n: number) => {
+          if (n === 1) { order.push('start-1'); await promiseA; order.push('end-1'); }
+          else if (n === 2) { order.push('start-2'); await promiseB; order.push('end-2'); }
+          else { order.push(`start-${n}`); order.push(`end-${n}`); }
+        },
+        ordered: true,
+        maxConcurrency: 3,
+      });
+
+      transfer.asyncPush(1);  // slow — blocked on promiseA
+      transfer.asyncPush(2);  // fast — blocked on promiseB
+      transfer.asyncPush(3);  // queued behind 2
+
+      // Let the executor start
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(order).toEqual(['start-1']);
+
+      // B resolves but must not start — A is still running
+      resolveB!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(order).toEqual(['start-1']);
+
+      // A resolves — then B runs, then 3
+      resolveA!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(order).toEqual(['start-1', 'end-1', 'start-2', 'end-2', 'start-3', 'end-3']);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncSinkTransfer ordered=false default executes callbacks in parallel test',
+  () => {
+    it('', async () => {
+      const order: string[] = [];
+      let resolveA: () => void;
+      let resolveB: () => void;
+      const promiseA = new Promise<void>((resolve) => { resolveA = resolve; });
+      const promiseB = new Promise<void>((resolve) => { resolveB = resolve; });
+
+      const transfer = new AsyncSinkTransfer<number>({
+        callback: async (n: number) => {
+          if (n === 1) { order.push('start-1'); await promiseA; order.push('end-1'); }
+          else if (n === 2) { order.push('start-2'); await promiseB; order.push('end-2'); }
+        },
+        maxConcurrency: 3,
+      });
+
+      transfer.asyncPush(1);  // slow
+      transfer.asyncPush(2);  // fast
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      // Both start in parallel (unordered)
+      expect(order).toEqual(['start-1', 'start-2']);
+
+      // B completes first
+      resolveB!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(order).toEqual(['start-1', 'start-2', 'end-2']);
+
+      // A completes
+      resolveA!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(order).toEqual(['start-1', 'start-2', 'end-2', 'end-1']);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncSinkTransfer ordered=true error with onError continues chain test',
+  () => {
+    it('', async () => {
+      const order: number[] = [];
+      const onError = jest.fn();
+
+      const transfer = new AsyncSinkTransfer<number>({
+        callback: async (n: number) => {
+          if (n === 1) throw new Error('boom');
+          order.push(n);
+        },
+        onError,
+        ordered: true,
+        maxConcurrency: 3,
+      });
+
+      transfer.asyncPush(1);  // throws
+      transfer.asyncPush(2);  // should still run
+      transfer.asyncPush(3);  // should still run
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(order).toEqual([2, 3]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncSinkTransfer ordered=true error without onError continues chain test',
+  () => {
+    it('', async () => {
+      const order: number[] = [];
+
+      const transfer = new AsyncSinkTransfer<number>({
+        callback: async (n: number) => {
+          if (n === 1) throw new Error('boom');
+          order.push(n);
+        },
+        ordered: true,
+        maxConcurrency: 3,
+      });
+
+      transfer.asyncPush(1).catch(() => {});  // throws — no onError
+      transfer.asyncPush(2);  // should still run (chain not broken)
+      transfer.asyncPush(3);  // should still run
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Chain continues despite unhandled error in callback 1
+      expect(order).toEqual([2, 3]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncSinkTransfer ordered=true with maxConcurrency=1 and buffer test',
+  () => {
+    it('', async () => {
+      const order: number[] = [];
+      let resolveFirst: () => void;
+      const promiseFirst = new Promise<void>((resolve) => { resolveFirst = resolve; });
+
+      const transfer = new AsyncSinkTransfer<number>({
+        callback: async (n: number) => {
+          if (n === 1) await promiseFirst;
+          order.push(n);
+        },
+        ordered: true,
+        maxConcurrency: 1,
+        bufferSize: 10,
+      });
+
+      transfer.asyncPush(1);  // starts (blocked)
+      transfer.asyncPush(2);  // buffered
+      transfer.asyncPush(3);  // buffered
+
+      resolveFirst!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(order).toEqual([1, 2, 3]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncSinkTransfer ordered=true destroy stops pending callbacks test',
+  () => {
+    it('', async () => {
+      const order: number[] = [];
+      let resolveFirst: () => void;
+      const promiseFirst = new Promise<void>((resolve) => { resolveFirst = resolve; });
+
+      const transfer = new AsyncSinkTransfer<number>({
+        callback: async (n: number) => {
+          if (n === 1) await promiseFirst;
+          order.push(n);
+        },
+        ordered: true,
+        maxConcurrency: 3,
+      });
+
+      transfer.asyncPush(1);  // starts (blocked)
+      transfer.asyncPush(2);  // queued in executor
+      transfer.asyncPush(3);  // queued in executor
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      transfer.destroy();
+
+      resolveFirst!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // 1 completes (was already running), 2 and 3 never run
+      expect(order).toEqual([1]);
+    });
+  },
+);
+
+describe(
+  'AsyncSinkTransfer ordered=true asyncPush awaits callback completion test',
+  () => {
+    it('', async () => {
+      let callbackDone = false;
+      let resolveCb: () => void;
+      const promiseCb = new Promise<void>((resolve) => { resolveCb = resolve; });
+
+      const transfer = new AsyncSinkTransfer<number>({
+        callback: async (n: number) => {
+          await promiseCb;
+          callbackDone = true;
+        },
+        ordered: true,
+        maxConcurrency: 3,
+      });
+
+      // asyncPush should not resolve until callback completes
+      const p = transfer.asyncPush(1);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(callbackDone).toBe(false);
+
+      resolveCb!();
+      await p;
+
+      expect(callbackDone).toBe(true);
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncSinkTransfer ordered=true error without onError propagates to caller test',
+  () => {
+    it('', async () => {
+      const transfer = new AsyncSinkTransfer<number>({
+        callback: async () => { throw new Error('sink boom'); },
+        ordered: true,
+        maxConcurrency: 3,
+      });
+
+      // Error should propagate to asyncPush caller
+      await expect(transfer.asyncPush(1)).rejects.toThrow('sink boom');
+
+      transfer.destroy();
+    });
+  },
+);
+

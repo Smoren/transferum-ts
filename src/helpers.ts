@@ -1,4 +1,4 @@
-import type { DisposableInterface, SubscriberInterface, TickerInterface } from "./interfaces";
+import type { DisposableInterface, SubscriberInterface } from "./interfaces";
 import type { DataHandler } from "./types";
 
 /** Wraps an unsubscribe callback into a managed subscription with active-state tracking and lifecycle hooks. */
@@ -141,5 +141,105 @@ export class ProxyReference<T> {
     const value = this.value;
     this.value = undefined;
     return value;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Sequence Guard helpers
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Ordered result queue for parallel-then-emit patterns.
+ *
+ * Used by AsyncConvertTransfer and AsyncConditionTransfer when
+ * maxConcurrency > 1. Multiple async operations run in
+ * parallel, but their results are emitted to subscribers strictly in
+ * arrival order: a result with a higher sequence number waits in the
+ * queue until all lower-numbered results have been emitted.
+ *
+ * Mechanics:
+ * - nextSeq() — assigns a monotonically increasing sequence number
+ * - submit(seq, value) — stores a completed result
+ * - drain(handler) — emits all consecutively-numbered results starting
+ *   from the expected sequence number
+ * - clear() — discards all pending results (used on destroy)
+ */
+export class PendingResultQueue<T> {
+  private _nextSeq: number = 0;
+  private _expectedSeq: number = 0;
+  private _pending: Map<number, T> = new Map();
+
+  /** Assigns the next sequence number for a new operation. */
+  public nextSeq(): number {
+    return this._nextSeq++;
+  }
+
+  /** Stores a completed result indexed by its sequence number. */
+  public submit(seq: number, value: T): void {
+    this._pending.set(seq, value);
+  }
+
+  /**
+   * Emits all consecutively-numbered results starting from the expected
+   * sequence number. Stops at the first gap (a not-yet-completed operation).
+   */
+  public drain(handler: (value: T) => void): void {
+    while (this._pending.has(this._expectedSeq)) {
+      const value = this._pending.get(this._expectedSeq) as T;
+      this._pending.delete(this._expectedSeq);
+      this._expectedSeq++;
+      handler(value);
+    }
+  }
+
+  /** Discards all pending results and resets sequence counters. */
+  public clear(): void {
+    this._pending.clear();
+    this._nextSeq = 0;
+    this._expectedSeq = 0;
+  }
+}
+
+/**
+ * Sequential async task executor for ordered side-effect patterns.
+ *
+ * Used by AsyncSinkTransfer and AsyncWriteTransfer when the `ordered`
+ * config option is enabled. Tasks are queued and executed one at a time
+ * in submission order, regardless of their internal async duration.
+ *
+ * Mechanics:
+ * - submit(task) — appends an async task to a promise chain
+ * - reset() — discards the chain (used on destroy)
+ *
+ * Error handling:
+ * - Tasks are responsible for their own error handling (via handleError).
+ * - The chain wraps each task in .catch(() => undefined) so that a
+ *   throwing task does not break the chain for subsequent tasks.
+ */
+export class OrderedExecutor {
+  private _chain: Promise<void> = Promise.resolve();
+  private _generation: number = 0;
+
+  /**
+   * Appends an async task to the sequential execution chain.
+   * Returns a promise that resolves/rejects with the task's own outcome.
+   * The chain itself never rejects (errors are caught) so subsequent
+   * tasks always run.
+   */
+  public submit(task: () => Promise<void>): Promise<void> {
+    const gen = this._generation;
+    const result = this._chain.then(async () => {
+      if (gen !== this._generation) return;
+      await task();
+    });
+    // Chain continues even if this task fails
+    this._chain = result.catch(() => undefined);
+    return result;
+  }
+
+  /** Resets the executor, discarding any pending (not yet started) tasks. */
+  public reset(): void {
+    this._generation++;
+    this._chain = Promise.resolve();
   }
 }

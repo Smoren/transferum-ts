@@ -668,3 +668,458 @@ describe(
   },
 );
 
+// ═══════════════════════════════════════════════════════════════
+// AsyncConditionTransfer Sequence Guard (maxConcurrency > 1)
+// ═══════════════════════════════════════════════════════════════
+// When maxConcurrency > 1 (and finite), parallel shouldAccept/shouldEmit
+// checks run concurrently but emissions happen strictly in data-arrival
+// order. shouldEmit receives the operation's local data, not shared _state.
+
+describe(
+  'AsyncConditionTransfer Sequence Guard emits in arrival order test',
+  () => {
+    it('', async () => {
+      const emitted: number[] = [];
+      let resolveA: () => void;
+      let resolveB: () => void;
+      const promiseA = new Promise<void>((resolve) => { resolveA = resolve; });
+      const promiseB = new Promise<void>((resolve) => { resolveB = resolve; });
+
+      const transfer = new AsyncConditionTransfer<number>({
+        shouldAccept: async (n) => {
+          if (n === 1) await promiseA;
+          else if (n === 2) await promiseB;
+          return true;
+        },
+        maxConcurrency: 2,
+      });
+
+      transfer.subscribe((value) => emitted.push(value));
+
+      transfer.asyncPush(1);  // slow — blocked on promiseA
+      transfer.asyncPush(2);  // fast — blocked on promiseB
+
+      // B's shouldAccept completes first, but must not emit before A
+      resolveB!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(emitted).toEqual([]);
+
+      // A completes — now both emit in order
+      resolveA!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(emitted).toEqual([1, 2]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConditionTransfer Sequence Guard shouldEmit on local data test',
+  () => {
+    it('', async () => {
+      const emitted: number[] = [];
+      let resolveA: () => void;
+      const promiseA = new Promise<void>((resolve) => { resolveA = resolve; });
+
+      // shouldEmit checks the local data, not shared _state
+      const seenValues: number[] = [];
+      const transfer = new AsyncConditionTransfer<number>({
+        shouldAccept: async (n) => {
+          if (n === 5) await promiseA;
+          return true;
+        },
+        shouldEmit: (data) => {
+          seenValues.push(data!);
+          return data! > 10;
+        },
+        maxConcurrency: 2,
+      });
+
+      transfer.subscribe((value) => emitted.push(value));
+
+      transfer.asyncPush(5);   // slow, shouldEmit=false (5 <= 10)
+      transfer.asyncPush(20);  // fast, shouldEmit=true (20 > 10)
+
+      // 20 finishes first but must wait for 5 (guard active)
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(emitted).toEqual([]);
+
+      resolveA!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // shouldEmit saw each operation's own data, not another's
+      expect(seenValues).toContain(5);
+      expect(seenValues).toContain(20);
+      // Only 20 emitted (5 filtered out by shouldEmit)
+      expect(emitted).toEqual([20]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConditionTransfer Sequence Guard shouldAccept=false does not block queue test',
+  () => {
+    it('', async () => {
+      const emitted: number[] = [];
+      let resolveA: () => void;
+      const promiseA = new Promise<void>((resolve) => { resolveA = resolve; });
+
+      const transfer = new AsyncConditionTransfer<number>({
+        shouldAccept: async (n) => {
+          if (n === 1) { await promiseA; return false; }
+          return true;
+        },
+        maxConcurrency: 2,
+      });
+
+      transfer.subscribe((value) => emitted.push(value));
+
+      transfer.asyncPush(1);  // slow, shouldAccept=false
+      transfer.asyncPush(2);  // fast, shouldAccept=true
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(emitted).toEqual([]);
+
+      resolveA!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // 1 filtered out, 2 emitted
+      expect(emitted).toEqual([2]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConditionTransfer Sequence Guard shouldEmit=false does not block queue test',
+  () => {
+    it('', async () => {
+      const emitted: number[] = [];
+      let resolveA: () => void;
+      const promiseA = new Promise<void>((resolve) => { resolveA = resolve; });
+
+      const transfer = new AsyncConditionTransfer<number>({
+        shouldEmit: async (n) => {
+          if (n === 1) { await promiseA; return false; }
+          return true;
+        },
+        maxConcurrency: 2,
+      });
+
+      transfer.subscribe((value) => emitted.push(value));
+
+      transfer.asyncPush(1);  // slow, shouldEmit=false
+      transfer.asyncPush(2);  // fast, shouldEmit=true
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(emitted).toEqual([]);
+
+      resolveA!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // 1 not emitted, 2 emitted
+      expect(emitted).toEqual([2]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConditionTransfer Sequence Guard shouldAccept error with onAcceptError does not block queue test',
+  () => {
+    it('', async () => {
+      const emitted: number[] = [];
+      const onAcceptError = jest.fn();
+      let resolveA: () => void;
+      const promiseA = new Promise<void>((resolve) => { resolveA = resolve; });
+
+      const transfer = new AsyncConditionTransfer<number>({
+        shouldAccept: async (n) => {
+          if (n === 1) { await promiseA; throw new Error('accept boom'); }
+          return true;
+        },
+        onAcceptError,
+        maxConcurrency: 2,
+      });
+
+      transfer.subscribe((value) => emitted.push(value));
+
+      transfer.asyncPush(1);  // slow, shouldAccept throws
+      transfer.asyncPush(2);  // fast, shouldAccept=true
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(emitted).toEqual([]);
+
+      resolveA!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(onAcceptError).toHaveBeenCalledTimes(1);
+      expect(emitted).toEqual([2]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConditionTransfer Sequence Guard shouldEmit error with onEmitError does not block queue test',
+  () => {
+    it('', async () => {
+      const emitted: number[] = [];
+      const onEmitError = jest.fn();
+      let resolveA: () => void;
+      const promiseA = new Promise<void>((resolve) => { resolveA = resolve; });
+
+      const transfer = new AsyncConditionTransfer<number>({
+        shouldEmit: async (n) => {
+          if (n === 1) { await promiseA; throw new Error('emit boom'); }
+          return true;
+        },
+        onEmitError,
+        maxConcurrency: 2,
+      });
+
+      transfer.subscribe((value) => emitted.push(value));
+
+      transfer.asyncPush(1);  // slow, shouldEmit throws
+      transfer.asyncPush(2);  // fast, shouldEmit=true
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(emitted).toEqual([]);
+
+      resolveA!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(onEmitError).toHaveBeenCalledTimes(1);
+      expect(emitted).toEqual([2]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConditionTransfer Sequence Guard inactive when maxConcurrency=1 test',
+  () => {
+    it('', async () => {
+      const emitted: number[] = [];
+      let resolveA: () => void;
+      const promiseA = new Promise<void>((resolve) => { resolveA = resolve; });
+
+      const transfer = new AsyncConditionTransfer<number>({
+        shouldAccept: async (n) => {
+          if (n === 1) await promiseA;
+          return true;
+        },
+        maxConcurrency: 1,
+      });
+
+      transfer.subscribe((value) => emitted.push(value));
+
+      transfer.asyncPush(1);  // starts (blocked)
+      transfer.asyncPush(2);  // queued
+
+      resolveA!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(emitted).toEqual([1, 2]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConditionTransfer Sequence Guard active when maxConcurrency=Infinity — ordered emission test',
+  () => {
+    it('', async () => {
+      const emitted: number[] = [];
+      let resolveA: () => void;
+      let resolveB: () => void;
+      const promiseA = new Promise<void>((resolve) => { resolveA = resolve; });
+      const promiseB = new Promise<void>((resolve) => { resolveB = resolve; });
+
+      const transfer = new AsyncConditionTransfer<number>({
+        shouldAccept: async (n) => {
+          if (n === 1) await promiseA;
+          else if (n === 2) await promiseB;
+          return true;
+        },
+      });
+
+      transfer.subscribe((value) => emitted.push(value));
+
+      transfer.asyncPush(1);  // slow
+      transfer.asyncPush(2);  // fast
+
+      // B completes first, but guard prevents emission before A
+      resolveB!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(emitted).toEqual([]);
+
+      // A completes — both emit in arrival order
+      resolveA!();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(emitted).toEqual([1, 2]);
+
+      transfer.destroy();
+    });
+  },
+);
+
+// ═══════════════════════════════════════════════════════════════
+// AsyncConditionTransfer non-guard path (maxConcurrency=1)
+// ═══════════════════════════════════════════════════════════════
+// When maxConcurrency <= 1, the Sequence Guard is inactive.
+// These tests cover the non-guard code paths for shouldAccept/shouldEmit
+// filtering and error handling.
+
+describe(
+  'AsyncConditionTransfer non-guard shouldAccept=false filters data test',
+  () => {
+    it('', async () => {
+      const emitted: number[] = [];
+      const transfer = new AsyncConditionTransfer<number>({
+        shouldAccept: (n) => n > 10,
+        maxConcurrency: 1,
+      });
+
+      transfer.subscribe((value) => emitted.push(value));
+
+      transfer.asyncPush(5);   // filtered out
+      transfer.asyncPush(20);  // passes
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(emitted).toEqual([20]);
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConditionTransfer non-guard shouldEmit=false blocks emission test',
+  () => {
+    it('', async () => {
+      const emitted: number[] = [];
+      const transfer = new AsyncConditionTransfer<number>({
+        shouldEmit: (n) => n! > 10,
+        maxConcurrency: 1,
+      });
+
+      transfer.subscribe((value) => emitted.push(value));
+
+      transfer.asyncPush(5);   // shouldEmit=false, not emitted
+      transfer.asyncPush(20);  // shouldEmit=true, emitted
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(emitted).toEqual([20]);
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConditionTransfer non-guard shouldEmit error with onEmitError suppresses test',
+  () => {
+    it('', async () => {
+      const emitted: number[] = [];
+      const onEmitError = jest.fn();
+      const transfer = new AsyncConditionTransfer<number>({
+        shouldEmit: (n) => {
+          if (n === 5) throw new Error('emit boom');
+          return true;
+        },
+        onEmitError,
+        maxConcurrency: 1,
+      });
+
+      transfer.subscribe((value) => emitted.push(value));
+
+      transfer.asyncPush(5);   // shouldEmit throws, suppressed
+      transfer.asyncPush(20);  // shouldEmit=true, emitted
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(onEmitError).toHaveBeenCalledTimes(1);
+      expect(emitted).toEqual([20]);
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConditionTransfer Sequence Guard shouldAccept error without onAcceptError does not block queue test',
+  () => {
+    it('', async () => {
+      const emitted: number[] = [];
+      let resolveA: () => void;
+      const promiseA = new Promise<void>((resolve) => { resolveA = resolve; });
+
+      const transfer = new AsyncConditionTransfer<number>({
+        shouldAccept: async (n) => {
+          if (n === 1) { await promiseA; throw new Error('accept boom'); }
+          return true;
+        },
+        maxConcurrency: 3,
+      });
+
+      transfer.subscribe((value) => emitted.push(value));
+
+      const p1 = transfer.asyncPush(1).catch(() => {});
+      transfer.asyncPush(2);  // should still emit after 1 fails
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(emitted).toEqual([]);
+
+      resolveA!();
+      await p1;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(emitted).toEqual([2]);
+      transfer.destroy();
+    });
+  },
+);
+
+describe(
+  'AsyncConditionTransfer Sequence Guard shouldEmit error without onEmitError does not block queue test',
+  () => {
+    it('', async () => {
+      const emitted: number[] = [];
+      let resolveA: () => void;
+      const promiseA = new Promise<void>((resolve) => { resolveA = resolve; });
+
+      const transfer = new AsyncConditionTransfer<number>({
+        shouldAccept: () => true,
+        shouldEmit: async (n) => {
+          if (n === 1) { await promiseA; throw new Error('emit boom'); }
+          return true;
+        },
+        maxConcurrency: 3,
+      });
+
+      transfer.subscribe((value) => emitted.push(value));
+
+      const p1 = transfer.asyncPush(1).catch(() => {});
+      transfer.asyncPush(2);  // should still emit after 1 fails
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(emitted).toEqual([]);
+
+      resolveA!();
+      await p1;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(emitted).toEqual([2]);
+      transfer.destroy();
+    });
+  },
+);
+

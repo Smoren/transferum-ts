@@ -224,14 +224,26 @@ export type AsyncIdlePollingTransferConfig<T> = BaseStateTransferConfig<T> & Err
   readonly tickerFactory?: TickerFactory;
 }
 
-/** Configuration for AsyncSinkTransfer — sync or async callback invoked on each incoming data, with optional error handler and backpressure. */
+/** Configuration for AsyncSinkTransfer — sync or async callback invoked on each incoming data, with optional error handler, backpressure, and ordered execution. */
 export type AsyncSinkTransferConfig<T> = ErrorHandlingConfig<AsyncSinkTransfer<T>> & BackpressureConfig<T> & {
   readonly callback: AsyncDataHandler<T> | DataHandler<T>;
+  /**
+   * When true, callback invocations are executed sequentially in data-arrival
+   * order, regardless of their async duration. Default: false (unordered,
+   * backward-compatible).
+   */
+  readonly ordered?: boolean;
 }
 
-/** Configuration for AsyncWriteTransfer — async or sync target flow with write(), optional error handler and backpressure. */
+/** Configuration for AsyncWriteTransfer — async or sync target flow with write(), optional error handler, backpressure, and ordered execution. */
 export type AsyncWriteTransferConfig<T> = ErrorHandlingConfig<AsyncWriteTransfer<T>> & BackpressureConfig<T> & {
   readonly flow: AsyncInputFlowInterface<T> | InputFlowInterface<T>;
+  /**
+   * When true, flow.write() invocations are executed sequentially in
+   * data-arrival order, regardless of their async duration.
+   * Default: false (unordered, backward-compatible).
+   */
+  readonly ordered?: boolean;
 }
 
 /** Configuration for AsyncReadTransfer — async or sync source flow with read() and optional error handler. */
