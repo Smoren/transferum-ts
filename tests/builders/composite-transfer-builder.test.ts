@@ -1,5 +1,5 @@
 import {
-  PipelineBuilder,
+  CompositeTransferBuilder,
   PushStoredChannelTransfer,
   PushChannelTransfer,
   GateTransfer,
@@ -11,16 +11,16 @@ import {
 import { describe, expect, it, jest } from '@jest/globals';
 
 // ═══════════════════════════════════════════════════════════════
-// PipelineBuilder — Basic creation
+// CompositeTransferBuilder — Basic creation
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder.start() creates builder with output transfer test',
+  'CompositeTransferBuilder.start() creates builder with output transfer test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
 
-      const builder = PipelineBuilder.start(startTransfer);
+      const builder = CompositeTransferBuilder.start(startTransfer);
 
       expect(builder).toBeDefined();
     });
@@ -28,12 +28,12 @@ describe(
 );
 
 describe(
-  'PipelineBuilder.start() accepts GateTransfer (output-only) test',
+  'CompositeTransferBuilder.start() accepts GateTransfer (output-only) test',
   () => {
     it('', () => {
       const startTransfer = new GateTransfer<number>({ activated: true });
 
-      const builder = PipelineBuilder.start(startTransfer);
+      const builder = CompositeTransferBuilder.start(startTransfer);
 
       expect(builder).toBeDefined();
     });
@@ -45,13 +45,13 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder finish creates duplex composite from duplex start test',
+  'CompositeTransferBuilder finish creates duplex composite from duplex start test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .finish(lastTransfer);
 
@@ -67,13 +67,13 @@ describe(
 );
 
 describe(
-  'PipelineBuilder finish creates input-only composite with SinkTransfer test',
+  'CompositeTransferBuilder finish creates input-only composite with SinkTransfer test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
       const sink = new SinkTransfer<number>({ callback: () => {} });
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .finish(sink);
 
@@ -90,12 +90,12 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder to chains single intermediate transfer test',
+  'CompositeTransferBuilder to chains single intermediate transfer test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(new PushStoredChannelTransfer<number>())
         .finish(new PushStoredChannelTransfer<number>());
@@ -106,12 +106,12 @@ describe(
 );
 
 describe(
-  'PipelineBuilder to chains multiple transfers test',
+  'CompositeTransferBuilder to chains multiple transfers test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(new PushStoredChannelTransfer<number>())
         .to(new PushStoredChannelTransfer<number>())
@@ -124,12 +124,12 @@ describe(
 );
 
 describe(
-  'PipelineBuilder to with ConditionTransfer type transformation test',
+  'CompositeTransferBuilder to with ConditionTransfer type transformation test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(new ConditionTransfer<number>({ shouldAccept: x => x > 0 }))
         .finish(new PushStoredChannelTransfer<number>());
@@ -144,7 +144,7 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder to with owned destroys intermediate on composite destroy test',
+  'CompositeTransferBuilder to with owned destroys intermediate on composite destroy test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
@@ -152,7 +152,7 @@ describe(
       const destroySpy = jest.fn();
       intermediate.destroy = destroySpy;
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(intermediate, true)
         .finish(new PushStoredChannelTransfer<number>());
@@ -165,7 +165,7 @@ describe(
 );
 
 describe(
-  'PipelineBuilder to without owned does not destroy intermediate test',
+  'CompositeTransferBuilder to without owned does not destroy intermediate test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
@@ -173,7 +173,7 @@ describe(
       const destroySpy = jest.fn();
       intermediate.destroy = destroySpy;
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(intermediate)
         .finish(new PushStoredChannelTransfer<number>());
@@ -190,7 +190,7 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder finish with owned destroys last transfer test',
+  'CompositeTransferBuilder finish with owned destroys last transfer test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
@@ -198,7 +198,7 @@ describe(
       const destroySpy = jest.fn();
       lastTransfer.destroy = destroySpy;
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .finish(lastTransfer, { owned: true });
 
@@ -214,14 +214,14 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder finish with gate option test',
+  'CompositeTransferBuilder finish with gate option test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
       const gate = new GateTransfer<number>({ activated: true });
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(gate)
         .finish(lastTransfer, { gate });
@@ -235,14 +235,14 @@ describe(
 );
 
 describe(
-  'PipelineBuilder gate blocks data when inactive test',
+  'CompositeTransferBuilder gate blocks data when inactive test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
       const gate = new GateTransfer<number>({ activated: false });
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(gate)
         .finish(lastTransfer, { gate });
@@ -267,13 +267,13 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder finish with triggerable (ManualFlowTransfer) test',
+  'CompositeTransferBuilder finish with triggerable (ManualFlowTransfer) test',
   () => {
     it('', () => {
       const startTransfer = new ManualFlowTransfer<number>();
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .finish(lastTransfer, { triggerable: startTransfer });
 
@@ -289,7 +289,7 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder finish with asyncTriggerable test',
+  'CompositeTransferBuilder finish with asyncTriggerable test',
   () => {
     it('', async () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
@@ -300,7 +300,7 @@ describe(
       });
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .finish(lastTransfer, { asyncTriggerable });
 
@@ -323,14 +323,14 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder finish with linkOnError test',
+  'CompositeTransferBuilder finish with linkOnError test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
       const onError = jest.fn();
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .finish(lastTransfer, { linkOnError: onError });
 
@@ -346,13 +346,13 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder data flows through pipeline test',
+  'CompositeTransferBuilder data flows through pipeline test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(new PushStoredChannelTransfer<number>())
         .finish(lastTransfer);
@@ -370,13 +370,13 @@ describe(
 );
 
 describe(
-  'PipelineBuilder data flows through multiple intermediates test',
+  'CompositeTransferBuilder data flows through multiple intermediates test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(new PushStoredChannelTransfer<number>())
         .to(new ConditionTransfer<number>({ shouldAccept: x => x > 10 }))
@@ -402,13 +402,13 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder toggle gate state test',
+  'CompositeTransferBuilder toggle gate state test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .finish(lastTransfer, { gate: new GateTransfer<number>({ activated: true }) });
 
@@ -428,14 +428,14 @@ describe(
 );
 
 describe(
-  'PipelineBuilder gate with activated=false then activate test',
+  'CompositeTransferBuilder gate with activated=false then activate test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
       const gate = new GateTransfer<number>({ activated: false });
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(gate)
         .finish(lastTransfer, { gate });
@@ -459,14 +459,14 @@ describe(
 );
 
 describe(
-  'PipelineBuilder gate in finish options blocks data test',
+  'CompositeTransferBuilder gate in finish options blocks data test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
       const channel = new PushStoredChannelTransfer<number>();
       const lastTransfer = new GateTransfer<number>({ activated: false });
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(channel)
         .finish(lastTransfer);
@@ -495,7 +495,7 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder startTransfer not destroyed on composite destroy test',
+  'CompositeTransferBuilder startTransfer not destroyed on composite destroy test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
@@ -510,7 +510,7 @@ describe(
       channel.destroy = channelDestroySpy;
       lastTransfer.destroy = lastDestroySpy;
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(channel, true)
         .finish(lastTransfer, { owned: true });
@@ -529,13 +529,13 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder handles undefined values test',
+  'CompositeTransferBuilder handles undefined values test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number | undefined>();
       const lastTransfer = new PushStoredChannelTransfer<number | undefined>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .finish(lastTransfer);
 
@@ -552,13 +552,13 @@ describe(
 );
 
 describe(
-  'PipelineBuilder handles null values test',
+  'CompositeTransferBuilder handles null values test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<null>();
       const lastTransfer = new PushStoredChannelTransfer<null>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .finish(lastTransfer);
 
@@ -575,7 +575,7 @@ describe(
 );
 
 describe(
-  'PipelineBuilder handles object values test',
+  'CompositeTransferBuilder handles object values test',
   () => {
     it('', () => {
       type Obj = { id: number; name: string };
@@ -583,7 +583,7 @@ describe(
       const startTransfer = new PushStoredChannelTransfer<Obj>();
       const lastTransfer = new PushStoredChannelTransfer<Obj>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .finish(lastTransfer);
 
@@ -606,7 +606,7 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder finish with owned=false does not destroy last transfer test',
+  'CompositeTransferBuilder finish with owned=false does not destroy last transfer test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
@@ -614,7 +614,7 @@ describe(
       const destroySpy = jest.fn();
       lastTransfer.destroy = destroySpy;
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .finish(lastTransfer, { owned: false });
 
@@ -630,7 +630,7 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder finish with both triggerable and gate test',
+  'CompositeTransferBuilder finish with both triggerable and gate test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
@@ -638,7 +638,7 @@ describe(
       const triggerable = new ManualFlowTransfer<number>();
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(gate)
         .to(triggerable)
@@ -680,14 +680,14 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder triggerable sends data on trigger test',
+  'CompositeTransferBuilder triggerable sends data on trigger test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
       const triggerable = new ManualFlowTransfer<number>();
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(triggerable)
         .finish(lastTransfer, { triggerable });
@@ -709,7 +709,7 @@ describe(
 );
 
 describe(
-  'PipelineBuilder triggerable in finish options with data flow test',
+  'CompositeTransferBuilder triggerable in finish options with data flow test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
@@ -717,7 +717,7 @@ describe(
       const manualFlow = new ManualFlowTransfer<number>();
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(channel)
         .finish(lastTransfer, { triggerable: manualFlow });
@@ -738,7 +738,7 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder all owned resources destroyed test',
+  'CompositeTransferBuilder all owned resources destroyed test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
@@ -751,7 +751,7 @@ describe(
       t2.destroy = spies[1];
       lastTransfer.destroy = spies[2];
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(t1, true)
         .to(t2, true)
@@ -767,12 +767,12 @@ describe(
 );
 
 describe(
-  'PipelineBuilder multiple destroy calls are safe test',
+  'CompositeTransferBuilder multiple destroy calls are safe test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .finish(new PushStoredChannelTransfer<number>());
 
@@ -789,13 +789,13 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder flags from start (Pushable) and finish (Pullable, Subscribable) test',
+  'CompositeTransferBuilder flags from start (Pushable) and finish (Pullable, Subscribable) test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .finish(lastTransfer);
 
@@ -812,13 +812,13 @@ describe(
 );
 
 describe(
-  'PipelineBuilder flags from GateTransfer start test',
+  'CompositeTransferBuilder flags from GateTransfer start test',
   () => {
     it('', () => {
       const startTransfer = new GateTransfer<number>({ activated: true });
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .finish(lastTransfer);
 
@@ -838,12 +838,12 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder private constructor uses default ownedResources test',
+  'CompositeTransferBuilder private constructor uses default ownedResources test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
 
-      const builder = new (PipelineBuilder as any)(startTransfer, startTransfer);
+      const builder = new (CompositeTransferBuilder as any)(startTransfer, startTransfer);
 
       const lastTransfer = new PushStoredChannelTransfer<number>();
       const composite = builder.finish(lastTransfer);
@@ -866,12 +866,12 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder multiple finish calls are safe test',
+  'CompositeTransferBuilder multiple finish calls are safe test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
 
-      const builder = PipelineBuilder.start(startTransfer);
+      const builder = CompositeTransferBuilder.start(startTransfer);
 
       const lastTransfer1 = new PushStoredChannelTransfer<number>();
       const lastTransfer2 = new PushStoredChannelTransfer<number>();
@@ -889,13 +889,13 @@ describe(
 );
 
 describe(
-  'PipelineBuilder builder is immutable test',
+  'CompositeTransferBuilder builder is immutable test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
       const intermediate1 = new PushStoredChannelTransfer<number>();
 
-      const builder1 = PipelineBuilder.start(startTransfer);
+      const builder1 = CompositeTransferBuilder.start(startTransfer);
       const builder2 = builder1.to(intermediate1);
 
       const lastTransfer1 = new PushStoredChannelTransfer<number>();
@@ -918,14 +918,14 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder unsubscribe stops notifications test',
+  'CompositeTransferBuilder unsubscribe stops notifications test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
       const channel = new PushStoredChannelTransfer<number>();
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(channel)
         .finish(lastTransfer);
@@ -949,7 +949,7 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder complex pipeline with 5 transfers test',
+  'CompositeTransferBuilder complex pipeline with 5 transfers test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
@@ -959,7 +959,7 @@ describe(
       const t4 = new PushStoredChannelTransfer<number>();
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(t1)
         .to(t2)
@@ -984,13 +984,13 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder handles zero and negative values test',
+  'CompositeTransferBuilder handles zero and negative values test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .finish(lastTransfer);
 
@@ -1009,13 +1009,13 @@ describe(
 );
 
 describe(
-  'PipelineBuilder handles large data values test',
+  'CompositeTransferBuilder handles large data values test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .finish(lastTransfer);
 
@@ -1037,14 +1037,14 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder output-style data flow from startTransfer push test',
+  'CompositeTransferBuilder output-style data flow from startTransfer push test',
   () => {
     it('', () => {
       const startTransfer = new GateTransfer<number>({ activated: true });
       const channel = new PushStoredChannelTransfer<number>();
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(channel)
         .finish(lastTransfer);
@@ -1064,14 +1064,14 @@ describe(
 );
 
 describe(
-  'PipelineBuilder output-style gate blocks data from startTransfer test',
+  'CompositeTransferBuilder output-style gate blocks data from startTransfer test',
   () => {
     it('', () => {
       const startTransfer = new GateTransfer<number>({ activated: false });
       const channel = new PushStoredChannelTransfer<number>();
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(channel)
         .finish(lastTransfer);
@@ -1093,13 +1093,13 @@ describe(
 );
 
 describe(
-  'PipelineBuilder output-style pull delegates to last transfer test',
+  'CompositeTransferBuilder output-style pull delegates to last transfer test',
   () => {
     it('', () => {
       const startTransfer = new GateTransfer<number>({ activated: true });
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .finish(lastTransfer);
 
@@ -1118,14 +1118,14 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder with PushChannelTransfer in chain test',
+  'CompositeTransferBuilder with PushChannelTransfer in chain test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
       const pushChannel = new PushChannelTransfer<number>();
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(pushChannel)
         .finish(lastTransfer);
@@ -1144,14 +1144,14 @@ describe(
 );
 
 describe(
-  'PipelineBuilder PushChannelTransfer drops data without subscriber test',
+  'CompositeTransferBuilder PushChannelTransfer drops data without subscriber test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
       const pushChannel = new PushChannelTransfer<number>();
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(pushChannel)
         .finish(lastTransfer);
@@ -1171,7 +1171,7 @@ describe(
 );
 
 describe(
-  'PipelineBuilder mixed PushChannel and PushStored chain test',
+  'CompositeTransferBuilder mixed PushChannel and PushStored chain test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
@@ -1180,7 +1180,7 @@ describe(
       const stored2 = new PushStoredChannelTransfer<number>();
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(stored1)
         .to(pushChannel)
@@ -1206,14 +1206,14 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder with GateTransfer in middle of chain test',
+  'CompositeTransferBuilder with GateTransfer in middle of chain test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
       const gate = new GateTransfer<number>({ activated: true });
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(gate as any)
         .finish(lastTransfer);
@@ -1236,14 +1236,14 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder with ConditionTransfer in chain test',
+  'CompositeTransferBuilder with ConditionTransfer in chain test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
       const condition = new ConditionTransfer<number>({shouldAccept: (x) => x > 0});
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .to(condition as any)
         .finish(lastTransfer);
@@ -1271,7 +1271,7 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder finish with both triggerable and asyncTriggerable test',
+  'CompositeTransferBuilder finish with both triggerable and asyncTriggerable test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
@@ -1282,7 +1282,7 @@ describe(
       });
       const lastTransfer = new PushStoredChannelTransfer<number>();
 
-      const composite = PipelineBuilder
+      const composite = CompositeTransferBuilder
         .start(startTransfer)
         .finish(lastTransfer, { asyncTriggerable });
 
@@ -1299,14 +1299,14 @@ describe(
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'PipelineBuilder type transformation chain test',
+  'CompositeTransferBuilder type transformation chain test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
       const stringTransfer = new PushStoredChannelTransfer<string>();
       const numberTransfer = new PushStoredChannelTransfer<number>();
 
-      const builder = PipelineBuilder
+      const builder = CompositeTransferBuilder
         .start(startTransfer)
         .to(stringTransfer as any)
         .to(numberTransfer as any);

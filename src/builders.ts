@@ -6,7 +6,7 @@ import type {
   OutputPipelineBuilderInterface,
   OperatorPipelineBuilderInterface,
   OperatorInterface,
-  PipelineBuilderInterface,
+  CompositeTransferBuilderInterface,
   TriggerableInterface,
   AsyncInputPipelineBuilderInterface,
   AsyncOutputPipelineBuilderInterface,
@@ -39,7 +39,7 @@ import { linkTransfers } from "./utils";
 // InputPipelineBuilder
 // ═══════════════════════════════════════════════════════════════
 /**
- * @deprecated Use `PipelineBuilder` instead. Will be removed in the next major release.
+ * @deprecated Use `CompositeTransferBuilder` instead. Will be removed in the next major release.
  *
  * Builder for constructing input pipelines (InputPipeline).
  *
@@ -221,7 +221,7 @@ export class InputPipelineBuilder<
 // OutputPipelineBuilder
 // ═══════════════════════════════════════════════════════════════
 /**
- * @deprecated Use `PipelineBuilder` instead. Will be removed in the next major release.
+ * @deprecated Use `CompositeTransferBuilder` instead. Will be removed in the next major release.
  *
  * Builder for constructing output pipelines (OutputPipeline).
  *
@@ -390,7 +390,7 @@ export class OutputPipelineBuilder implements OutputPipelineBuilderInterface {
 // DuplexPipelineBuilder
 // ═══════════════════════════════════════════════════════════════
 /**
- * @deprecated Use `PipelineBuilder` instead. Will be removed in the next major release.
+ * @deprecated Use `CompositeTransferBuilder` instead. Will be removed in the next major release.
  *
  * Builder for constructing full-duplex pipelines (DuplexPipeline).
  *
@@ -715,7 +715,7 @@ export class OperatorPipelineBuilder<TFlow extends readonly unknown[]> implement
 // AsyncInputPipelineBuilder
 // ═══════════════════════════════════════════════════════════════
 /**
- * @deprecated Use `PipelineBuilder` instead. Will be removed in the next major release.
+ * @deprecated Use `CompositeTransferBuilder` instead. Will be removed in the next major release.
  *
  * Builder for constructing input pipelines with async transfer support.
  *
@@ -811,7 +811,7 @@ export class AsyncInputPipelineBuilder<
 // AsyncOutputPipelineBuilder
 // ═══════════════════════════════════════════════════════════════
 /**
- * @deprecated Use `PipelineBuilder` instead. Will be removed in the next major release.
+ * @deprecated Use `CompositeTransferBuilder` instead. Will be removed in the next major release.
  *
  * Builder for constructing output pipelines with async transfer support.
  *
@@ -903,7 +903,7 @@ export class AsyncOutputPipelineBuilder implements AsyncOutputPipelineBuilderInt
 // AsyncDuplexPipelineBuilder
 // ═══════════════════════════════════════════════════════════════
 /**
- * @deprecated Use `PipelineBuilder` instead. Will be removed in the next major release.
+ * @deprecated Use `CompositeTransferBuilder` instead. Will be removed in the next major release.
  *
  * Builder for constructing full-duplex pipelines with async transfer support.
  *
@@ -1074,11 +1074,11 @@ export class AsyncOperatorPipelineBuilder<TFlow extends readonly unknown[]> impl
 }
 
 // ═══════════════════════════════════════════════════════════════
-// PipelineBuilder (unified)
+// CompositeTransferBuilder (unified)
 // ═══════════════════════════════════════════════════════════════
 /**
- * Unified builder for constructing pipelines of any direction (input, output, duplex)
- * with both sync and async transfer support.
+ * Unified builder for constructing composite transfers of any direction
+ * (input, output, duplex) with both sync and async transfer support.
  *
  * Purpose:
  * Creates a composite transfer (`CompositeTransfer`) whose capability flags are
@@ -1107,23 +1107,23 @@ export class AsyncOperatorPipelineBuilder<TFlow extends readonly unknown[]> impl
  *
  * @example
  * ```typescript
- * const pipeline = PipelineBuilder
+ * const composite = CompositeTransferBuilder
  *   .start(new PushStoredChannelTransfer<number>())
  *   .to(new ConditionTransfer<number>({ shouldAccept: x => x > 0 }))
  *   .to(new BufferTransfer<number>())
  *   .finish(new SinkTransfer<number>({ callback: console.log }), { owned: true });
  *
- * pipeline.push(42);
- * pipeline.destroy();
+ * composite.push(42);
+ * composite.destroy();
  * ```
  *
  * @typeParam TCurrent — data type flowing through the current chain link
  * @typeParam TStartTransfer — type of the initial transfer (must be OutputTransfer)
  */
-export class PipelineBuilder<
+export class CompositeTransferBuilder<
   TCurrent,
   TStartTransfer extends OutputTransfer<unknown>,
-> implements PipelineBuilderInterface<TCurrent, TStartTransfer> {
+> implements CompositeTransferBuilderInterface<TCurrent, TStartTransfer> {
   private readonly _startTransfer: TStartTransfer;
   private readonly _currentTransfer: DuplexTransfer<unknown, TCurrent>;
   private readonly _ownedResources: DisposableInterface[];
@@ -1146,12 +1146,12 @@ export class PipelineBuilder<
    *
    * @typeParam TStartTransfer — type of the initial transfer (must be OutputTransfer)
    * @param startTransfer — initial output transfer
-   * @returns A new PipelineBuilder instance
+   * @returns A new CompositeTransferBuilder instance
    */
   public static start<TStartTransfer extends OutputTransfer<any>>(
     startTransfer: TStartTransfer,
-  ): PipelineBuilderInterface<OutputTransferDataType<TStartTransfer>, TStartTransfer> {
-    return new PipelineBuilder<OutputTransferDataType<TStartTransfer>, TStartTransfer>(
+  ): CompositeTransferBuilderInterface<OutputTransferDataType<TStartTransfer>, TStartTransfer> {
+    return new CompositeTransferBuilder<OutputTransferDataType<TStartTransfer>, TStartTransfer>(
       startTransfer,
       startTransfer as DuplexTransfer<unknown, any>,
       [],
@@ -1159,7 +1159,7 @@ export class PipelineBuilder<
   }
 
   /**
-   * Adds an intermediate duplex transfer to the pipeline chain.
+   * Adds an intermediate duplex transfer to the chain.
    *
    * Links the current transfer to nextTransfer via linkTransfers(), then returns
    * a new builder with TNext as the current data type.
@@ -1172,7 +1172,7 @@ export class PipelineBuilder<
   public to<TNext>(
     nextTransfer: DuplexTransfer<TCurrent, TNext>,
     owned?: boolean,
-  ): PipelineBuilderInterface<TNext, TStartTransfer> {
+  ): CompositeTransferBuilderInterface<TNext, TStartTransfer> {
     const subscriber = linkTransfers(this._currentTransfer, nextTransfer);
     const nextOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
 
@@ -1180,7 +1180,7 @@ export class PipelineBuilder<
       nextOwnedResources.push(nextTransfer);
     }
 
-    return new PipelineBuilder<TNext, TStartTransfer>(
+    return new CompositeTransferBuilder<TNext, TStartTransfer>(
       this._startTransfer,
       nextTransfer,
       nextOwnedResources,
@@ -1188,7 +1188,7 @@ export class PipelineBuilder<
   }
 
   /**
-   * Completes the pipeline construction and creates a composite transfer.
+   * Completes the chain construction and creates a composite transfer.
    *
    * Links the current transfer to lastTransfer, creates a UniversalCompositeTransfer
    * with input = startTransfer, output = lastTransfer, and returns it typed as

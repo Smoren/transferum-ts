@@ -264,7 +264,7 @@ export interface AsyncPollingProxyTransferInterface<T> extends AsyncPollingProxy
 }
 
 /**
- * @deprecated Use `PipelineBuilderInterface` instead. Will be removed in the next major release.
+ * @deprecated Use `CompositeTransferBuilderInterface` instead. Will be removed in the next major release.
  *
  * Input pipeline builder interface — produces a strictly input-only composite transfer.
  *
@@ -291,7 +291,7 @@ export interface InputPipelineBuilderInterface<TCurrent, TStartTransfer extends 
 }
 
 /**
- * @deprecated Use `PipelineBuilderInterface` instead. Will be removed in the next major release.
+ * @deprecated Use `CompositeTransferBuilderInterface` instead. Will be removed in the next major release.
  *
  * Output pipeline builder interface — produces a duplex composite transfer with output-only start.
  *
@@ -319,7 +319,7 @@ export interface OutputPipelineBuilderInterface {
 }
 
 /**
- * @deprecated Use `PipelineBuilderInterface` instead. Will be removed in the next major release.
+ * @deprecated Use `CompositeTransferBuilderInterface` instead. Will be removed in the next major release.
  *
  * Duplex pipeline builder interface — produces a duplex composite transfer.
  *
@@ -394,7 +394,7 @@ export interface OperatorPipelineBuilderInterface<TFlow extends readonly unknown
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * @deprecated Use `PipelineBuilderInterface` instead. Will be removed in the next major release.
+ * @deprecated Use `CompositeTransferBuilderInterface` instead. Will be removed in the next major release.
  *
  * Async input pipeline builder interface — like InputPipelineBuilderInterface,
  * but supports async triggerable and linkOnError for async-push rejection handling.
@@ -422,7 +422,7 @@ export interface AsyncInputPipelineBuilderInterface<TCurrent, TStartTransfer ext
 }
 
 /**
- * @deprecated Use `PipelineBuilderInterface` instead. Will be removed in the next major release.
+ * @deprecated Use `CompositeTransferBuilderInterface` instead. Will be removed in the next major release.
  *
  * Async output pipeline builder interface — like OutputPipelineBuilderInterface,
  * but supports async triggerable and linkOnError for async-push rejection handling.
@@ -451,7 +451,7 @@ export interface AsyncOutputPipelineBuilderInterface {
 }
 
 /**
- * @deprecated Use `PipelineBuilderInterface` instead. Will be removed in the next major release.
+ * @deprecated Use `CompositeTransferBuilderInterface` instead. Will be removed in the next major release.
  *
  * Async duplex pipeline builder interface — like DuplexPipelineBuilderInterface,
  * but supports async triggerable and linkOnError for async-push rejection handling.
@@ -527,7 +527,7 @@ export interface AsyncOperatorPipelineBuilderInterface<TFlow extends readonly un
 }
 
 /**
- * Unified pipeline builder interface — replaces Input/Output/Duplex builder interfaces.
+ * Unified composite transfer builder interface — replaces Input/Output/Duplex builder interfaces.
  *
  * Pipeline structure: OutputTransfer [→ DuplexTransfer → …] → InputTransfer.
  * The start transfer provides output capabilities (source of data);
@@ -541,14 +541,14 @@ export interface AsyncOperatorPipelineBuilderInterface<TFlow extends readonly un
  *
  * Works for both sync and async pipelines — `linkOnError` in finish() options enables async error handling.
  */
-export interface PipelineBuilderInterface<
+export interface CompositeTransferBuilderInterface<
   TCurrent,
   TStartTransfer extends OutputTransfer<unknown>,
 > {
   to<TNext>(
     nextTransfer: DuplexTransfer<TCurrent, TNext>,
     owned?: boolean,
-  ): PipelineBuilderInterface<TNext, TStartTransfer>;
+  ): CompositeTransferBuilderInterface<TNext, TStartTransfer>;
 
   finish<
     TFinishTransfer extends InputTransfer<TCurrent>,
