@@ -1,32 +1,32 @@
 import type {
   DisposableInterface,
-  DuplexPipelineBuilderInterface,
   GateInterface,
-  InputPipelineBuilderInterface,
-  OutputPipelineBuilderInterface,
   OperatorPipelineBuilderInterface,
   OperatorInterface,
   CompositeTransferBuilderInterface,
   TriggerableInterface,
-  AsyncInputPipelineBuilderInterface,
-  AsyncOutputPipelineBuilderInterface,
-  AsyncDuplexPipelineBuilderInterface,
   AsyncOperatorPipelineBuilderInterface,
   AsyncTriggerableInterface,
   AsyncOperatorInterface,
+  InputPipelineBuilderInterface,
+  OutputPipelineBuilderInterface,
+  DuplexPipelineBuilderInterface,
+  AsyncInputPipelineBuilderInterface,
+  AsyncOutputPipelineBuilderInterface,
+  AsyncDuplexPipelineBuilderInterface,
 } from "./interfaces";
 import type {
   First,
   Last,
   CompositeTransfer,
-  CompositeDuplexTransfer,
   DuplexTransfer,
-  CompositeInputTransfer,
   InputTransfer,
   InputTransferDataType,
-  CompositeOutputTransfer,
   OutputTransfer,
   OutputTransferDataType,
+  CompositeInputTransfer,
+  CompositeOutputTransfer,
+  CompositeDuplexTransfer,
 } from "./types";
 import type { ErrorHandler } from "./types";
 import type { LinkConfig } from "./configs";
@@ -34,567 +34,6 @@ import { PipelineOperator, AsyncPipelineOperator } from "./operators";
 import { DisposableSubscriberAdapter } from "./helpers";
 import { UniversalCompositeTransfer } from "./transfers";
 import { linkTransfers } from "./utils";
-
-// ═══════════════════════════════════════════════════════════════
-// InputPipelineBuilder
-// ═══════════════════════════════════════════════════════════════
-/**
- * @deprecated Use `CompositeTransferBuilder` instead. Will be removed in the next major release.
- *
- * Builder for constructing input pipelines (InputPipeline).
- *
- * Purpose:
- * Creates a composite transfer with an input interface (InputCompositeTransfer),
- * which accepts data from outside and passes it through a chain of intermediate
- * duplex transfers to the final input transfer.
- *
- * Pipeline structure:
- *   TStartTransfer [-> DuplexTransfer -> ... ->] -> InputTransfer
- *   │              │                                │
- *   └─ start()     └─ to()                          └─ finish()
- *
- * Where:
- * - TStartTransfer — initial duplex transfer (must be DuplexTransfer)
- * - DuplexTransfer — intermediate chain links (optional, via to())
- * - InputTransfer — final transfer (PushableTransferInterface | InputPollingTransferInterface)
- *
- * Mechanics:
- * 1. start(startTransfer) — creates a builder with the initial transfer
- * 2. to(nextTransfer, owned?) — adds an intermediate duplex transfer to the chain,
- *    linking it to the previous one via linkTransfers()
- * 3. finish(lastTransfer, options?) — completes the pipeline, creating a UniversalCompositeTransfer
- *
- * finish() options:
- * - triggerable?: TriggerableInterface — explicit trigger for the composite
- * - gate?: GateInterface — explicit gate for flow control
- * - owned?: boolean — whether to destroy lastTransfer on composite destroy()
- *
- * The owned parameter in to():
- * - owned = true — the intermediate transfer is added to the owned resources array
- *   and will be destroyed on composite destroy()
- * - owned = false (default) — the transfer is not destroyed automatically
- *
- * Data types:
- * - TStart — data type of the initial transfer (inferred automatically)
- * - TCurrent — data type of the current chain link (changes after each to())
- * - Composite input type = InputTransferDataType<TStartTransfer>
- *
- * Use cases:
- * - Building a reactive data processing pipeline
- * - Chain of transformations with automatic subscription management
- * - Creating input nodes for pipeline architecture
- *
- * @example
- * ```typescript
- * const pipeline = InputPipelineBuilder
- *   .start(new PushStoredChannelTransfer<number>())
- *   .to(new ConditionTransfer<number>(x => x > 0))
- *   .to(new BufferTransfer<number>())
- *   .finish(new GateTransfer<number>({ activated: true, initialValue: 0 }), {
- *     owned: true
- *   });
- *
- * pipeline.push(42);
- * pipeline.destroy();
- * ```
- *
- * @typeParam TCurrent — data type of the current chain link
- * @typeParam TStartTransfer — type of the initial transfer (must be InputTransfer)
- */
-export class InputPipelineBuilder<
-  TCurrent,
-  TStartTransfer extends InputTransfer<unknown>
-> implements InputPipelineBuilderInterface<TCurrent, TStartTransfer> {
-  private readonly _startTransfer: TStartTransfer;
-  private readonly _currentTransfer: DuplexTransfer<unknown, TCurrent>;
-  private readonly _ownedResources: DisposableInterface[];
-
-  private constructor(
-    startTransfer: TStartTransfer,
-    currentTransfer: DuplexTransfer<unknown, TCurrent>,
-    ownedResources: DisposableInterface[] = [],
-  ) {
-    this._startTransfer = startTransfer;
-    this._currentTransfer = currentTransfer;
-    this._ownedResources = ownedResources;
-  }
-
-  /**
-   * Static method to create a builder with an initial duplex transfer.
-   *
-   * @typeParam TCurrent — data type of the initial transfer
-   * @typeParam TStartTransfer — type of the initial transfer (must be DuplexTransfer)
-   * @param startTransfer — initial duplex transfer
-   * @returns A new InputPipelineBuilder instance
-   */
-  public static start<TCurrent, TStartTransfer extends DuplexTransfer<unknown, TCurrent>>(
-    startTransfer: TStartTransfer,
-  ): InputPipelineBuilderInterface<TCurrent, TStartTransfer> {
-    return new InputPipelineBuilder<TCurrent, TStartTransfer>(startTransfer, startTransfer, []);
-  }
-
-  /**
-   * Adds an intermediate duplex transfer to the pipeline chain.
-   *
-   * Mechanics:
-   * 1. Links the current transfer to nextTransfer via linkTransfers()
-   * 2. Creates a DisposableSubscriberAdapter to manage the subscription
-   * 3. Adds the adapter (and optionally nextTransfer) to the owned resources array
-   * 4. Returns a new builder with the updated chain
-   *
-   * @typeParam TNext — data type of the next transfer
-   * @param nextTransfer — duplex transfer to add to the chain
-   * @param owned — if true, nextTransfer will be destroyed on composite destroy()
-   * @returns A new builder with the updated TNext type
-   */
-  public to<TNext>(
-    nextTransfer: DuplexTransfer<TCurrent, TNext>,
-    owned?: boolean,
-  ): InputPipelineBuilderInterface<TNext, TStartTransfer> {
-    const subscriber = linkTransfers(this._currentTransfer, nextTransfer);
-    const nextOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
-
-    if (owned) {
-      nextOwnedResources.push(nextTransfer);
-    }
-
-    return new InputPipelineBuilder<TNext, TStartTransfer>(
-      this._startTransfer,
-      nextTransfer,
-      nextOwnedResources
-    );
-  }
-
-  /**
-   * Completes the pipeline construction and creates a composite transfer.
-   *
-   * Mechanics:
-   * 1. Links the last transfer in the chain to lastTransfer via linkTransfers()
-   * 2. Creates a UniversalCompositeTransfer with input = startTransfer, output = lastTransfer
-   * 3. Adds all owned resources (intermediate transfers + adapters + optionally lastTransfer)
-   * 4. Applies triggerable and gate options to the composite
-   *
-   * Options:
-   * - triggerable — explicit trigger for the composite (overrides extraction from input/output)
-   * - gate — explicit gate for flow control (overrides extraction from input/output)
-   * - owned — if true, lastTransfer is added to owned resources
-   *
-   * @typeParam TTriggerable — trigger type (TriggerableInterface | undefined)
-   * @typeParam TGate — gate type (GateInterface | undefined)
-   * @param lastTransfer — final input transfer
-   * @param options — completion options (triggerable, gate, owned)
-   * @returns InputCompositeTransfer with computed types
-   */
-  public finish<
-    TTriggerable extends TriggerableInterface | undefined = undefined,
-    TGate extends GateInterface | undefined = undefined,
-  >(
-    lastTransfer: InputTransfer<TCurrent>,
-    options?: {
-      triggerable?: TTriggerable;
-      gate?: TGate;
-      owned?: boolean,
-    },
-  ): CompositeInputTransfer<InputTransferDataType<TStartTransfer>, TStartTransfer, TTriggerable, undefined, TGate> {
-    const subscriber = linkTransfers(this._currentTransfer, lastTransfer);
-    const finalOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
-
-    if (options?.owned) {
-      finalOwnedResources.push(lastTransfer);
-    }
-
-    // Create the composite instance, passing explicitly provided configurations
-    const composite = new UniversalCompositeTransfer<InputTransferDataType<TStartTransfer>, never>({
-      input: this._startTransfer,
-      output: lastTransfer as OutputTransfer<never>,
-      owned: finalOwnedResources,
-      triggerable: options?.triggerable,
-      gate: options?.gate,
-    });
-
-    // Return the computed type, fully satisfying the client's IDE
-    return composite as InputTransfer<InputTransferDataType<TStartTransfer>> as CompositeInputTransfer<InputTransferDataType<TStartTransfer>, TStartTransfer, TTriggerable, undefined, TGate>;
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// OutputPipelineBuilder
-// ═══════════════════════════════════════════════════════════════
-/**
- * @deprecated Use `CompositeTransferBuilder` instead. Will be removed in the next major release.
- *
- * Builder for constructing output pipelines (OutputPipeline).
- *
- * Purpose:
- * Creates a composite transfer with an output interface (OutputCompositeTransfer),
- * which extracts data from the initial output transfer and passes it through
- * a chain of intermediate duplex transfers to the final transfer.
- *
- * Pipeline structure:
- *   OutputTransfer [-> DuplexTransfer -> ... ->] -> TFinishTransfer
- *   │              │                                │
- *   └─ start()     └─ to()                          └─ finish()
- *
- * Where:
- * - OutputTransfer — initial output transfer (PullableTransferInterface | SubscribableTransferInterface | GateTransferInterface)
- * - DuplexTransfer — intermediate chain links (optional, via to())
- * - TFinishTransfer — final duplex transfer
- *
- * Mechanics:
- * 1. start(startTransfer) — creates a builder with the initial output transfer
- * 2. to(nextTransfer, owned?) — adds an intermediate duplex transfer to the chain,
- *    linking it to the previous one via linkTransfers()
- * 3. finish(lastTransfer, options?) — completes the pipeline, creating a UniversalCompositeTransfer
- *
- * finish() options:
- * - triggerable?: TriggerableInterface — explicit trigger for the composite
- * - gate?: GateInterface — explicit gate for flow control
- * - owned?: boolean — whether to destroy lastTransfer on composite destroy()
- *
- * The owned parameter in to():
- * - owned = true — the intermediate transfer is added to the owned resources array
- *   and will be destroyed on composite destroy()
- * - owned = false (default) — the transfer is not destroyed automatically
- *
- * Data types:
- * - Composite output type = OutputTransferDataType<TFinishTransfer>
- *
- * Use cases:
- * - Building a pipeline for extracting data from an external source
- * - Chain of transformations with polling or subscribable source
- * - Creating output nodes for pipeline architecture
- *
- * @example
- * ```typescript
- * const pipeline = OutputPipelineBuilder
- *   .start(new GateTransfer<number>({ activated: true, initialValue: 0 }))
- *   .to(new PushStoredChannelTransfer<number>())
- *   .finish(new PushStoredChannelTransfer<number>(), {
- *     owned: true
- *   });
- *
- * pipeline.subscribe(data => console.log(data));
- * pipeline.destroy();
- * ```
- */
-export class OutputPipelineBuilder implements OutputPipelineBuilderInterface {
-  private readonly _startTransfer: OutputTransfer<unknown>;
-  private readonly _currentTransfer: DuplexTransfer<unknown, unknown>;
-  private readonly _ownedResources: DisposableInterface[];
-
-  private constructor(
-    startTransfer: OutputTransfer<unknown>,
-    currentTransfer: DuplexTransfer<unknown, unknown>,
-    ownedResources: DisposableInterface[] = [],
-  ) {
-    this._startTransfer = startTransfer;
-    this._currentTransfer = currentTransfer;
-    this._ownedResources = ownedResources;
-  }
-
-  /**
-   * Static method to create a builder with an initial output transfer.
-   *
-   * @param startTransfer — initial output transfer (OutputTransfer)
-   * @returns A new OutputPipelineBuilder instance
-   */
-  public static start(startTransfer: OutputTransfer<unknown>): OutputPipelineBuilderInterface {
-    return new OutputPipelineBuilder(
-      startTransfer,
-      startTransfer as DuplexTransfer<unknown, unknown>,
-      [],
-    ) as OutputPipelineBuilderInterface;
-  }
-
-  /**
-   * Adds an intermediate duplex transfer to the pipeline chain.
-   *
-   * Mechanics:
-   * 1. Links the current transfer to nextTransfer via linkTransfers()
-   * 2. Creates a DisposableSubscriberAdapter to manage the subscription
-   * 3. Adds the adapter (and optionally nextTransfer) to the owned resources array
-   * 4. Returns a new builder with the updated chain
-   *
-   * @param nextTransfer — duplex transfer to add to the chain
-   * @param owned — if true, nextTransfer will be destroyed on composite destroy()
-   * @returns A new builder to continue the chain
-   */
-  public to(nextTransfer: DuplexTransfer<unknown, unknown>, owned?: boolean): OutputPipelineBuilderInterface {
-    const subscriber = linkTransfers(this._currentTransfer, nextTransfer);
-    const nextOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
-
-    if (owned) {
-      nextOwnedResources.push(nextTransfer);
-    }
-
-    return new OutputPipelineBuilder(
-      this._startTransfer,
-      nextTransfer,
-      nextOwnedResources
-    );
-  }
-
-  /**
-   * Completes the pipeline construction and creates a composite transfer.
-   *
-   * Mechanics:
-   * 1. Links the last transfer in the chain to lastTransfer via linkTransfers()
-   * 2. Creates a UniversalCompositeTransfer with input = startTransfer (muted to never), output = lastTransfer
-   * 3. Adds all owned resources (intermediate transfers + adapters + optionally lastTransfer)
-   * 4. Applies triggerable and gate options to the composite
-   *
-   * Options:
-   * - triggerable — explicit trigger for the composite
-   * - gate — explicit gate for flow control
-   * - owned — if true, lastTransfer is added to owned resources
-   *
-   * @typeParam TFinishTransfer — final transfer type (must be DuplexTransfer)
-   * @typeParam TTriggerable — trigger type (TriggerableInterface | undefined)
-   * @typeParam TGate — gate type (GateInterface | undefined)
-   * @param lastTransfer — final duplex transfer
-   * @param options — completion options (triggerable, gate, owned)
-   * @returns OutputCompositeTransfer with computed types
-   */
-  public finish<
-    TFinishTransfer extends DuplexTransfer<unknown, any>,
-    TTriggerable extends TriggerableInterface | undefined = undefined,
-    TGate extends GateInterface | undefined = undefined,
-  >(
-    lastTransfer: TFinishTransfer,
-    options?: {
-      triggerable?: TTriggerable;
-      gate?: TGate;
-      owned?: boolean;
-    },
-  ): CompositeOutputTransfer<OutputTransferDataType<TFinishTransfer>, TFinishTransfer, TTriggerable, undefined, TGate> {
-    const subscriber = linkTransfers(this._currentTransfer, lastTransfer);
-    const finalOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
-
-    if (options?.owned) {
-      finalOwnedResources.push(lastTransfer);
-    }
-
-    const composite = new UniversalCompositeTransfer({
-      input: this._startTransfer as InputTransfer<never>,
-      output: lastTransfer,
-      owned: finalOwnedResources,
-      triggerable: options?.triggerable,
-      gate: options?.gate,
-    });
-
-    return composite as OutputTransfer<OutputTransferDataType<TFinishTransfer>> as CompositeOutputTransfer<OutputTransferDataType<TFinishTransfer>, TFinishTransfer, TTriggerable, undefined, TGate>;
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// DuplexPipelineBuilder
-// ═══════════════════════════════════════════════════════════════
-/**
- * @deprecated Use `CompositeTransferBuilder` instead. Will be removed in the next major release.
- *
- * Builder for constructing full-duplex pipelines (DuplexPipeline).
- *
- * Purpose:
- * Creates a composite transfer with a duplex interface (DuplexCompositeTransfer),
- * which supports both input (push) and output (pull/subscribe) operations.
- *
- * Pipeline structure:
- *   TStartTransfer [-> DuplexTransfer -> ... ->] -> TFinishTransfer
- *   │              │                                │
- *   └─ start()     └─ to()                          └─ finish()
- *
- * Where:
- * - TStartTransfer — initial duplex transfer (must be InputTransfer)
- * - DuplexTransfer — intermediate chain links (optional, via to())
- * - TFinishTransfer — final output transfer (OutputTransfer)
- *
- * Mechanics:
- * 1. start(startTransfer) — creates a builder with the initial duplex transfer
- * 2. to(nextTransfer, owned?) — adds an intermediate duplex transfer to the chain,
- *    linking it to the previous one via linkTransfers()
- * 3. finish(lastTransfer, options?) — completes the pipeline, creating a UniversalCompositeTransfer
- *
- * finish() options:
- * - triggerable?: TriggerableInterface — explicit trigger for the composite
- * - gate?: GateInterface — explicit gate for flow control
- * - owned?: boolean — whether to destroy lastTransfer on composite destroy()
- *
- * The owned parameter in to():
- * - owned = true — the intermediate transfer is added to the owned resources array
- *   and will be destroyed on composite destroy()
- * - owned = false (default) — the transfer is not destroyed automatically
- *
- * Data types:
- * - Composite input type = InputTransferDataType<TStartTransfer>
- * - Composite output type = OutputTransferDataType<TFinishTransfer>
- *
- * Use cases:
- * - Building a bidirectional data processing pipeline
- * - Data transformation with both push and pull operations
- * - Creating intermediate nodes for complex pipeline architectures
- *
- * @example
- * ```typescript
- * const pipeline = DuplexPipelineBuilder
- *   .start(new PushStoredChannelTransfer<number>())
- *   .to(new ConditionTransfer<number>(x => x > 0))
- *   .to(new PushStoredChannelTransfer<number>())
- *   .finish(new PushStoredChannelTransfer<number>(), {
- *     owned: true
- *   });
- *
- * // Push data
- * pipeline.push(42);
- *
- * // Subscribe to output data
- * pipeline.subscribe(data => console.log(data));
- *
- * // Pull data
- * const value = pipeline.pull();
- *
- * pipeline.destroy();
- * ```
- *
- * @typeParam TCurrent — data type of the current chain link
- * @typeParam TStartTransfer — type of the initial transfer (must be InputTransfer)
- */
-export class DuplexPipelineBuilder<
-  TCurrent,
-  TStartTransfer extends InputTransfer<unknown>
-> implements DuplexPipelineBuilderInterface<TCurrent, TStartTransfer> {
-  private readonly _startTransfer: TStartTransfer;
-  private readonly _currentTransfer: DuplexTransfer<unknown, TCurrent>;
-  private readonly _ownedResources: DisposableInterface[];
-
-  private constructor(
-    startTransfer: TStartTransfer,
-    currentTransfer: DuplexTransfer<unknown, TCurrent>,
-    ownedResources: DisposableInterface[] = [],
-  ) {
-    this._startTransfer = startTransfer;
-    this._currentTransfer = currentTransfer;
-    this._ownedResources = ownedResources;
-  }
-
-  /**
-   * Static method to create a builder with an initial duplex transfer.
-   *
-   * @typeParam TCurrent — data type of the initial transfer
-   * @typeParam TStartTransfer — type of the initial transfer (must be DuplexTransfer)
-   * @param startTransfer — initial duplex transfer
-   * @returns A new DuplexPipelineBuilder instance
-   */
-  public static start<TCurrent, TStartTransfer extends DuplexTransfer<unknown, TCurrent>>(
-    startTransfer: TStartTransfer,
-  ): DuplexPipelineBuilderInterface<TCurrent, TStartTransfer> {
-    return new DuplexPipelineBuilder<TCurrent, TStartTransfer>(startTransfer, startTransfer, []);
-  }
-
-  /**
-   * Adds an intermediate duplex transfer to the pipeline chain.
-   *
-   * Mechanics:
-   * 1. Links the current transfer to nextTransfer via linkTransfers()
-   * 2. Creates a DisposableSubscriberAdapter to manage the subscription
-   * 3. Adds the adapter (and optionally nextTransfer) to the owned resources array
-   * 4. Returns a new builder with the updated chain
-   *
-   * @typeParam TNext — data type of the next transfer
-   * @param nextTransfer — duplex transfer to add to the chain
-   * @param owned — if true, nextTransfer will be destroyed on composite destroy()
-   * @returns A new builder with the updated TNext type
-   */
-  public to<TNext>(
-    nextTransfer: DuplexTransfer<TCurrent, TNext>,
-    owned?: boolean,
-  ): DuplexPipelineBuilderInterface<TNext, TStartTransfer> {
-    const subscriber = linkTransfers(this._currentTransfer, nextTransfer);
-    const nextOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
-
-    if (owned) {
-      nextOwnedResources.push(nextTransfer);
-    }
-
-    return new DuplexPipelineBuilder<TNext, TStartTransfer>(
-      this._startTransfer,
-      nextTransfer,
-      nextOwnedResources
-    );
-  }
-
-  /**
-   * Completes the pipeline construction and creates a full-duplex composite transfer.
-   *
-   * Mechanics:
-   * 1. Links the last transfer in the chain to lastTransfer via linkTransfers()
-   * 2. Creates a UniversalCompositeTransfer with input = startTransfer, output = lastTransfer
-   * 3. Adds all owned resources (intermediate transfers + adapters + optionally lastTransfer)
-   * 4. Applies triggerable and gate options to the composite
-   *
-   * Options:
-   * - triggerable — explicit trigger for the composite (overrides extraction from input/output)
-   * - gate — explicit gate for flow control (overrides extraction from input/output)
-   * - owned — if true, lastTransfer is added to owned resources
-   *
-   * @typeParam TFinishTransfer — final transfer type (must be OutputTransfer)
-   * @typeParam TTriggerable — trigger type (TriggerableInterface | undefined)
-   * @typeParam TGate — gate type (GateInterface | undefined)
-   * @param lastTransfer — final output transfer
-   * @param options — completion options (triggerable, gate, owned)
-   * @returns DuplexCompositeTransfer with computed input and output types
-   */
-  public finish<
-    TFinishTransfer extends DuplexTransfer<unknown, any>,
-    TTriggerable extends TriggerableInterface | undefined = undefined,
-    TGate extends GateInterface | undefined = undefined,
-  >(
-    lastTransfer: TFinishTransfer,
-    options?: {
-      triggerable?: TTriggerable;
-      gate?: TGate;
-      owned?: boolean;
-    },
-  ): CompositeDuplexTransfer<
-    InputTransferDataType<TStartTransfer>,
-    OutputTransferDataType<TFinishTransfer>,
-    TStartTransfer,
-    TFinishTransfer,
-    TTriggerable,
-    undefined,
-    TGate
-  > {
-    const subscriber = linkTransfers(this._currentTransfer, lastTransfer);
-    const finalOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
-
-    if (options?.owned) {
-      finalOwnedResources.push(lastTransfer);
-    }
-
-    // Extract data types for input and output via utility types
-    type TStartData = InputTransferDataType<TStartTransfer>;
-    type TFinishData = OutputTransferDataType<TFinishTransfer>;
-
-    // Create the full-duplex composite instance
-    const composite = new UniversalCompositeTransfer<TStartData, TFinishData>({
-      input: this._startTransfer,
-      output: lastTransfer,
-      owned: finalOwnedResources,
-      triggerable: options?.triggerable,
-      gate: options?.gate,
-    });
-
-    // Signature double cast to pass compiler checks and keep the client IDE clean
-    return composite as DuplexTransfer<TStartData, TFinishData> as CompositeDuplexTransfer<
-      TStartData,
-      TFinishData,
-      TStartTransfer,
-      TFinishTransfer,
-      TTriggerable,
-      undefined,
-      TGate
-    >;
-  }
-}
 
 // ═══════════════════════════════════════════════════════════════
 // OperatorPipelineBuilder
@@ -708,313 +147,6 @@ export class OperatorPipelineBuilder<TFlow extends readonly unknown[]> implement
    */
   build(this: OperatorPipelineBuilder<readonly [unknown, ...unknown[]]>): PipelineOperator<First<TFlow>, Last<TFlow>> {
     return new PipelineOperator<First<TFlow>, Last<TFlow>>(this._operators);
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// AsyncInputPipelineBuilder
-// ═══════════════════════════════════════════════════════════════
-/**
- * @deprecated Use `CompositeTransferBuilder` instead. Will be removed in the next major release.
- *
- * Builder for constructing input pipelines with async transfer support.
- *
- * Differences from InputPipelineBuilder:
- * - linkTransfers is called with LinkConfig (onError for async-push rejection)
- * - finish() accepts asyncTriggerable in addition to triggerable
- * - asyncTriggerable is passed to UniversalCompositeTransfer
- *
- * @typeParam TCurrent — data type of the current chain link
- * @typeParam TStartTransfer — type of the initial transfer (must be InputTransfer)
- */
-export class AsyncInputPipelineBuilder<
-  TCurrent,
-  TStartTransfer extends InputTransfer<unknown>
-> implements AsyncInputPipelineBuilderInterface<TCurrent, TStartTransfer> {
-  private readonly _startTransfer: TStartTransfer;
-  private readonly _currentTransfer: DuplexTransfer<unknown, TCurrent>;
-  private readonly _ownedResources: DisposableInterface[];
-
-  private constructor(
-    startTransfer: TStartTransfer,
-    currentTransfer: DuplexTransfer<unknown, TCurrent>,
-    ownedResources: DisposableInterface[] = [],
-  ) {
-    this._startTransfer = startTransfer;
-    this._currentTransfer = currentTransfer;
-    this._ownedResources = ownedResources;
-  }
-
-  public static start<TCurrent, TStartTransfer extends DuplexTransfer<unknown, TCurrent>>(
-    startTransfer: TStartTransfer,
-  ): AsyncInputPipelineBuilderInterface<TCurrent, TStartTransfer> {
-    return new AsyncInputPipelineBuilder<TCurrent, TStartTransfer>(startTransfer, startTransfer, []);
-  }
-
-  public to<TNext>(
-    nextTransfer: DuplexTransfer<TCurrent, TNext>,
-    owned?: boolean,
-  ): AsyncInputPipelineBuilderInterface<TNext, TStartTransfer> {
-    const subscriber = linkTransfers(this._currentTransfer, nextTransfer);
-    const nextOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
-
-    if (owned) {
-      nextOwnedResources.push(nextTransfer);
-    }
-
-    return new AsyncInputPipelineBuilder<TNext, TStartTransfer>(
-      this._startTransfer,
-      nextTransfer,
-      nextOwnedResources
-    );
-  }
-
-  public finish<
-    TTriggerable extends TriggerableInterface | undefined = undefined,
-    TAsyncTriggerable extends AsyncTriggerableInterface | undefined = undefined,
-    TGate extends GateInterface | undefined = undefined,
-  >(
-    lastTransfer: InputTransfer<TCurrent>,
-    options?: {
-      triggerable?: TTriggerable;
-      asyncTriggerable?: TAsyncTriggerable;
-      gate?: TGate;
-      owned?: boolean;
-      linkOnError?: ErrorHandler<InputTransfer<TCurrent>>;
-    },
-  ): CompositeInputTransfer<InputTransferDataType<TStartTransfer>, TStartTransfer, TTriggerable, TAsyncTriggerable, TGate> {
-    const linkConfig: LinkConfig<InputTransfer<TCurrent>> | undefined = options?.linkOnError !== undefined
-      ? { onError: options.linkOnError }
-      : undefined;
-
-    const subscriber = linkTransfers(this._currentTransfer, lastTransfer, linkConfig);
-    const finalOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
-
-    if (options?.owned) {
-      finalOwnedResources.push(lastTransfer);
-    }
-
-    const composite = new UniversalCompositeTransfer<InputTransferDataType<TStartTransfer>, never>({
-      input: this._startTransfer,
-      output: lastTransfer as OutputTransfer<never>,
-      owned: finalOwnedResources,
-      triggerable: options?.triggerable,
-      asyncTriggerable: options?.asyncTriggerable,
-      gate: options?.gate,
-    });
-
-    return composite as InputTransfer<InputTransferDataType<TStartTransfer>> as CompositeInputTransfer<InputTransferDataType<TStartTransfer>, TStartTransfer, TTriggerable, TAsyncTriggerable, TGate>;
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// AsyncOutputPipelineBuilder
-// ═══════════════════════════════════════════════════════════════
-/**
- * @deprecated Use `CompositeTransferBuilder` instead. Will be removed in the next major release.
- *
- * Builder for constructing output pipelines with async transfer support.
- *
- * Differences from OutputPipelineBuilder:
- * - linkTransfers is called with LinkConfig (onError for async-push rejection)
- * - finish() accepts asyncTriggerable in addition to triggerable
- */
-export class AsyncOutputPipelineBuilder implements AsyncOutputPipelineBuilderInterface {
-  private readonly _startTransfer: OutputTransfer<unknown>;
-  private readonly _currentTransfer: DuplexTransfer<unknown, any>;
-  private readonly _ownedResources: DisposableInterface[];
-
-  private constructor(
-    startTransfer: OutputTransfer<unknown>,
-    currentTransfer: DuplexTransfer<unknown, unknown>,
-    ownedResources: DisposableInterface[] = [],
-  ) {
-    this._startTransfer = startTransfer;
-    this._currentTransfer = currentTransfer;
-    this._ownedResources = ownedResources;
-  }
-
-  public static start(startTransfer: OutputTransfer<unknown>): AsyncOutputPipelineBuilderInterface {
-    return new AsyncOutputPipelineBuilder(
-      startTransfer,
-      startTransfer as DuplexTransfer<unknown, unknown>,
-      [],
-    ) as AsyncOutputPipelineBuilderInterface;
-  }
-
-  public to(
-    nextTransfer: DuplexTransfer<unknown, unknown>,
-    owned?: boolean,
-  ): AsyncOutputPipelineBuilderInterface {
-    const subscriber = linkTransfers(this._currentTransfer, nextTransfer);
-    const nextOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
-
-    if (owned) {
-      nextOwnedResources.push(nextTransfer);
-    }
-
-    return new AsyncOutputPipelineBuilder(
-      this._startTransfer,
-      nextTransfer,
-      nextOwnedResources
-    ) as AsyncOutputPipelineBuilderInterface;
-  }
-
-  public finish<
-    TFinishTransfer extends DuplexTransfer<unknown, any>,
-    TTriggerable extends TriggerableInterface | undefined = undefined,
-    TAsyncTriggerable extends AsyncTriggerableInterface | undefined = undefined,
-    TGate extends GateInterface | undefined = undefined,
-  >(
-    lastTransfer: TFinishTransfer,
-    options?: {
-      triggerable?: TTriggerable;
-      asyncTriggerable?: TAsyncTriggerable;
-      gate?: TGate;
-      owned?: boolean;
-      linkOnError?: ErrorHandler<TFinishTransfer>;
-    },
-  ): CompositeOutputTransfer<OutputTransferDataType<TFinishTransfer>, TFinishTransfer, TTriggerable, TAsyncTriggerable, TGate> {
-    const linkConfig: LinkConfig<TFinishTransfer> | undefined = options?.linkOnError !== undefined
-      ? { onError: options.linkOnError }
-      : undefined;
-
-    const subscriber = linkTransfers(this._currentTransfer, lastTransfer, linkConfig);
-    const finalOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
-
-    if (options?.owned) {
-      finalOwnedResources.push(lastTransfer);
-    }
-
-    const composite = new UniversalCompositeTransfer({
-      input: this._startTransfer as InputTransfer<never>,
-      output: lastTransfer,
-      owned: finalOwnedResources,
-      triggerable: options?.triggerable,
-      asyncTriggerable: options?.asyncTriggerable,
-      gate: options?.gate,
-    });
-
-    return composite as OutputTransfer<OutputTransferDataType<TFinishTransfer>> as CompositeOutputTransfer<OutputTransferDataType<TFinishTransfer>, TFinishTransfer, TTriggerable, TAsyncTriggerable, TGate>;
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// AsyncDuplexPipelineBuilder
-// ═══════════════════════════════════════════════════════════════
-/**
- * @deprecated Use `CompositeTransferBuilder` instead. Will be removed in the next major release.
- *
- * Builder for constructing full-duplex pipelines with async transfer support.
- *
- * Differences from DuplexPipelineBuilder:
- * - linkTransfers is called with LinkConfig (onError for async-push rejection)
- * - finish() accepts asyncTriggerable in addition to triggerable
- *
- * @typeParam TCurrent — data type of the current chain link
- * @typeParam TStartTransfer — type of the initial transfer (must be InputTransfer)
- */
-export class AsyncDuplexPipelineBuilder<
-  TCurrent,
-  TStartTransfer extends InputTransfer<unknown>
-> implements AsyncDuplexPipelineBuilderInterface<TCurrent, TStartTransfer> {
-  private readonly _startTransfer: TStartTransfer;
-  private readonly _currentTransfer: DuplexTransfer<unknown, TCurrent>;
-  private readonly _ownedResources: DisposableInterface[];
-
-  private constructor(
-    startTransfer: TStartTransfer,
-    currentTransfer: DuplexTransfer<unknown, TCurrent>,
-    ownedResources: DisposableInterface[] = [],
-  ) {
-    this._startTransfer = startTransfer;
-    this._currentTransfer = currentTransfer;
-    this._ownedResources = ownedResources;
-  }
-
-  public static start<TStart extends InputTransfer<unknown>>(
-    startTransfer: TStart,
-  ): AsyncDuplexPipelineBuilderInterface<InputTransferDataType<TStart>, TStart> {
-    return new AsyncDuplexPipelineBuilder<InputTransferDataType<TStart>, TStart>(
-      startTransfer,
-      startTransfer as DuplexTransfer<unknown, any>,
-      []
-    );
-  }
-
-  public to<TNext>(
-    nextTransfer: DuplexTransfer<TCurrent, TNext>,
-    owned?: boolean,
-  ): AsyncDuplexPipelineBuilderInterface<TNext, TStartTransfer> {
-    const subscriber = linkTransfers(this._currentTransfer, nextTransfer);
-    const nextOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
-
-    if (owned) {
-      nextOwnedResources.push(nextTransfer);
-    }
-
-    return new AsyncDuplexPipelineBuilder<TNext, TStartTransfer>(
-      this._startTransfer,
-      nextTransfer,
-      nextOwnedResources
-    );
-  }
-
-  public finish<
-    TFinishTransfer extends DuplexTransfer<unknown, any>,
-    TTriggerable extends TriggerableInterface | undefined = undefined,
-    TAsyncTriggerable extends AsyncTriggerableInterface | undefined = undefined,
-    TGate extends GateInterface | undefined = undefined,
-  >(
-    lastTransfer: TFinishTransfer,
-    options?: {
-      triggerable?: TTriggerable;
-      asyncTriggerable?: TAsyncTriggerable;
-      gate?: TGate;
-      owned?: boolean;
-      linkOnError?: ErrorHandler<TFinishTransfer>;
-    },
-  ): CompositeDuplexTransfer<
-    InputTransferDataType<TStartTransfer>,
-    OutputTransferDataType<TFinishTransfer>,
-    TStartTransfer,
-    TFinishTransfer,
-    TTriggerable,
-    TAsyncTriggerable,
-    TGate
-  > {
-    const linkConfig: LinkConfig<TFinishTransfer> | undefined = options?.linkOnError !== undefined
-      ? { onError: options.linkOnError }
-      : undefined;
-
-    const subscriber = linkTransfers(this._currentTransfer, lastTransfer, linkConfig);
-    const finalOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
-
-    if (options?.owned) {
-      finalOwnedResources.push(lastTransfer);
-    }
-
-    type TStartData = InputTransferDataType<TStartTransfer>;
-    type TFinishData = OutputTransferDataType<TFinishTransfer>;
-
-    const composite = new UniversalCompositeTransfer<TStartData, TFinishData>({
-      input: this._startTransfer,
-      output: lastTransfer,
-      owned: finalOwnedResources,
-      triggerable: options?.triggerable,
-      asyncTriggerable: options?.asyncTriggerable,
-      gate: options?.gate,
-    });
-
-    return composite as DuplexTransfer<TStartData, TFinishData> as CompositeDuplexTransfer<
-      TStartData,
-      TFinishData,
-      TStartTransfer,
-      TFinishTransfer,
-      TTriggerable,
-      TAsyncTriggerable,
-      TGate
-    >;
   }
 }
 
@@ -1256,6 +388,860 @@ export class CompositeTransferBuilder<
     });
 
     return composite as CompositeTransfer<
+      TStartData,
+      TFinishData,
+      TStartTransfer,
+      TFinishTransfer,
+      TTriggerable,
+      TAsyncTriggerable,
+      TGate
+    >;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Deprecated builders
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * @deprecated Use `CompositeTransferBuilder` instead. Will be removed in the next major release.
+ *
+ * Builder for constructing input pipelines (InputPipeline).
+ *
+ * Purpose:
+ * Creates a composite transfer with an input interface (InputCompositeTransfer),
+ * which accepts data from outside and passes it through a chain of intermediate
+ * duplex transfers to the final input transfer.
+ *
+ * Pipeline structure:
+ *   TStartTransfer [-> DuplexTransfer -> ... ->] -> InputTransfer
+ *   │              │                                │
+ *   └─ start()     └─ to()                          └─ finish()
+ *
+ * Where:
+ * - TStartTransfer — initial duplex transfer (must be DuplexTransfer)
+ * - DuplexTransfer — intermediate chain links (optional, via to())
+ * - InputTransfer — final transfer (PushableTransferInterface | InputPollingTransferInterface)
+ *
+ * Mechanics:
+ * 1. start(startTransfer) — creates a builder with the initial transfer
+ * 2. to(nextTransfer, owned?) — adds an intermediate duplex transfer to the chain,
+ *    linking it to the previous one via linkTransfers()
+ * 3. finish(lastTransfer, options?) — completes the pipeline, creating a UniversalCompositeTransfer
+ *
+ * finish() options:
+ * - triggerable?: TriggerableInterface — explicit trigger for the composite
+ * - gate?: GateInterface — explicit gate for flow control
+ * - owned?: boolean — whether to destroy lastTransfer on composite destroy()
+ *
+ * The owned parameter in to():
+ * - owned = true — the intermediate transfer is added to the owned resources array
+ *   and will be destroyed on composite destroy()
+ * - owned = false (default) — the transfer is not destroyed automatically
+ *
+ * Data types:
+ * - TStart — data type of the initial transfer (inferred automatically)
+ * - TCurrent — data type of the current chain link (changes after each to())
+ * - Composite input type = InputTransferDataType<TStartTransfer>
+ *
+ * Use cases:
+ * - Building a reactive data processing pipeline
+ * - Chain of transformations with automatic subscription management
+ * - Creating input nodes for pipeline architecture
+ *
+ * @example
+ * ```typescript
+ * const pipeline = InputPipelineBuilder
+ *   .start(new PushStoredChannelTransfer<number>())
+ *   .to(new ConditionTransfer<number>(x => x > 0))
+ *   .to(new BufferTransfer<number>())
+ *   .finish(new GateTransfer<number>({ activated: true, initialValue: 0 }), {
+ *     owned: true
+ *   });
+ *
+ * pipeline.push(42);
+ * pipeline.destroy();
+ * ```
+ *
+ * @typeParam TCurrent — data type of the current chain link
+ * @typeParam TStartTransfer — type of the initial transfer (must be InputTransfer)
+ */
+export class InputPipelineBuilder<
+  TCurrent,
+  TStartTransfer extends InputTransfer<unknown>
+> implements InputPipelineBuilderInterface<TCurrent, TStartTransfer> {
+  private readonly _startTransfer: TStartTransfer;
+  private readonly _currentTransfer: DuplexTransfer<unknown, TCurrent>;
+  private readonly _ownedResources: DisposableInterface[];
+
+  private constructor(
+    startTransfer: TStartTransfer,
+    currentTransfer: DuplexTransfer<unknown, TCurrent>,
+    ownedResources: DisposableInterface[] = [],
+  ) {
+    this._startTransfer = startTransfer;
+    this._currentTransfer = currentTransfer;
+    this._ownedResources = ownedResources;
+  }
+
+  /**
+   * Static method to create a builder with an initial duplex transfer.
+   *
+   * @typeParam TCurrent — data type of the initial transfer
+   * @typeParam TStartTransfer — type of the initial transfer (must be DuplexTransfer)
+   * @param startTransfer — initial duplex transfer
+   * @returns A new InputPipelineBuilder instance
+   */
+  public static start<TCurrent, TStartTransfer extends DuplexTransfer<unknown, TCurrent>>(
+    startTransfer: TStartTransfer,
+  ): InputPipelineBuilderInterface<TCurrent, TStartTransfer> {
+    return new InputPipelineBuilder<TCurrent, TStartTransfer>(startTransfer, startTransfer, []);
+  }
+
+  /**
+   * Adds an intermediate duplex transfer to the pipeline chain.
+   *
+   * Mechanics:
+   * 1. Links the current transfer to nextTransfer via linkTransfers()
+   * 2. Creates a DisposableSubscriberAdapter to manage the subscription
+   * 3. Adds the adapter (and optionally nextTransfer) to the owned resources array
+   * 4. Returns a new builder with the updated chain
+   *
+   * @typeParam TNext — data type of the next transfer
+   * @param nextTransfer — duplex transfer to add to the chain
+   * @param owned — if true, nextTransfer will be destroyed on composite destroy()
+   * @returns A new builder with the updated TNext type
+   */
+  public to<TNext>(
+    nextTransfer: DuplexTransfer<TCurrent, TNext>,
+    owned?: boolean,
+  ): InputPipelineBuilderInterface<TNext, TStartTransfer> {
+    const subscriber = linkTransfers(this._currentTransfer, nextTransfer);
+    const nextOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
+
+    if (owned) {
+      nextOwnedResources.push(nextTransfer);
+    }
+
+    return new InputPipelineBuilder<TNext, TStartTransfer>(
+      this._startTransfer,
+      nextTransfer,
+      nextOwnedResources
+    );
+  }
+
+  /**
+   * Completes the pipeline construction and creates a composite transfer.
+   *
+   * Mechanics:
+   * 1. Links the last transfer in the chain to lastTransfer via linkTransfers()
+   * 2. Creates a UniversalCompositeTransfer with input = startTransfer, output = lastTransfer
+   * 3. Adds all owned resources (intermediate transfers + adapters + optionally lastTransfer)
+   * 4. Applies triggerable and gate options to the composite
+   *
+   * Options:
+   * - triggerable — explicit trigger for the composite (overrides extraction from input/output)
+   * - gate — explicit gate for flow control (overrides extraction from input/output)
+   * - owned — if true, lastTransfer is added to owned resources
+   *
+   * @typeParam TTriggerable — trigger type (TriggerableInterface | undefined)
+   * @typeParam TGate — gate type (GateInterface | undefined)
+   * @param lastTransfer — final input transfer
+   * @param options — completion options (triggerable, gate, owned)
+   * @returns InputCompositeTransfer with computed types
+   */
+  public finish<
+    TTriggerable extends TriggerableInterface | undefined = undefined,
+    TGate extends GateInterface | undefined = undefined,
+  >(
+    lastTransfer: InputTransfer<TCurrent>,
+    options?: {
+      triggerable?: TTriggerable;
+      gate?: TGate;
+      owned?: boolean,
+    },
+  ): CompositeInputTransfer<InputTransferDataType<TStartTransfer>, TStartTransfer, TTriggerable, undefined, TGate> {
+    const subscriber = linkTransfers(this._currentTransfer, lastTransfer);
+    const finalOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
+
+    if (options?.owned) {
+      finalOwnedResources.push(lastTransfer);
+    }
+
+    // Create the composite instance, passing explicitly provided configurations
+    const composite = new UniversalCompositeTransfer<InputTransferDataType<TStartTransfer>, never>({
+      input: this._startTransfer,
+      output: lastTransfer as OutputTransfer<never>,
+      owned: finalOwnedResources,
+      triggerable: options?.triggerable,
+      gate: options?.gate,
+    });
+
+    // Return the computed type, fully satisfying the client's IDE
+    return composite as InputTransfer<InputTransferDataType<TStartTransfer>> as CompositeInputTransfer<InputTransferDataType<TStartTransfer>, TStartTransfer, TTriggerable, undefined, TGate>;
+  }
+}
+
+/**
+ * @deprecated Use `CompositeTransferBuilder` instead. Will be removed in the next major release.
+ *
+ * Builder for constructing output pipelines (OutputPipeline).
+ *
+ * Purpose:
+ * Creates a composite transfer with an output interface (OutputCompositeTransfer),
+ * which extracts data from the initial output transfer and passes it through
+ * a chain of intermediate duplex transfers to the final transfer.
+ *
+ * Pipeline structure:
+ *   OutputTransfer [-> DuplexTransfer -> ... ->] -> TFinishTransfer
+ *   │              │                                │
+ *   └─ start()     └─ to()                          └─ finish()
+ *
+ * Where:
+ * - OutputTransfer — initial output transfer (PullableTransferInterface | SubscribableTransferInterface | GateTransferInterface)
+ * - DuplexTransfer — intermediate chain links (optional, via to())
+ * - TFinishTransfer — final duplex transfer
+ *
+ * Mechanics:
+ * 1. start(startTransfer) — creates a builder with the initial output transfer
+ * 2. to(nextTransfer, owned?) — adds an intermediate duplex transfer to the chain,
+ *    linking it to the previous one via linkTransfers()
+ * 3. finish(lastTransfer, options?) — completes the pipeline, creating a UniversalCompositeTransfer
+ *
+ * finish() options:
+ * - triggerable?: TriggerableInterface — explicit trigger for the composite
+ * - gate?: GateInterface — explicit gate for flow control
+ * - owned?: boolean — whether to destroy lastTransfer on composite destroy()
+ *
+ * The owned parameter in to():
+ * - owned = true — the intermediate transfer is added to the owned resources array
+ *   and will be destroyed on composite destroy()
+ * - owned = false (default) — the transfer is not destroyed automatically
+ *
+ * Data types:
+ * - Composite output type = OutputTransferDataType<TFinishTransfer>
+ *
+ * Use cases:
+ * - Building a pipeline for extracting data from an external source
+ * - Chain of transformations with polling or subscribable source
+ * - Creating output nodes for pipeline architecture
+ *
+ * @example
+ * ```typescript
+ * const pipeline = OutputPipelineBuilder
+ *   .start(new GateTransfer<number>({ activated: true, initialValue: 0 }))
+ *   .to(new PushStoredChannelTransfer<number>())
+ *   .finish(new PushStoredChannelTransfer<number>(), {
+ *     owned: true
+ *   });
+ *
+ * pipeline.subscribe(data => console.log(data));
+ * pipeline.destroy();
+ * ```
+ */
+export class OutputPipelineBuilder implements OutputPipelineBuilderInterface {
+  private readonly _startTransfer: OutputTransfer<unknown>;
+  private readonly _currentTransfer: DuplexTransfer<unknown, unknown>;
+  private readonly _ownedResources: DisposableInterface[];
+
+  private constructor(
+    startTransfer: OutputTransfer<unknown>,
+    currentTransfer: DuplexTransfer<unknown, unknown>,
+    ownedResources: DisposableInterface[] = [],
+  ) {
+    this._startTransfer = startTransfer;
+    this._currentTransfer = currentTransfer;
+    this._ownedResources = ownedResources;
+  }
+
+  /**
+   * Static method to create a builder with an initial output transfer.
+   *
+   * @param startTransfer — initial output transfer (OutputTransfer)
+   * @returns A new OutputPipelineBuilder instance
+   */
+  public static start(startTransfer: OutputTransfer<unknown>): OutputPipelineBuilderInterface {
+    return new OutputPipelineBuilder(
+      startTransfer,
+      startTransfer as DuplexTransfer<unknown, unknown>,
+      [],
+    ) as OutputPipelineBuilderInterface;
+  }
+
+  /**
+   * Adds an intermediate duplex transfer to the pipeline chain.
+   *
+   * Mechanics:
+   * 1. Links the current transfer to nextTransfer via linkTransfers()
+   * 2. Creates a DisposableSubscriberAdapter to manage the subscription
+   * 3. Adds the adapter (and optionally nextTransfer) to the owned resources array
+   * 4. Returns a new builder with the updated chain
+   *
+   * @param nextTransfer — duplex transfer to add to the chain
+   * @param owned — if true, nextTransfer will be destroyed on composite destroy()
+   * @returns A new builder to continue the chain
+   */
+  public to(nextTransfer: DuplexTransfer<unknown, unknown>, owned?: boolean): OutputPipelineBuilderInterface {
+    const subscriber = linkTransfers(this._currentTransfer, nextTransfer);
+    const nextOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
+
+    if (owned) {
+      nextOwnedResources.push(nextTransfer);
+    }
+
+    return new OutputPipelineBuilder(
+      this._startTransfer,
+      nextTransfer,
+      nextOwnedResources
+    );
+  }
+
+  /**
+   * Completes the pipeline construction and creates a composite transfer.
+   *
+   * Mechanics:
+   * 1. Links the last transfer in the chain to lastTransfer via linkTransfers()
+   * 2. Creates a UniversalCompositeTransfer with input = startTransfer (muted to never), output = lastTransfer
+   * 3. Adds all owned resources (intermediate transfers + adapters + optionally lastTransfer)
+   * 4. Applies triggerable and gate options to the composite
+   *
+   * Options:
+   * - triggerable — explicit trigger for the composite
+   * - gate — explicit gate for flow control
+   * - owned — if true, lastTransfer is added to owned resources
+   *
+   * @typeParam TFinishTransfer — final transfer type (must be DuplexTransfer)
+   * @typeParam TTriggerable — trigger type (TriggerableInterface | undefined)
+   * @typeParam TGate — gate type (GateInterface | undefined)
+   * @param lastTransfer — final duplex transfer
+   * @param options — completion options (triggerable, gate, owned)
+   * @returns OutputCompositeTransfer with computed types
+   */
+  public finish<
+    TFinishTransfer extends DuplexTransfer<unknown, any>,
+    TTriggerable extends TriggerableInterface | undefined = undefined,
+    TGate extends GateInterface | undefined = undefined,
+  >(
+    lastTransfer: TFinishTransfer,
+    options?: {
+      triggerable?: TTriggerable;
+      gate?: TGate;
+      owned?: boolean;
+    },
+  ): CompositeOutputTransfer<OutputTransferDataType<TFinishTransfer>, TFinishTransfer, TTriggerable, undefined, TGate> {
+    const subscriber = linkTransfers(this._currentTransfer, lastTransfer);
+    const finalOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
+
+    if (options?.owned) {
+      finalOwnedResources.push(lastTransfer);
+    }
+
+    const composite = new UniversalCompositeTransfer({
+      input: this._startTransfer as InputTransfer<never>,
+      output: lastTransfer,
+      owned: finalOwnedResources,
+      triggerable: options?.triggerable,
+      gate: options?.gate,
+    });
+
+    return composite as OutputTransfer<OutputTransferDataType<TFinishTransfer>> as CompositeOutputTransfer<OutputTransferDataType<TFinishTransfer>, TFinishTransfer, TTriggerable, undefined, TGate>;
+  }
+}
+
+/**
+ * @deprecated Use `CompositeTransferBuilder` instead. Will be removed in the next major release.
+ *
+ * Builder for constructing full-duplex pipelines (DuplexPipeline).
+ *
+ * Purpose:
+ * Creates a composite transfer with a duplex interface (DuplexCompositeTransfer),
+ * which supports both input (push) and output (pull/subscribe) operations.
+ *
+ * Pipeline structure:
+ *   TStartTransfer [-> DuplexTransfer -> ... ->] -> TFinishTransfer
+ *   │              │                                │
+ *   └─ start()     └─ to()                          └─ finish()
+ *
+ * Where:
+ * - TStartTransfer — initial duplex transfer (must be InputTransfer)
+ * - DuplexTransfer — intermediate chain links (optional, via to())
+ * - TFinishTransfer — final output transfer (OutputTransfer)
+ *
+ * Mechanics:
+ * 1. start(startTransfer) — creates a builder with the initial duplex transfer
+ * 2. to(nextTransfer, owned?) — adds an intermediate duplex transfer to the chain,
+ *    linking it to the previous one via linkTransfers()
+ * 3. finish(lastTransfer, options?) — completes the pipeline, creating a UniversalCompositeTransfer
+ *
+ * finish() options:
+ * - triggerable?: TriggerableInterface — explicit trigger for the composite
+ * - gate?: GateInterface — explicit gate for flow control
+ * - owned?: boolean — whether to destroy lastTransfer on composite destroy()
+ *
+ * The owned parameter in to():
+ * - owned = true — the intermediate transfer is added to the owned resources array
+ *   and will be destroyed on composite destroy()
+ * - owned = false (default) — the transfer is not destroyed automatically
+ *
+ * Data types:
+ * - Composite input type = InputTransferDataType<TStartTransfer>
+ * - Composite output type = OutputTransferDataType<TFinishTransfer>
+ *
+ * Use cases:
+ * - Building a bidirectional data processing pipeline
+ * - Data transformation with both push and pull operations
+ * - Creating intermediate nodes for complex pipeline architectures
+ *
+ * @example
+ * ```typescript
+ * const pipeline = DuplexPipelineBuilder
+ *   .start(new PushStoredChannelTransfer<number>())
+ *   .to(new ConditionTransfer<number>(x => x > 0))
+ *   .to(new PushStoredChannelTransfer<number>())
+ *   .finish(new PushStoredChannelTransfer<number>(), {
+ *     owned: true
+ *   });
+ *
+ * // Push data
+ * pipeline.push(42);
+ *
+ * // Subscribe to output data
+ * pipeline.subscribe(data => console.log(data));
+ *
+ * // Pull data
+ * const value = pipeline.pull();
+ *
+ * pipeline.destroy();
+ * ```
+ *
+ * @typeParam TCurrent — data type of the current chain link
+ * @typeParam TStartTransfer — type of the initial transfer (must be InputTransfer)
+ */
+export class DuplexPipelineBuilder<
+  TCurrent,
+  TStartTransfer extends InputTransfer<unknown>
+> implements DuplexPipelineBuilderInterface<TCurrent, TStartTransfer> {
+  private readonly _startTransfer: TStartTransfer;
+  private readonly _currentTransfer: DuplexTransfer<unknown, TCurrent>;
+  private readonly _ownedResources: DisposableInterface[];
+
+  private constructor(
+    startTransfer: TStartTransfer,
+    currentTransfer: DuplexTransfer<unknown, TCurrent>,
+    ownedResources: DisposableInterface[] = [],
+  ) {
+    this._startTransfer = startTransfer;
+    this._currentTransfer = currentTransfer;
+    this._ownedResources = ownedResources;
+  }
+
+  /**
+   * Static method to create a builder with an initial duplex transfer.
+   *
+   * @typeParam TCurrent — data type of the initial transfer
+   * @typeParam TStartTransfer — type of the initial transfer (must be DuplexTransfer)
+   * @param startTransfer — initial duplex transfer
+   * @returns A new DuplexPipelineBuilder instance
+   */
+  public static start<TCurrent, TStartTransfer extends DuplexTransfer<unknown, TCurrent>>(
+    startTransfer: TStartTransfer,
+  ): DuplexPipelineBuilderInterface<TCurrent, TStartTransfer> {
+    return new DuplexPipelineBuilder<TCurrent, TStartTransfer>(startTransfer, startTransfer, []);
+  }
+
+  /**
+   * Adds an intermediate duplex transfer to the pipeline chain.
+   *
+   * Mechanics:
+   * 1. Links the current transfer to nextTransfer via linkTransfers()
+   * 2. Creates a DisposableSubscriberAdapter to manage the subscription
+   * 3. Adds the adapter (and optionally nextTransfer) to the owned resources array
+   * 4. Returns a new builder with the updated chain
+   *
+   * @typeParam TNext — data type of the next transfer
+   * @param nextTransfer — duplex transfer to add to the chain
+   * @param owned — if true, nextTransfer will be destroyed on composite destroy()
+   * @returns A new builder with the updated TNext type
+   */
+  public to<TNext>(
+    nextTransfer: DuplexTransfer<TCurrent, TNext>,
+    owned?: boolean,
+  ): DuplexPipelineBuilderInterface<TNext, TStartTransfer> {
+    const subscriber = linkTransfers(this._currentTransfer, nextTransfer);
+    const nextOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
+
+    if (owned) {
+      nextOwnedResources.push(nextTransfer);
+    }
+
+    return new DuplexPipelineBuilder<TNext, TStartTransfer>(
+      this._startTransfer,
+      nextTransfer,
+      nextOwnedResources
+    );
+  }
+
+  /**
+   * Completes the pipeline construction and creates a full-duplex composite transfer.
+   *
+   * Mechanics:
+   * 1. Links the last transfer in the chain to lastTransfer via linkTransfers()
+   * 2. Creates a UniversalCompositeTransfer with input = startTransfer, output = lastTransfer
+   * 3. Adds all owned resources (intermediate transfers + adapters + optionally lastTransfer)
+   * 4. Applies triggerable and gate options to the composite
+   *
+   * Options:
+   * - triggerable — explicit trigger for the composite (overrides extraction from input/output)
+   * - gate — explicit gate for flow control (overrides extraction from input/output)
+   * - owned — if true, lastTransfer is added to owned resources
+   *
+   * @typeParam TFinishTransfer — final transfer type (must be OutputTransfer)
+   * @typeParam TTriggerable — trigger type (TriggerableInterface | undefined)
+   * @typeParam TGate — gate type (GateInterface | undefined)
+   * @param lastTransfer — final output transfer
+   * @param options — completion options (triggerable, gate, owned)
+   * @returns DuplexCompositeTransfer with computed input and output types
+   */
+  public finish<
+    TFinishTransfer extends DuplexTransfer<unknown, any>,
+    TTriggerable extends TriggerableInterface | undefined = undefined,
+    TGate extends GateInterface | undefined = undefined,
+  >(
+    lastTransfer: TFinishTransfer,
+    options?: {
+      triggerable?: TTriggerable;
+      gate?: TGate;
+      owned?: boolean;
+    },
+  ): CompositeDuplexTransfer<
+    InputTransferDataType<TStartTransfer>,
+    OutputTransferDataType<TFinishTransfer>,
+    TStartTransfer,
+    TFinishTransfer,
+    TTriggerable,
+    undefined,
+    TGate
+  > {
+    const subscriber = linkTransfers(this._currentTransfer, lastTransfer);
+    const finalOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
+
+    if (options?.owned) {
+      finalOwnedResources.push(lastTransfer);
+    }
+
+    // Extract data types for input and output via utility types
+    type TStartData = InputTransferDataType<TStartTransfer>;
+    type TFinishData = OutputTransferDataType<TFinishTransfer>;
+
+    // Create the full-duplex composite instance
+    const composite = new UniversalCompositeTransfer<TStartData, TFinishData>({
+      input: this._startTransfer,
+      output: lastTransfer,
+      owned: finalOwnedResources,
+      triggerable: options?.triggerable,
+      gate: options?.gate,
+    });
+
+    // Signature double cast to pass compiler checks and keep the client IDE clean
+    return composite as DuplexTransfer<TStartData, TFinishData> as CompositeDuplexTransfer<
+      TStartData,
+      TFinishData,
+      TStartTransfer,
+      TFinishTransfer,
+      TTriggerable,
+      undefined,
+      TGate
+    >;
+  }
+}
+
+/**
+ * @deprecated Use `CompositeTransferBuilder` instead. Will be removed in the next major release.
+ *
+ * Builder for constructing input pipelines with async transfer support.
+ *
+ * Differences from InputPipelineBuilder:
+ * - linkTransfers is called with LinkConfig (onError for async-push rejection)
+ * - finish() accepts asyncTriggerable in addition to triggerable
+ * - asyncTriggerable is passed to UniversalCompositeTransfer
+ *
+ * @typeParam TCurrent — data type of the current chain link
+ * @typeParam TStartTransfer — type of the initial transfer (must be InputTransfer)
+ */
+export class AsyncInputPipelineBuilder<
+  TCurrent,
+  TStartTransfer extends InputTransfer<unknown>
+> implements AsyncInputPipelineBuilderInterface<TCurrent, TStartTransfer> {
+  private readonly _startTransfer: TStartTransfer;
+  private readonly _currentTransfer: DuplexTransfer<unknown, TCurrent>;
+  private readonly _ownedResources: DisposableInterface[];
+
+  private constructor(
+    startTransfer: TStartTransfer,
+    currentTransfer: DuplexTransfer<unknown, TCurrent>,
+    ownedResources: DisposableInterface[] = [],
+  ) {
+    this._startTransfer = startTransfer;
+    this._currentTransfer = currentTransfer;
+    this._ownedResources = ownedResources;
+  }
+
+  public static start<TCurrent, TStartTransfer extends DuplexTransfer<unknown, TCurrent>>(
+    startTransfer: TStartTransfer,
+  ): AsyncInputPipelineBuilderInterface<TCurrent, TStartTransfer> {
+    return new AsyncInputPipelineBuilder<TCurrent, TStartTransfer>(startTransfer, startTransfer, []);
+  }
+
+  public to<TNext>(
+    nextTransfer: DuplexTransfer<TCurrent, TNext>,
+    owned?: boolean,
+  ): AsyncInputPipelineBuilderInterface<TNext, TStartTransfer> {
+    const subscriber = linkTransfers(this._currentTransfer, nextTransfer);
+    const nextOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
+
+    if (owned) {
+      nextOwnedResources.push(nextTransfer);
+    }
+
+    return new AsyncInputPipelineBuilder<TNext, TStartTransfer>(
+      this._startTransfer,
+      nextTransfer,
+      nextOwnedResources
+    );
+  }
+
+  public finish<
+    TTriggerable extends TriggerableInterface | undefined = undefined,
+    TAsyncTriggerable extends AsyncTriggerableInterface | undefined = undefined,
+    TGate extends GateInterface | undefined = undefined,
+  >(
+    lastTransfer: InputTransfer<TCurrent>,
+    options?: {
+      triggerable?: TTriggerable;
+      asyncTriggerable?: TAsyncTriggerable;
+      gate?: TGate;
+      owned?: boolean;
+      linkOnError?: ErrorHandler<InputTransfer<TCurrent>>;
+    },
+  ): CompositeInputTransfer<InputTransferDataType<TStartTransfer>, TStartTransfer, TTriggerable, TAsyncTriggerable, TGate> {
+    const linkConfig: LinkConfig<InputTransfer<TCurrent>> | undefined = options?.linkOnError !== undefined
+      ? { onError: options.linkOnError }
+      : undefined;
+
+    const subscriber = linkTransfers(this._currentTransfer, lastTransfer, linkConfig);
+    const finalOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
+
+    if (options?.owned) {
+      finalOwnedResources.push(lastTransfer);
+    }
+
+    const composite = new UniversalCompositeTransfer<InputTransferDataType<TStartTransfer>, never>({
+      input: this._startTransfer,
+      output: lastTransfer as OutputTransfer<never>,
+      owned: finalOwnedResources,
+      triggerable: options?.triggerable,
+      asyncTriggerable: options?.asyncTriggerable,
+      gate: options?.gate,
+    });
+
+    return composite as InputTransfer<InputTransferDataType<TStartTransfer>> as CompositeInputTransfer<InputTransferDataType<TStartTransfer>, TStartTransfer, TTriggerable, TAsyncTriggerable, TGate>;
+  }
+}
+
+/**
+ * @deprecated Use `CompositeTransferBuilder` instead. Will be removed in the next major release.
+ *
+ * Builder for constructing output pipelines with async transfer support.
+ *
+ * Differences from OutputPipelineBuilder:
+ * - linkTransfers is called with LinkConfig (onError for async-push rejection)
+ * - finish() accepts asyncTriggerable in addition to triggerable
+ */
+export class AsyncOutputPipelineBuilder implements AsyncOutputPipelineBuilderInterface {
+  private readonly _startTransfer: OutputTransfer<unknown>;
+  private readonly _currentTransfer: DuplexTransfer<unknown, any>;
+  private readonly _ownedResources: DisposableInterface[];
+
+  private constructor(
+    startTransfer: OutputTransfer<unknown>,
+    currentTransfer: DuplexTransfer<unknown, unknown>,
+    ownedResources: DisposableInterface[] = [],
+  ) {
+    this._startTransfer = startTransfer;
+    this._currentTransfer = currentTransfer;
+    this._ownedResources = ownedResources;
+  }
+
+  public static start(startTransfer: OutputTransfer<unknown>): AsyncOutputPipelineBuilderInterface {
+    return new AsyncOutputPipelineBuilder(
+      startTransfer,
+      startTransfer as DuplexTransfer<unknown, unknown>,
+      [],
+    ) as AsyncOutputPipelineBuilderInterface;
+  }
+
+  public to(
+    nextTransfer: DuplexTransfer<unknown, unknown>,
+    owned?: boolean,
+  ): AsyncOutputPipelineBuilderInterface {
+    const subscriber = linkTransfers(this._currentTransfer, nextTransfer);
+    const nextOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
+
+    if (owned) {
+      nextOwnedResources.push(nextTransfer);
+    }
+
+    return new AsyncOutputPipelineBuilder(
+      this._startTransfer,
+      nextTransfer,
+      nextOwnedResources
+    ) as AsyncOutputPipelineBuilderInterface;
+  }
+
+  public finish<
+    TFinishTransfer extends DuplexTransfer<unknown, any>,
+    TTriggerable extends TriggerableInterface | undefined = undefined,
+    TAsyncTriggerable extends AsyncTriggerableInterface | undefined = undefined,
+    TGate extends GateInterface | undefined = undefined,
+  >(
+    lastTransfer: TFinishTransfer,
+    options?: {
+      triggerable?: TTriggerable;
+      asyncTriggerable?: TAsyncTriggerable;
+      gate?: TGate;
+      owned?: boolean;
+      linkOnError?: ErrorHandler<TFinishTransfer>;
+    },
+  ): CompositeOutputTransfer<OutputTransferDataType<TFinishTransfer>, TFinishTransfer, TTriggerable, TAsyncTriggerable, TGate> {
+    const linkConfig: LinkConfig<TFinishTransfer> | undefined = options?.linkOnError !== undefined
+      ? { onError: options.linkOnError }
+      : undefined;
+
+    const subscriber = linkTransfers(this._currentTransfer, lastTransfer, linkConfig);
+    const finalOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
+
+    if (options?.owned) {
+      finalOwnedResources.push(lastTransfer);
+    }
+
+    const composite = new UniversalCompositeTransfer({
+      input: this._startTransfer as InputTransfer<never>,
+      output: lastTransfer,
+      owned: finalOwnedResources,
+      triggerable: options?.triggerable,
+      asyncTriggerable: options?.asyncTriggerable,
+      gate: options?.gate,
+    });
+
+    return composite as OutputTransfer<OutputTransferDataType<TFinishTransfer>> as CompositeOutputTransfer<OutputTransferDataType<TFinishTransfer>, TFinishTransfer, TTriggerable, TAsyncTriggerable, TGate>;
+  }
+}
+
+/**
+ * @deprecated Use `CompositeTransferBuilder` instead. Will be removed in the next major release.
+ *
+ * Builder for constructing full-duplex pipelines with async transfer support.
+ *
+ * Differences from DuplexPipelineBuilder:
+ * - linkTransfers is called with LinkConfig (onError for async-push rejection)
+ * - finish() accepts asyncTriggerable in addition to triggerable
+ *
+ * @typeParam TCurrent — data type of the current chain link
+ * @typeParam TStartTransfer — type of the initial transfer (must be InputTransfer)
+ */
+export class AsyncDuplexPipelineBuilder<
+  TCurrent,
+  TStartTransfer extends InputTransfer<unknown>
+> implements AsyncDuplexPipelineBuilderInterface<TCurrent, TStartTransfer> {
+  private readonly _startTransfer: TStartTransfer;
+  private readonly _currentTransfer: DuplexTransfer<unknown, TCurrent>;
+  private readonly _ownedResources: DisposableInterface[];
+
+  private constructor(
+    startTransfer: TStartTransfer,
+    currentTransfer: DuplexTransfer<unknown, TCurrent>,
+    ownedResources: DisposableInterface[] = [],
+  ) {
+    this._startTransfer = startTransfer;
+    this._currentTransfer = currentTransfer;
+    this._ownedResources = ownedResources;
+  }
+
+  public static start<TStart extends InputTransfer<unknown>>(
+    startTransfer: TStart,
+  ): AsyncDuplexPipelineBuilderInterface<InputTransferDataType<TStart>, TStart> {
+    return new AsyncDuplexPipelineBuilder<InputTransferDataType<TStart>, TStart>(
+      startTransfer,
+      startTransfer as DuplexTransfer<unknown, any>,
+      []
+    );
+  }
+
+  public to<TNext>(
+    nextTransfer: DuplexTransfer<TCurrent, TNext>,
+    owned?: boolean,
+  ): AsyncDuplexPipelineBuilderInterface<TNext, TStartTransfer> {
+    const subscriber = linkTransfers(this._currentTransfer, nextTransfer);
+    const nextOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
+
+    if (owned) {
+      nextOwnedResources.push(nextTransfer);
+    }
+
+    return new AsyncDuplexPipelineBuilder<TNext, TStartTransfer>(
+      this._startTransfer,
+      nextTransfer,
+      nextOwnedResources
+    );
+  }
+
+  public finish<
+    TFinishTransfer extends DuplexTransfer<unknown, any>,
+    TTriggerable extends TriggerableInterface | undefined = undefined,
+    TAsyncTriggerable extends AsyncTriggerableInterface | undefined = undefined,
+    TGate extends GateInterface | undefined = undefined,
+  >(
+    lastTransfer: TFinishTransfer,
+    options?: {
+      triggerable?: TTriggerable;
+      asyncTriggerable?: TAsyncTriggerable;
+      gate?: TGate;
+      owned?: boolean;
+      linkOnError?: ErrorHandler<TFinishTransfer>;
+    },
+  ): CompositeDuplexTransfer<
+    InputTransferDataType<TStartTransfer>,
+    OutputTransferDataType<TFinishTransfer>,
+    TStartTransfer,
+    TFinishTransfer,
+    TTriggerable,
+    TAsyncTriggerable,
+    TGate
+  > {
+    const linkConfig: LinkConfig<TFinishTransfer> | undefined = options?.linkOnError !== undefined
+      ? { onError: options.linkOnError }
+      : undefined;
+
+    const subscriber = linkTransfers(this._currentTransfer, lastTransfer, linkConfig);
+    const finalOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
+
+    if (options?.owned) {
+      finalOwnedResources.push(lastTransfer);
+    }
+
+    type TStartData = InputTransferDataType<TStartTransfer>;
+    type TFinishData = OutputTransferDataType<TFinishTransfer>;
+
+    const composite = new UniversalCompositeTransfer<TStartData, TFinishData>({
+      input: this._startTransfer,
+      output: lastTransfer,
+      owned: finalOwnedResources,
+      triggerable: options?.triggerable,
+      asyncTriggerable: options?.asyncTriggerable,
+      gate: options?.gate,
+    });
+
+    return composite as DuplexTransfer<TStartData, TFinishData> as CompositeDuplexTransfer<
       TStartData,
       TFinishData,
       TStartTransfer,
