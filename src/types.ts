@@ -132,7 +132,11 @@ export type InputTransferDataType<T> = T extends InputTransfer<infer U> ? U : ne
 /** Extracts the output data type from an OutputTransfer. */
 export type OutputTransferDataType<T> = T extends OutputTransfer<infer U> ? U : never;
 
-/** Composite transfer type produced by InputPipelineBuilder — exposes input capabilities plus optional trigger/gate. */
+/**
+ * @deprecated Use `CompositeTransfer` instead. Will be removed in the next major release.
+ *
+ * Composite transfer type produced by InputPipelineBuilder — exposes input capabilities plus optional trigger/gate.
+ */
 export type CompositeInputTransfer<
   TStart,
   TTransfer extends InputTransfer<TStart>,
@@ -146,7 +150,11 @@ export type CompositeInputTransfer<
   & (TAsyncTriggerable extends AsyncTriggerableInterface ? AsyncTriggerableInterface : {})
   & (TGate extends GateInterface ? GateInterface : {});
 
-/** Composite transfer type produced by OutputPipelineBuilder — exposes output capabilities plus optional trigger/gate. */
+/**
+ * @deprecated Use `CompositeTransfer` instead. Will be removed in the next major release.
+ *
+ * Composite transfer type produced by OutputPipelineBuilder — exposes output capabilities plus optional trigger/gate.
+ */
 export type CompositeOutputTransfer<
   TFinish,
   TTransfer extends OutputTransfer<TFinish>,
@@ -160,7 +168,11 @@ export type CompositeOutputTransfer<
   & (TAsyncTriggerable extends AsyncTriggerableInterface ? AsyncTriggerableInterface : {})
   & (TGate extends GateInterface ? GateInterface : {});
 
-/** Composite transfer type produced by DuplexPipelineBuilder — exposes both input and output capabilities plus optional trigger/gate. */
+/**
+ * @deprecated Use `CompositeTransfer` instead. Will be removed in the next major release.
+ *
+ * Composite transfer type produced by DuplexPipelineBuilder — exposes both input and output capabilities plus optional trigger/gate.
+ */
 export type CompositeDuplexTransfer<
   TStart,
   TFinish,
@@ -183,3 +195,47 @@ export type CompositeDuplexTransfer<
 export type BaseSelectorKey = string | number | symbol;
 /** Extracts the key type from a bridge map. */
 export type SelectorKey<TMap extends Record<BaseSelectorKey, BridgeInterface>> = keyof TMap;
+
+/** Filters `never` elements out of a tuple type, preserving order of the remaining elements. */
+type FilterNever<T extends any[], Acc extends any[] = []> =
+  T extends [infer Head, ...infer Rest]
+    ? [Head] extends [never] ? FilterNever<Rest, Acc> : FilterNever<Rest, [...Acc, Head]>
+    : Acc;
+
+/**
+ * Unified composite transfer type produced by PipelineBuilder.
+ *
+ * Input capability flags (Pushable, PollingProxy, AsyncPushable, AsyncPollingProxy)
+ * are extracted from the start transfer. Output capability flags (Pullable, Subscribable,
+ * AsyncPullable) are extracted from the finish transfer. Triggerable, AsyncTriggerable,
+ * and Gate are extracted from options or the start/finish transfers (same priority logic
+ * as UniversalCompositeTransfer).
+ *
+ * The result is a `Transfer<TInput, TOutput, [...Flags]>` — the same computed type used
+ * by all transfer factories, with compile-time literal flags guaranteeing method existence.
+ */
+export type CompositeTransfer<
+  TInput,
+  TOutput,
+  TStartTransfer,
+  TFinishTransfer,
+  TTriggerable extends TriggerableInterface | undefined,
+  TAsyncTriggerable extends AsyncTriggerableInterface | undefined,
+  TGate extends GateInterface | undefined,
+> = Transfer<TInput, TOutput, FilterNever<[
+  // Input flags — from start transfer
+  TStartTransfer extends { readonly isPushable: true } ? Pushable<TInput> : never,
+  TStartTransfer extends { readonly isPollingProxy: true } ? PollingProxy<TInput> : never,
+  TStartTransfer extends { readonly isAsyncPushable: true } ? AsyncPushable<TInput> : never,
+  TStartTransfer extends { readonly isAsyncPollingProxy: true } ? AsyncPollingProxy<TInput> : never,
+
+  // Output flags — from finish transfer
+  TFinishTransfer extends { readonly isPullable: true } ? Pullable<TOutput> : never,
+  TFinishTransfer extends { readonly isSubscribable: true } ? Subscribable<TOutput> : never,
+  TFinishTransfer extends { readonly isAsyncPullable: true } ? AsyncPullable<TOutput> : never,
+
+  // Optional flags — from explicit options or extracted by UniversalCompositeTransfer
+  TTriggerable extends TriggerableInterface ? Triggerable : never,
+  TAsyncTriggerable extends AsyncTriggerableInterface ? AsyncTriggerable : never,
+  TGate extends GateInterface ? Gate : never,
+]>>;

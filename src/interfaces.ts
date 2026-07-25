@@ -7,7 +7,9 @@ import type {
   First,
   Last,
   InputTransfer,
+  OutputTransfer,
   SelectorKey,
+  CompositeTransfer,
   CompositeDuplexTransfer,
   CompositeInputTransfer,
   CompositeOutputTransfer,
@@ -262,6 +264,8 @@ export interface AsyncPollingProxyTransferInterface<T> extends AsyncPollingProxy
 }
 
 /**
+ * @deprecated Use `PipelineBuilderInterface` instead. Will be removed in the next major release.
+ *
  * Input pipeline builder interface — produces a strictly input-only composite transfer.
  *
  * Pipeline structure: TStartTransfer [→ DuplexTransfer → …] → InputTransfer.
@@ -287,6 +291,8 @@ export interface InputPipelineBuilderInterface<TCurrent, TStartTransfer extends 
 }
 
 /**
+ * @deprecated Use `PipelineBuilderInterface` instead. Will be removed in the next major release.
+ *
  * Output pipeline builder interface — produces a duplex composite transfer with output-only start.
  *
  * Pipeline structure: OutputTransfer [→ DuplexTransfer → …] → TFinishTransfer.
@@ -313,6 +319,8 @@ export interface OutputPipelineBuilderInterface {
 }
 
 /**
+ * @deprecated Use `PipelineBuilderInterface` instead. Will be removed in the next major release.
+ *
  * Duplex pipeline builder interface — produces a duplex composite transfer.
  *
  * Pipeline structure: TStartTransfer [→ DuplexTransfer → …] → TFinishTransfer.
@@ -386,6 +394,8 @@ export interface OperatorPipelineBuilderInterface<TFlow extends readonly unknown
 // ═══════════════════════════════════════════════════════════════
 
 /**
+ * @deprecated Use `PipelineBuilderInterface` instead. Will be removed in the next major release.
+ *
  * Async input pipeline builder interface — like InputPipelineBuilderInterface,
  * but supports async triggerable and linkOnError for async-push rejection handling.
  */
@@ -412,6 +422,8 @@ export interface AsyncInputPipelineBuilderInterface<TCurrent, TStartTransfer ext
 }
 
 /**
+ * @deprecated Use `PipelineBuilderInterface` instead. Will be removed in the next major release.
+ *
  * Async output pipeline builder interface — like OutputPipelineBuilderInterface,
  * but supports async triggerable and linkOnError for async-push rejection handling.
  */
@@ -439,6 +451,8 @@ export interface AsyncOutputPipelineBuilderInterface {
 }
 
 /**
+ * @deprecated Use `PipelineBuilderInterface` instead. Will be removed in the next major release.
+ *
  * Async duplex pipeline builder interface — like DuplexPipelineBuilderInterface,
  * but supports async triggerable and linkOnError for async-push rejection handling.
  */
@@ -510,6 +524,55 @@ export interface AsyncOperatorPipelineBuilderInterface<TFlow extends readonly un
   build(
     this: AsyncOperatorPipelineBuilderInterface<readonly [unknown, ...unknown[]]>
   ): AsyncOperatorInterface<First<TFlow>, Last<TFlow>>;
+}
+
+/**
+ * Unified pipeline builder interface — replaces Input/Output/Duplex builder interfaces.
+ *
+ * Pipeline structure: OutputTransfer [→ DuplexTransfer → …] → InputTransfer.
+ * The start transfer provides output capabilities (source of data);
+ * intermediate transfers are duplex (relay data through the chain);
+ * the finish transfer provides input capabilities (sink for data).
+ *
+ * The composite result exposes:
+ * - Input flags (Pushable, PollingProxy, AsyncPushable, AsyncPollingProxy) from the start transfer.
+ * - Output flags (Pullable, Subscribable, AsyncPullable) from the finish transfer.
+ * - Triggerable, AsyncTriggerable, Gate from explicit options or extracted by UniversalCompositeTransfer.
+ *
+ * Works for both sync and async pipelines — `linkOnError` in finish() options enables async error handling.
+ */
+export interface PipelineBuilderInterface<
+  TCurrent,
+  TStartTransfer extends OutputTransfer<unknown>,
+> {
+  to<TNext>(
+    nextTransfer: DuplexTransfer<TCurrent, TNext>,
+    owned?: boolean,
+  ): PipelineBuilderInterface<TNext, TStartTransfer>;
+
+  finish<
+    TFinishTransfer extends InputTransfer<TCurrent>,
+    TTriggerable extends TriggerableInterface | undefined = undefined,
+    TAsyncTriggerable extends AsyncTriggerableInterface | undefined = undefined,
+    TGate extends GateInterface | undefined = undefined,
+  >(
+    lastTransfer: TFinishTransfer,
+    options?: {
+      triggerable?: TTriggerable;
+      asyncTriggerable?: TAsyncTriggerable;
+      gate?: TGate;
+      owned?: boolean;
+      linkOnError?: ErrorHandler<TFinishTransfer>;
+    },
+  ): CompositeTransfer<
+    InputTransferDataType<TStartTransfer>,
+    OutputTransferDataType<TFinishTransfer>,
+    TStartTransfer,
+    TFinishTransfer,
+    TTriggerable,
+    TAsyncTriggerable,
+    TGate
+  >;
 }
 
 /** Bridge contract — a gated, disposable connection between two transfers. */
