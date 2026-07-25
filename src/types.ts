@@ -203,7 +203,7 @@ type FilterNever<T extends any[], Acc extends any[] = []> =
     : Acc;
 
 /**
- * Unified composite transfer type produced by PipelineBuilder.
+ * Unified composite transfer type produced by CompositeTransferBuilder.
  *
  * Input capability flags (Pushable, PollingProxy, AsyncPushable, AsyncPollingProxy)
  * are extracted from the start transfer. Output capability flags (Pullable, Subscribable,
