@@ -99,7 +99,9 @@ Type-safe primitives — **transfers** (nodes), **bridges** (edges), **builders*
   - [Bridge Comparison Table](#bridge-comparison-table)
   - [AsyncTransformBridge](#asynctransformbridge)
 - [Pipeline Builders](#pipeline-builders)
-  - [Async Builders](#async-builders)
+  - [CompositeTransferBuilder](#compositetransferbuilder)
+  - [The `owned` parameter](#the-owned-parameter)
+  - [Deprecated Builders](#deprecated-builders)
 - [Factories](#factories)
 - [Utilities](#utilities)
 - [Types](#types)
@@ -158,7 +160,8 @@ This is a graph.
 
 ```typescript
 import {
-  OutputPipelineBuilder, createAsyncPollingSourceTransfer, createConvertTransfer, createMapOperator, createPushStoredChannelTransfer,
+  CompositeTransferBuilder, createAsyncPollingSourceTransfer, createConvertTransfer,
+  createMapOperator, createPushStoredChannelTransfer,
 } from 'transferum';
 
 // Poll an API every 5 seconds, transform the response, update subscribers
@@ -168,7 +171,7 @@ const polling = createAsyncPollingSourceTransfer<ServerState>({
   activated: true,
 });
 
-const pipeline = OutputPipelineBuilder
+const pipeline = CompositeTransferBuilder
   .start(polling)
   .to(createConvertTransfer<ServerState, ViewModel>({
     operator: createMapOperator((state) => toViewModel(state)),
@@ -182,19 +185,23 @@ pipeline.subscribe((vm) => renderUI(vm));
 
 ```typescript
 import {
-  AsyncInputPipelineBuilder, createPushStoredChannelTransfer, createDebounceTransfer, createAsyncConditionTransfer,
+  CompositeTransferBuilder, createPushStoredChannelTransfer, createDebounceTransfer, createAsyncConditionTransfer,
   createAsyncConvertTransfer, createAsyncSinkTransfer, createAsyncMapOperator,
 } from 'transferum';
 
 // Debounce input → validate → transform → send to async sink
 const input = createPushStoredChannelTransfer<string>();
 
-const pipeline = AsyncInputPipelineBuilder
+const pipeline = CompositeTransferBuilder
   .start(input)
   .to(createDebounceTransfer<string>({ delay: 300 }))
   .to(createAsyncConditionTransfer<string>({ shouldAccept: async (s) => s.length > 0 }))
-  .to(createAsyncConvertTransfer<string, ValidationResult>({ operator: createAsyncMapOperator(async (s) => await validate(s)) }))
-  .finish(createAsyncSinkTransfer<ValidationResult>({ callback: async (result) => await saveResult(result) }));
+  .to(createAsyncConvertTransfer<string, ValidationResult>({
+    operator: createAsyncMapOperator(async (s) => await validate(s)),
+  }), { onLinkError: (e) => console.error(e) })
+  .finish(createAsyncSinkTransfer<ValidationResult>({
+    callback: async (result) => await saveResult(result),
+  }), { onLinkError: (e) => console.error(e) });
 
 input.push('user@example.com'); // debounced → validated → saved
 ```
@@ -266,18 +273,20 @@ channel.push({ temperature: 25 });
 
 ```typescript
 import {
-  AsyncDuplexPipelineBuilder, createPushStoredChannelTransfer, createAsyncConvertTransfer, createAsyncMapOperator,
+  CompositeTransferBuilder, createPushStoredChannelTransfer, createAsyncConvertTransfer, createAsyncMapOperator,
 } from 'transferum';
 
 // Push data → async transform → notify subscribers
 const source = createPushStoredChannelTransfer<RawData>();
 
-const pipeline = AsyncDuplexPipelineBuilder
+const pipeline = CompositeTransferBuilder
   .start(source)
   .to(createAsyncConvertTransfer<RawData, ProcessedData>({
     operator: createAsyncMapOperator(async (raw) => await process(raw)),
-  }))
-  .finish(createPushStoredChannelTransfer<ProcessedData>());
+  }), { onLinkError: (e) => console.error(e) })
+  .finish(createPushStoredChannelTransfer<ProcessedData>(), {
+    onLinkError: (e) => console.error(e),
+  });
 
 pipeline.subscribe((data) => console.log('processed data', data));
 
@@ -407,7 +416,10 @@ effects.check('shake');
 Read data from multiple sensors (temperature, humidity, motion) via `AsyncPollingSourceTransfer` → filter (`ConditionTransfer`) → aggregate → send to cloud or local storage.
 
 ```typescript
-import { OutputPipelineBuilder, createAsyncPollingSourceTransfer, createMergeTransfer, createConditionTransfer, createAsyncWriteTransfer } from 'transferum';
+import {
+  CompositeTransferBuilder, createAsyncPollingSourceTransfer, createMergeTransfer,
+  createConditionTransfer, createAsyncWriteTransfer,
+} from 'transferum';
 
 const sensor1 = createAsyncPollingSourceTransfer<SensorData>({
   fetcher: () => Promise.resolve({ temperature: 25, humidity: 50 }),
@@ -425,7 +437,7 @@ const aggregator = createMergeTransfer<SensorData>({
   sources: [sensor1, sensor2],
 });
 
-const pipeline = OutputPipelineBuilder
+const pipeline = CompositeTransferBuilder
   .start(aggregator)
   .to(createConditionTransfer<SensorData>({ shouldAccept: (d) => d.temperature > 0 && d.humidity >= 0 }))
   .finish(createAsyncWriteTransfer<SensorData>({ flow: cloudStorage }));
@@ -457,7 +469,10 @@ commandRouter.select('thermostat'); // switch to thermostat control
 Poll device temperature via `AsyncPollingSourceTransfer` → filter by threshold (`ConditionTransfer`) → throttle alerts (`ThrottleTransfer`) → transform into alert (`ConvertTransfer`) → send notification.
 
 ```typescript
-import { OutputPipelineBuilder, createConditionTransfer, createThrottleTransfer, createConvertTransfer, createMapOperator, createAsyncPollingSourceTransfer } from 'transferum';
+import {
+  CompositeTransferBuilder, createConditionTransfer, createThrottleTransfer,
+  createConvertTransfer, createMapOperator, createAsyncPollingSourceTransfer,
+} from 'transferum';
 
 const TEMPERATURE_THRESHOLD = 95;
 
@@ -467,7 +482,7 @@ const tempMonitor = createAsyncPollingSourceTransfer<number>({
   activated: true,
 });
 
-const alertPipeline = OutputPipelineBuilder
+const alertPipeline = CompositeTransferBuilder
   .start(tempMonitor)
   .to(createConditionTransfer({ shouldAccept: (temp) => temp > TEMPERATURE_THRESHOLD }))
   .to(createThrottleTransfer({ interval: 5000 }))
@@ -486,19 +501,21 @@ Process user input in form fields → `DebounceTransfer` for autosave or live se
 
 ```typescript
 import {
-  AsyncDuplexPipelineBuilder, createDebounceTransfer, createAsyncConditionTransfer,
+  CompositeTransferBuilder, createDebounceTransfer, createAsyncConditionTransfer,
   createAsyncConvertTransfer, createPushStoredChannelTransfer, createAsyncMapOperator,
 } from 'transferum';
 
 const searchInput = createDebounceTransfer<string>({ delay: 300 });
 
-const pipeline = AsyncDuplexPipelineBuilder
+const pipeline = CompositeTransferBuilder
   .start(searchInput)
   .to(createAsyncConditionTransfer<string>({ shouldAccept: async (s) => s.length >= 3 }))
   .to(createAsyncConvertTransfer<string, SearchResult[]>({
     operator: createAsyncMapOperator(async (query) => await searchAPI(query)),
-  }))
-  .finish(createPushStoredChannelTransfer<SearchResult[]>());
+  }), { onLinkError: (e) => console.error(e) })
+  .finish(createPushStoredChannelTransfer<SearchResult[]>(), {
+    onLinkError: (e) => console.error(e),
+  });
 
 pipeline.subscribe((results) => renderSuggestions(results));
 searchInput.push('user query');
@@ -541,14 +558,14 @@ Receive streaming quotes → calculate indicators (`MapOperator`) → filter by 
 
 ```typescript
 import {
-  DuplexPipelineBuilder, createPushChannelTransfer, createPushStoredChannelTransfer, createConvertTransfer,
+  CompositeTransferBuilder, createPushChannelTransfer, createPushStoredChannelTransfer, createConvertTransfer,
   createConditionTransfer, createAsyncSinkTransfer, createMapOperator,
 } from 'transferum';
 
 const quoteStream = createPushChannelTransfer<Quote[]>();
 const thresholdChannel = createPushStoredChannelTransfer<number>({ initialValue: 100 });
 
-const indicatorPipeline = DuplexPipelineBuilder
+const indicatorPipeline = CompositeTransferBuilder
   .start(quoteStream)
   .to(createConvertTransfer<Quote[], TechnicalIndicator>({
     operator: createMapOperator((quotes): TechnicalIndicator => ({
@@ -565,7 +582,9 @@ const indicatorPipeline = DuplexPipelineBuilder
       targetPrice: ind.value,
     })),
   }))
-  .finish(createAsyncSinkTransfer<TradingSignal>({ callback: async (signal) => await executeTrade(signal) }));
+  .finish(createAsyncSinkTransfer<TradingSignal>({
+    callback: async (signal) => await executeTrade(signal),
+  }), { onLinkError: (e) => console.error(e) });
 
 quoteStream.push([{ symbol: 'AAPL', price: 150, timestamp: Date.now() }]);
 thresholdChannel.push(200);
@@ -779,13 +798,13 @@ fromEvent(searchInput, 'input')
 ```typescript
 // Transferum
 import {
-  InputPipelineBuilder, createPushChannelTransfer, createDebounceTransfer, createConditionTransfer,
+  CompositeTransferBuilder, createPushChannelTransfer, createDebounceTransfer, createConditionTransfer,
   createDisplaceTransfer, createAsyncConvertTransfer, createAsyncMapOperator, createSinkTransfer,
 } from 'transferum';
 
 const input = createPushChannelTransfer<string>();
 
-const pipeline = InputPipelineBuilder
+const pipeline = CompositeTransferBuilder
   .start(input)
   .to(createDebounceTransfer<string>({ delay: 300 }))
   .to(createConditionTransfer<string>({ shouldAccept: q => q.length >= 3 }))
@@ -2676,66 +2695,120 @@ source.push(42); // → async transformation → "val_42" at target's subscriber
 
 Builders provide a fluent API for assembling transfer chains with automatic linking via `linkTransfers`.
 
-### InputPipelineBuilder
+### CompositeTransferBuilder
 
-Builds an input pipeline: `start(Duplex) → to(Duplex)* → finish(Input)`.
+`CompositeTransferBuilder` is the unified, type-safe builder that replaces `InputPipelineBuilder`, `OutputPipelineBuilder`, `DuplexPipelineBuilder`, and all async variants. A single builder covers all pipeline directions.
+
+**Pipeline structure:** `OutputTransfer [→ DuplexTransfer → …] → InputTransfer`
 
 ```typescript
 import {
-  InputPipelineBuilder,
+  CompositeTransferBuilder,
   createPushStoredChannelTransfer,
-  createConvertTransfer,
+  createConditionTransfer,
   createSinkTransfer,
-  createMapOperator,
-} from 'transferum';
-
-const pipeline = InputPipelineBuilder
-  .start(createPushStoredChannelTransfer<number>())
-  .to(createConvertTransfer<number, string>({ operator: createMapOperator((n) => n.toString()) }))
-  .finish(createSinkTransfer<string>({ callback: (s) => console.log(s) }));
-
-pipeline.push(21); // → "21"
-```
-
-### OutputPipelineBuilder
-
-Builds an output pipeline: `start(Output) → to(Duplex)* → finish(Duplex)`.
-
-```typescript
-import {
-  OutputPipelineBuilder,
   createPollingSourceTransfer,
   createConvertTransfer,
-  createPushStoredChannelTransfer,
   createMapOperator,
 } from 'transferum';
 
-const pipeline = OutputPipelineBuilder
+// Input pipeline: push → condition → sink
+const input = CompositeTransferBuilder
+  .start(createPushStoredChannelTransfer<number>())
+  .to(createConditionTransfer<number>({ shouldAccept: x => x > 0 }))
+  .finish(createSinkTransfer<number>({ callback: console.log }), { owned: true });
+
+input.push(42); // → 42
+
+// Output pipeline: polling → convert → stored channel
+const output = CompositeTransferBuilder
   .start(createPollingSourceTransfer<number>({ fetcher: () => 42, interval: 1000, activated: true }))
-  .to(createConvertTransfer<number, string>({ operator: createMapOperator((n) => n.toString()) }))
+  .to(createConvertTransfer<number, string>({ operator: createMapOperator(n => n.toString()) }))
   .finish(createPushStoredChannelTransfer<string>());
 
-pipeline.subscribe((data) => console.log(data));
-```
+output.subscribe(data => console.log(data)); // → "42" every second
 
-### DuplexPipelineBuilder
-
-Builds a full-duplex pipeline: `start(Duplex) → to(Duplex)* → finish(Output)`.
-
-```typescript
-import { DuplexPipelineBuilder, createPushStoredChannelTransfer, createConditionTransfer } from 'transferum';
-
-const pipeline = DuplexPipelineBuilder
+// Full-duplex pipeline: push → condition → stored channel (push + subscribe + pull)
+const duplex = CompositeTransferBuilder
   .start(createPushStoredChannelTransfer<number>())
-  .to(createConditionTransfer<number>({ shouldAccept: (n) => n > 0 }))
+  .to(createConditionTransfer<number>({ shouldAccept: x => x > 0 }))
   .finish(createPushStoredChannelTransfer<number>(), { owned: true });
 
-pipeline.push(42);
-pipeline.subscribe((data) => console.log(data));
-pipeline.pull();
-
-pipeline.destroy(); // destroys owned resources
+duplex.push(42);
+duplex.subscribe(data => console.log(data)); // → 42
+duplex.pull(); // → 42
+duplex.destroy(); // destroys owned resources
 ```
+
+**Auto-capability inference:**
+- Input flags (`Pushable`, `PollingProxy`, `AsyncPushable`, `AsyncPollingProxy`) are extracted from the **start** transfer.
+- Output flags (`Pullable`, `Subscribable`, `AsyncPullable`) are extracted from the **finish** transfer.
+- Triggerable, AsyncTriggerable, and Gate are inferred from explicit options or auto-extracted from the chain.
+
+**`to(transfer, options)`:**
+```typescript
+to(nextTransfer, {
+  owned?: boolean,                    // destroy nextTransfer on composite destroy()
+  onLinkError?: ErrorHandler,         // async linking error handler
+})
+```
+
+**`finish(lastTransfer, options)`:**
+```typescript
+finish(lastTransfer, {
+  triggerable?: TriggerableInterface,           // explicit trigger (priority over auto-extraction)
+  asyncTriggerable?: AsyncTriggerableInterface, // explicit async trigger
+  gate?: GateInterface,                         // explicit gate (priority over auto-extraction)
+  owned?: boolean,                              // whether to destroy lastTransfer on destroy()
+  onLinkError?: ErrorHandler,                   // async linking error handler
+})
+```
+
+**Unified sync + async:** The `onLinkError` option in `to()` and `finish()` enables async error handling across the entire chain, eliminating the need for separate async builder variants.
+
+```typescript
+import {
+  CompositeTransferBuilder,
+  createPushStoredChannelTransfer,
+  createAsyncConvertTransfer,
+  createAsyncMapOperator,
+} from 'transferum';
+
+const pipeline = CompositeTransferBuilder
+  .start(createPushStoredChannelTransfer<number>())
+  .to(createAsyncConvertTransfer<number, string>({
+    operator: createAsyncMapOperator(async (n) => n.toString()),
+    onLinkError: (e) => console.error(e),
+  }))
+  .finish(createPushStoredChannelTransfer<string>(), {
+    owned: true,
+    onLinkError: (e) => console.error(e),
+  });
+
+pipeline.push(42);
+pipeline.subscribe((data) => console.log(data)); // → "42"
+```
+
+### The `owned` parameter
+
+- `owned: true` in `to(transfer, { owned?: boolean, ... })` — the intermediate transfer is destroyed on composite `destroy()`.
+- `owned: true` in `finish(lastTransfer, { owned?: boolean, ... })` — the final transfer is destroyed on composite `destroy()`.
+- `owned: false` (default) — the transfer is not destroyed automatically.
+
+### Deprecated Builders
+
+> **@deprecated** The following builders are deprecated and will be removed in the next major release. Use `CompositeTransferBuilder` instead.
+
+| Builder                      | Status      |
+|------------------------------|-------------|
+| `InputPipelineBuilder`       | @deprecated |
+| `OutputPipelineBuilder`      | @deprecated |
+| `DuplexPipelineBuilder`      | @deprecated |
+| `AsyncInputPipelineBuilder`  | @deprecated |
+| `AsyncOutputPipelineBuilder` | @deprecated |
+| `AsyncDuplexPipelineBuilder` | @deprecated |
+
+`OperatorPipelineBuilder` and `AsyncOperatorPipelineBuilder` work with `OperatorInterface` / `AsyncOperatorInterface` (not `TransferInterface`) and remain non-deprecated.
 
 ### OperatorPipelineBuilder
 
@@ -2754,61 +2827,9 @@ const operator = OperatorPipelineBuilder
 console.log(operator.apply(21)); // "42"
 ```
 
-### The `owned` parameter
+### AsyncOperatorPipelineBuilder
 
-- `owned: true` in `to()` — the intermediate transfer is destroyed on composite `destroy()`.
-- `owned: true` in `finish()` — the final transfer is destroyed on composite `destroy()`.
-- `owned: false` (default) — the transfer is not destroyed automatically.
-
-### `finish()` options
-
-```
-finish(lastTransfer, {
-  triggerable?: TriggerableInterface,           // explicit trigger (priority over auto-extraction)
-  asyncTriggerable?: AsyncTriggerableInterface, // explicit async trigger (async builders only)
-  gate?: GateInterface,                         // explicit gate (priority over auto-extraction)
-  owned?: boolean,                              // whether to destroy lastTransfer on destroy()
-  linkOnError?: ErrorHandler,                   // async linking error handler (async builders only)
-})
-```
-
-### Async Builders
-
-Async builders are analogous to sync builders, but:
-- `linkTransfers` is called with `LinkConfig` (`onError` for async-push rejection)
-- `finish()` accepts `asyncTriggerable` in addition to `triggerable`
-- `asyncTriggerable` is passed to `UniversalCompositeTransfer`
-
-> **Sync builders and async targets:** Sync builders (`InputPipelineBuilder`, `OutputPipelineBuilder`, `DuplexPipelineBuilder`) do not pass `linkOnError` to `linkTransfers`. If the final transfer is async-only (`AsyncSinkTransfer`, `AsyncConvertTransfer`, `AsyncConditionTransfer`, etc.) and the preceding transfer is `Subscribable`, the link uses the async `subscribable → asyncPushable` strategy — and without `linkOnError`, rejections from `asyncPush()` become **unhandled promise rejections** (see [Error Handling](#error-handling)). To handle them, use an async builder (which supports `linkOnError` in `finish()`), or link the final transfer manually via `linkTransfers()` with `onError`.
-
-| Builder                        | Sync analog               | Difference                                                                  |
-|--------------------------------|---------------------------|-----------------------------------------------------------------------------|
-| `AsyncInputPipelineBuilder`    | `InputPipelineBuilder`    | `linkOnError` + `asyncTriggerable` in `finish()`                            |
-| `AsyncOutputPipelineBuilder`   | `OutputPipelineBuilder`   | `linkOnError` + `asyncTriggerable` in `finish()`                            |
-| `AsyncDuplexPipelineBuilder`   | `DuplexPipelineBuilder`   | `linkOnError` + `asyncTriggerable` in `finish()`                            |
-| `AsyncOperatorPipelineBuilder` | `OperatorPipelineBuilder` | Accepts sync and async operators, `build()` returns `AsyncPipelineOperator` |
-
-```typescript
-import {
-  AsyncDuplexPipelineBuilder,
-  createPushStoredChannelTransfer,
-  createAsyncConvertTransfer,
-  createAsyncMapOperator,
-} from 'transferum';
-
-const pipeline = AsyncDuplexPipelineBuilder
-  .start(createPushStoredChannelTransfer<number>())
-  .to(createAsyncConvertTransfer<number, string>({
-    operator: createAsyncMapOperator(async (n) => n.toString()),
-  }))
-  .finish(createPushStoredChannelTransfer<string>(), {
-    owned: true,
-    linkOnError: (e) => console.error(e),
-  });
-
-pipeline.push(42);
-pipeline.subscribe((data) => console.log(data)); // → "42"
-```
+Accepts both sync and async operators, `build()` returns `AsyncPipelineOperator`.
 
 ```typescript
 import { AsyncOperatorPipelineBuilder, createMapOperator, createAsyncMapOperator } from 'transferum';
@@ -2895,33 +2916,34 @@ Universal error handler:
 
 Key types are defined in `types.ts`:
 
-| Type                                             | Description                                                                               |
-|--------------------------------------------------|-------------------------------------------------------------------------------------------|
-| `Transfer<TInOrAll, TOutOrFeatures, TFeatures?>` | Computed transfer type from a list of capabilities                                        |
-| `GateInterface`                                  | Flow control: `active`, `activate()`, `deactivate()`, `toggle()`, `onStateChange()`       |
-| `SubscriberInterface`                            | Subscription management: `active`, `unsubscribe()`, `onUnsubscribe()`, `offUnsubscribe()` |
-| `DisposableInterface`                            | Resource cleanup: `destroy()`                                                             |
-| `InputTransfer<T>`                               | `PushableTransferInterface \| PollingProxyTransferInterface \| GateTransferInterface`     |
-| `OutputTransfer<T>`                              | `PullableTransferInterface \| SubscribableTransferInterface \| GateTransferInterface`     |
-| `DuplexTransfer<TIn, TOut>`                      | `InputTransfer<TIn> & OutputTransfer<TOut>`                                               |
-| `CompositeInputTransfer`                         | Composite input transfer (from a builder)                                                 |
-| `CompositeOutputTransfer`                        | Composite output transfer (from a builder)                                                |
-| `CompositeDuplexTransfer`                        | Composite duplex transfer (from a builder)                                                |
-| `First<T>` / `Last<T>`                           | First/last element of a tuple                                                             |
-| `InputTransferDataType<T>`                       | Extracts the data type from `InputTransfer`                                               |
-| `OutputTransferDataType<T>`                      | Extracts the data type from `OutputTransfer`                                              |
-| `AsyncDataHandler<T>`                            | Data handler: `(data: T) => Promise<void> \| void`                                        |
-| `ErrorHandler<TSource>`                          | Error handler: `(e: Error, source: TSource) => void`                                      |
-| `AsyncDataFetcher<T>`                            | Data fetcher function: `() => Promise<T \| undefined>`                                    |
-| `AsyncPushable<T>`                               | `AsyncPushableInterface<T> & { readonly isAsyncPushable: true }`                          |
-| `AsyncPullable<T>`                               | `AsyncPullableInterface<T> & { readonly isAsyncPullable: true }`                          |
-| `AsyncTriggerable`                               | `AsyncTriggerableInterface & { readonly isAsyncTriggerable: true }`                       |
-| `AsyncPollingProxy<T>`                           | `AsyncPollingProxyInterface<T> & { readonly isAsyncPollingProxy: true }`                  |
-| `AsyncOperatorInterface<TInput, TOutput>`        | Async operator: `apply(data: TInput): Promise<TOutput>`                                   |
-| `AsyncInputFlowInterface<T>`                     | Async write: `write(data: T): Promise<void>`                                              |
-| `AsyncOutputFlowInterface<T>`                    | Async read: `read(): Promise<T \| undefined>`                                             |
-| `AsyncIOFlowInterface<TInput, TOutput>`          | `AsyncInputFlowInterface<TInput> & AsyncOutputFlowInterface<TOutput>`                     |
-| `AsyncStorageInterface<TInput, TOutput>`         | `AsyncIOFlowInterface` + `size`, `clear()`, `reset()` (async)                             |
+| Type                                                       | Description                                                                                               |
+|------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|
+| `Transfer<TInOrAll, TOutOrFeatures, TFeatures?>`           | Computed transfer type from a list of capabilities                                                        |
+| `GateInterface`                                            | Flow control: `active`, `activate()`, `deactivate()`, `toggle()`, `onStateChange()`                       |
+| `SubscriberInterface`                                      | Subscription management: `active`, `unsubscribe()`, `onUnsubscribe()`, `offUnsubscribe()`                 |
+| `DisposableInterface`                                      | Resource cleanup: `destroy()`                                                                             |
+| `InputTransfer<T>`                                         | `PushableTransferInterface \| PollingProxyTransferInterface \| GateTransferInterface`                     |
+| `OutputTransfer<T>`                                        | `PullableTransferInterface \| SubscribableTransferInterface \| GateTransferInterface`                     |
+| `DuplexTransfer<TIn, TOut>`                                | `InputTransfer<TIn> & OutputTransfer<TOut>`                                                               |
+| `CompositeInputTransfer`                                   | Composite input transfer (from a builder) **[deprecated: use `CompositeTransfer`]**                       |
+| `CompositeOutputTransfer`                                  | Composite output transfer (from a builder) **[deprecated: use `CompositeTransfer`]**                      |
+| `CompositeDuplexTransfer`                                  | Composite duplex transfer (from a builder) **[deprecated: use `CompositeTransfer`]**                      |
+| `CompositeTransfer<TInput, TOutput, TStart, TFinish, ...>` | Composite transfer type with computed capability flags from start and finish transfers (new unified type) |
+| `First<T>` / `Last<T>`                                     | First/last element of a tuple                                                                             |
+| `InputTransferDataType<T>`                                 | Extracts the data type from `InputTransfer`                                                               |
+| `OutputTransferDataType<T>`                                | Extracts the data type from `OutputTransfer`                                                              |
+| `AsyncDataHandler<T>`                                      | Data handler: `(data: T) => Promise<void> \| void`                                                        |
+| `ErrorHandler<TSource>`                                    | Error handler: `(e: Error, source: TSource) => void`                                                      |
+| `AsyncDataFetcher<T>`                                      | Data fetcher function: `() => Promise<T \| undefined>`                                                    |
+| `AsyncPushable<T>`                                         | `AsyncPushableInterface<T> & { readonly isAsyncPushable: true }`                                          |
+| `AsyncPullable<T>`                                         | `AsyncPullableInterface<T> & { readonly isAsyncPullable: true }`                                          |
+| `AsyncTriggerable`                                         | `AsyncTriggerableInterface & { readonly isAsyncTriggerable: true }`                                       |
+| `AsyncPollingProxy<T>`                                     | `AsyncPollingProxyInterface<T> & { readonly isAsyncPollingProxy: true }`                                  |
+| `AsyncOperatorInterface<TInput, TOutput>`                  | Async operator: `apply(data: TInput): Promise<TOutput>`                                                   |
+| `AsyncInputFlowInterface<T>`                               | Async write: `write(data: T): Promise<void>`                                                              |
+| `AsyncOutputFlowInterface<T>`                              | Async read: `read(): Promise<T \| undefined>`                                                             |
+| `AsyncIOFlowInterface<TInput, TOutput>`                    | `AsyncInputFlowInterface<TInput> & AsyncOutputFlowInterface<TOutput>`                                     |
+| `AsyncStorageInterface<TInput, TOutput>`                   | `AsyncIOFlowInterface` + `size`, `clear()`, `reset()` (async)                                             |
 
 > **Capability-derived types:** `InputTransfer<T>`, `OutputTransfer<T>`, `DuplexTransfer<TIn, TOut>`, and `Transfer<…>` are not hand-written unions — they are computed from capability flag interfaces (where each flag is narrowed to `true`). Branded types like `Pushable<T>`, `Subscribable<T>`, `Gate` add a literal `true` brand to the corresponding flag. Builders use these types to enforce capability compatibility at compile time. See [Capability Flags System](#capability-flags-system).
 
@@ -2978,6 +3000,8 @@ Configs are defined in `configs.ts`. All configs are types (not classes), passed
 All polling transfers support an optional `tickerFactory?: TickerFactory` to replace the default ticker (`RAFTicker.factory`).
 
 `BackpressureConfig<T>` (`maxConcurrency?`, `bufferSize?`, `onBufferOverflow?`) is shared by `AsyncSinkTransfer`, `AsyncWriteTransfer`, `AsyncConvertTransfer`, and `AsyncConditionTransfer`. See [Backpressure](#backpressure).
+
+`onLinkError` in `CompositeTransferBuilder.to()` and `finish()` passes `onError` to `linkTransfers` for async-push rejection handling.
 
 | Config         | For                           | Required fields         |
 |----------------|-------------------------------|-------------------------|

@@ -1,5 +1,60 @@
 # Transferum Change Log
 
+## v1.5.0 - 2026-07-26
+
+### CompositeTransferBuilder — unified pipeline builder
+
+* **New builder:** `CompositeTransferBuilder` — a single, type-safe builder that replaces `InputPipelineBuilder`, `OutputPipelineBuilder`, `DuplexPipelineBuilder`, `AsyncInputPipelineBuilder`, `AsyncOutputPipelineBuilder`, and `AsyncDuplexPipelineBuilder`.
+* **Pipeline structure:** `OutputTransfer [→ DuplexTransfer → …] → InputTransfer`. The `start()` method accepts an `OutputTransfer`, `to()` accepts a `DuplexTransfer`, and `finish()` accepts an `InputTransfer`.
+* **Auto-capability inference:** Input flags (`Pushable`, `PollingProxy`, `AsyncPushable`, `AsyncPollingProxy`) are extracted from the start transfer; output flags (`Pullable`, `Subscribable`, `AsyncPullable`) are extracted from the finish transfer. Triggerable, AsyncTriggerable, and Gate are inferred from explicit options or auto-extracted from the chain.
+* **`to(transfer, options)`:** accepts an options object `{ owned?: boolean, onLinkError?: ErrorHandler }` instead of the previous `(transfer, owned?)` signature. `onLinkError` enables async linking error handling at any intermediate step.
+* **`finish(lastTransfer, options)`:** accepts `{ triggerable?, asyncTriggerable?, gate?, owned?, onLinkError? }`. Returns a `CompositeTransfer<TInput, TOutput, TStartTransfer, TFinishTransfer, TTriggerable, TAsyncTriggerable, TGate>` — a computed type with capability flags derived from start and finish transfers.
+* **Unified sync + async:** `onLinkError` in `to()` and `finish()` enables async error handling across the entire chain, eliminating the need for separate async builder variants.
+* **Examples:**
+  ```typescript
+  // Input pipeline (replaces InputPipelineBuilder)
+  const input = CompositeTransferBuilder
+    .start(createPushStoredChannelTransfer<number>())
+    .to(createConditionTransfer<number>({ shouldAccept: x => x > 0 }))
+    .finish(createSinkTransfer<number>({ callback: console.log }), { owned: true });
+  input.push(42);
+
+  // Output pipeline (replaces OutputPipelineBuilder)
+  const output = CompositeTransferBuilder
+    .start(createPollingSourceTransfer<number>({ fetcher: () => 42, interval: 1000, activated: true }))
+    .to(createConvertTransfer<number, string>({ operator: createMapOperator(n => n.toString()) }))
+    .finish(createPushStoredChannelTransfer<string>());
+  output.subscribe(data => console.log(data));
+
+  // Full-duplex pipeline (replaces DuplexPipelineBuilder)
+  const duplex = CompositeTransferBuilder
+    .start(createPushStoredChannelTransfer<number>())
+    .to(createConditionTransfer<number>({ shouldAccept: x => x > 0 }))
+    .finish(createPushStoredChannelTransfer<number>(), { owned: true });
+  duplex.push(42);
+  duplex.subscribe(data => console.log(data));
+  ```
+
+### Deprecated builders
+
+* `InputPipelineBuilder`, `OutputPipelineBuilder`, `DuplexPipelineBuilder` — marked `@deprecated`. Use `CompositeTransferBuilder` instead. Will be removed in the next major release.
+* `AsyncInputPipelineBuilder`, `AsyncOutputPipelineBuilder`, `AsyncDuplexPipelineBuilder` — marked `@deprecated`. Use `CompositeTransferBuilder` with `onLinkError` for async error handling. Will be removed in the next major release.
+* `AsyncOperatorPipelineBuilder` — remains non-deprecated as it works with `OperatorInterface` / `AsyncOperatorInterface`, not `TransferInterface`.
+
+### Type safety improvements
+
+* **`CompositeTransfer` type:** New computed type in `types.ts` that derives capability flags from start and finish transfers via `FilterNever<[...]>`. Replaces `CompositeInputTransfer`, `CompositeOutputTransfer`, and `CompositeDuplexTransfer` (which remain for backward compatibility).
+
+### Infrastructure
+
+* **Code reorganization:** Deprecated builders, interfaces, and types moved to the bottom sections of their respective files for better readability.
+* **`CompositeTransferBuilderInterface`:** Interface updated with `to(transfer, options?)` and `finish(lastTransfer, options?)` method signatures.
+
+### Tests
+
+* **CompositeTransferBuilder test suite:** 1319 tests covering input, output, and duplex pipeline construction, capability flag inference, `owned` resource management, `onLinkError` error handling, `triggerable`/`gate`/`asyncTriggerable` options, type-safe chaining, and `destroy()` lifecycle.
+* **Coverage:** Maintained **100% test coverage** (statements, branches, functions, lines) across all 11 source files. Total tests: **3,454**.
+
 ## v1.4.0 - 2026-07-25
 
 ### Sequence Guard for AsyncConvertTransfer and AsyncConditionTransfer
