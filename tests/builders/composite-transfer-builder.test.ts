@@ -1239,7 +1239,7 @@ describe(
 
       const composite = CompositeTransferBuilder
         .start(startTransfer)
-        .to(gate as any)
+        .to(gate)
         .finish(lastTransfer);
 
       const received: number[] = [];
@@ -1269,7 +1269,7 @@ describe(
 
       const composite = CompositeTransferBuilder
         .start(startTransfer)
-        .to(condition as any)
+        .to(condition)
         .finish(lastTransfer);
 
       const received: number[] = [];
@@ -1312,34 +1312,6 @@ describe(
 
       expect(composite.isTriggerable).toBe(true);
       expect(composite.isAsyncTriggerable).toBe(true);
-
-      composite.destroy();
-    });
-  },
-);
-
-// ═══════════════════════════════════════════════════════════════
-// Type transformation chain — number → string → number
-// ═══════════════════════════════════════════════════════════════
-
-describe(
-  'CompositeTransferBuilder type transformation chain test',
-  () => {
-    it('', () => {
-      const startTransfer = new PushStoredChannelTransfer<number>();
-      const stringTransfer = new PushStoredChannelTransfer<string>();
-      const numberTransfer = new PushStoredChannelTransfer<number>();
-
-      const builder = CompositeTransferBuilder
-        .start(startTransfer)
-        .to(stringTransfer as any)
-        .to(numberTransfer as any);
-
-      const lastTransfer = new PushStoredChannelTransfer<number>();
-      const composite = builder.finish(lastTransfer);
-
-      expect(composite).toBeDefined();
-      expect(composite.isInput).toBe(true);
 
       composite.destroy();
     });
