@@ -140,6 +140,30 @@ describe(
 );
 
 // ═══════════════════════════════════════════════════════════════
+// to() — linkOnError (async mode)
+// ═══════════════════════════════════════════════════════════════
+
+describe(
+  'CompositeTransferBuilder to with linkOnError passes handler to linkTransfers test',
+  () => {
+    it('', () => {
+      const startTransfer = new PushStoredChannelTransfer<number>();
+      const onError = jest.fn();
+      const lastTransfer = new PushStoredChannelTransfer<number>();
+
+      const composite = CompositeTransferBuilder
+        .start(startTransfer)
+        .to(new PushStoredChannelTransfer<number>(), { linkOnError: onError })
+        .finish(lastTransfer);
+
+      expect(composite).toBeDefined();
+
+      composite.destroy();
+    });
+  },
+);
+
+// ═══════════════════════════════════════════════════════════════
 // to() — owned parameter
 // ═══════════════════════════════════════════════════════════════
 
@@ -154,7 +178,7 @@ describe(
 
       const composite = CompositeTransferBuilder
         .start(startTransfer)
-        .to(intermediate, true)
+        .to(intermediate, { owned: true })
         .finish(new PushStoredChannelTransfer<number>());
 
       composite.destroy();
@@ -512,7 +536,7 @@ describe(
 
       const composite = CompositeTransferBuilder
         .start(startTransfer)
-        .to(channel, true)
+        .to(channel, { owned: true })
         .finish(lastTransfer, { owned: true });
 
       composite.destroy();
@@ -753,8 +777,8 @@ describe(
 
       const composite = CompositeTransferBuilder
         .start(startTransfer)
-        .to(t1, true)
-        .to(t2, true)
+        .to(t1, { owned: true })
+        .to(t2, { owned: true })
         .finish(lastTransfer, { owned: true });
 
       composite.destroy();

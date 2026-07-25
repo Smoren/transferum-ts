@@ -294,25 +294,38 @@ export class CompositeTransferBuilder<
    * Adds an intermediate duplex transfer to the chain.
    *
    * Links the current transfer to nextTransfer via linkTransfers(), then returns
-   * a new builder with TNext as the current data type.
+   * a new builder with the next transfer's output data type as the current type.
    *
-   * @typeParam TNext — output data type of the next transfer
+   * Options:
+   * - owned — if true, nextTransfer will be destroyed on composite destroy()
+   * - linkOnError — error handler for async-push rejection (enables async linking
+   *   when the chain contains async transfers)
+   *
+   * @typeParam TNextTransfer — type of the next duplex transfer
    * @param nextTransfer — duplex transfer to add to the chain
-   * @param owned — if true, nextTransfer will be destroyed on composite destroy()
-   * @returns A new builder with the updated TNext type
+   * @param options — optional link configuration: `owned` (destroy nextTransfer on composite destroy),
+   *   `linkOnError` (error handler for async-push rejection, enables async linking)
+   * @returns A new builder with the updated output data type
    */
-  public to<TNext>(
-    nextTransfer: DuplexTransfer<TCurrent, TNext>,
-    owned?: boolean,
-  ): CompositeTransferBuilderInterface<TNext, TStartTransfer> {
-    const subscriber = linkTransfers(this._currentTransfer, nextTransfer);
+  public to<TNextTransfer extends DuplexTransfer<TCurrent, any>>(
+    nextTransfer: TNextTransfer,
+    options?: {
+      owned?: boolean;
+      linkOnError?: ErrorHandler<TNextTransfer>;
+    },
+  ): CompositeTransferBuilderInterface<OutputTransferDataType<TNextTransfer>, TStartTransfer> {
+    const linkConfig: LinkConfig<TNextTransfer> | undefined = options?.linkOnError !== undefined
+      ? { onError: options.linkOnError }
+      : undefined;
+
+    const subscriber = linkTransfers(this._currentTransfer, nextTransfer, linkConfig);
     const nextOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
 
-    if (owned) {
+    if (options?.owned) {
       nextOwnedResources.push(nextTransfer);
     }
 
-    return new CompositeTransferBuilder<TNext, TStartTransfer>(
+    return new CompositeTransferBuilder<OutputTransferDataType<TNextTransfer>, TStartTransfer>(
       this._startTransfer,
       nextTransfer,
       nextOwnedResources,
