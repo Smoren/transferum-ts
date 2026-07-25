@@ -234,7 +234,7 @@ export class AsyncOperatorPipelineBuilder<TFlow extends readonly unknown[]> impl
  * the composite exposes output capabilities. This naturally covers all three cases
  * (input-only, output-only, full-duplex) without separate builder classes.
  *
- * Sync and async are unified: `onRelayError` in finish() options enables async error
+ * Sync and async are unified: `onLinkError` in finish() options enables async error
  * handling when the chain contains async transfers.
  *
  * @example
@@ -298,24 +298,24 @@ export class CompositeTransferBuilder<
    *
    * Options:
    * - owned — if true, nextTransfer will be destroyed on composite destroy()
-   * - onRelayError — error handler for async-push rejection (enables async linking
+   * - onLinkError — error handler for async-push rejection (enables async linking
    *   when the chain contains async transfers)
    *
    * @typeParam TNextTransfer — type of the next duplex transfer
    * @param nextTransfer — duplex transfer to add to the chain
    * @param options — optional link configuration: `owned` (destroy nextTransfer on composite destroy),
-   *   `onRelayError` (error handler for async-push rejection, enables async linking)
+   *   `onLinkError` (error handler for async-push rejection, enables async linking)
    * @returns A new builder with the updated output data type
    */
   public to<TNextTransfer extends DuplexTransfer<TCurrent, unknown>>(
     nextTransfer: TNextTransfer,
     options?: {
       owned?: boolean;
-      onRelayError?: ErrorHandler<TNextTransfer>;
+      onLinkError?: ErrorHandler<TNextTransfer>;
     },
   ): CompositeTransferBuilderInterface<OutputTransferDataType<TNextTransfer>, TStartTransfer> {
-    const linkConfig: LinkConfig<TNextTransfer> | undefined = options?.onRelayError !== undefined
-      ? { onError: options.onRelayError }
+    const linkConfig: LinkConfig<TNextTransfer> | undefined = options?.onLinkError !== undefined
+      ? { onError: options.onLinkError }
       : undefined;
 
     const subscriber = linkTransfers(this._currentTransfer, nextTransfer, linkConfig);
@@ -344,7 +344,7 @@ export class CompositeTransferBuilder<
    * - asyncTriggerable — explicit async trigger for the composite
    * - gate — explicit gate for flow control
    * - owned — if true, lastTransfer is added to owned resources
-   * - onRelayError — error handler for async-push rejection (enables async mode)
+   * - onLinkError — error handler for async-push rejection (enables async mode)
    *
    * @typeParam TFinishTransfer — final transfer type (must be InputTransfer)
    * @typeParam TTriggerable — sync trigger type
@@ -366,7 +366,7 @@ export class CompositeTransferBuilder<
       asyncTriggerable?: TAsyncTriggerable;
       gate?: TGate;
       owned?: boolean;
-      onRelayError?: ErrorHandler<TFinishTransfer>;
+      onLinkError?: ErrorHandler<TFinishTransfer>;
     },
   ): CompositeTransfer<
     InputTransferDataType<TStartTransfer>,
@@ -377,8 +377,8 @@ export class CompositeTransferBuilder<
     TAsyncTriggerable,
     TGate
   > {
-    const linkConfig: LinkConfig<TFinishTransfer> | undefined = options?.onRelayError !== undefined
-      ? { onError: options.onRelayError }
+    const linkConfig: LinkConfig<TFinishTransfer> | undefined = options?.onLinkError !== undefined
+      ? { onError: options.onLinkError }
       : undefined;
 
     const subscriber = linkTransfers(this._currentTransfer, lastTransfer, linkConfig);

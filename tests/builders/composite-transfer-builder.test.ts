@@ -140,11 +140,11 @@ describe(
 );
 
 // ═══════════════════════════════════════════════════════════════
-// to() — onRelayError (async mode)
+// to() — onLinkError (async mode)
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'CompositeTransferBuilder to with onRelayError passes handler to linkTransfers test',
+  'CompositeTransferBuilder to with onLinkError passes handler to linkTransfers test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
@@ -153,7 +153,7 @@ describe(
 
       const composite = CompositeTransferBuilder
         .start(startTransfer)
-        .to(new PushStoredChannelTransfer<number>(), { onRelayError: onError })
+        .to(new PushStoredChannelTransfer<number>(), { onLinkError: onError })
         .finish(lastTransfer);
 
       expect(composite).toBeDefined();
@@ -343,11 +343,11 @@ describe(
 );
 
 // ═══════════════════════════════════════════════════════════════
-// finish() — onRelayError (async mode)
+// finish() — onLinkError (async mode)
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'CompositeTransferBuilder finish with onRelayError test',
+  'CompositeTransferBuilder finish with onLinkError test',
   () => {
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
@@ -356,7 +356,7 @@ describe(
 
       const composite = CompositeTransferBuilder
         .start(startTransfer)
-        .finish(lastTransfer, { onRelayError: onError });
+        .finish(lastTransfer, { onLinkError: onError });
 
       expect(composite).toBeDefined();
 

@@ -344,7 +344,7 @@ export interface AsyncOperatorPipelineBuilderInterface<TFlow extends readonly un
  * - Output flags (Pullable, Subscribable, AsyncPullable) from the finish transfer.
  * - Triggerable, AsyncTriggerable, Gate from explicit options or extracted by UniversalCompositeTransfer.
  *
- * Works for both sync and async pipelines — `onRelayError` in finish() options enables async error handling.
+ * Works for both sync and async pipelines — `onLinkError` in finish() options enables async error handling.
  */
 export interface CompositeTransferBuilderInterface<
   TCurrent,
@@ -354,7 +354,7 @@ export interface CompositeTransferBuilderInterface<
     nextTransfer: TNextTransfer,
     options?: {
       owned?: boolean;
-      onRelayError?: ErrorHandler<TNextTransfer>;
+      onLinkError?: ErrorHandler<TNextTransfer>;
     },
   ): CompositeTransferBuilderInterface<OutputTransferDataType<TNextTransfer>, TStartTransfer>;
 
@@ -370,7 +370,7 @@ export interface CompositeTransferBuilderInterface<
       asyncTriggerable?: TAsyncTriggerable;
       gate?: TGate;
       owned?: boolean;
-      onRelayError?: ErrorHandler<TFinishTransfer>;
+      onLinkError?: ErrorHandler<TFinishTransfer>;
     },
   ): CompositeTransfer<
     InputTransferDataType<TStartTransfer>,
