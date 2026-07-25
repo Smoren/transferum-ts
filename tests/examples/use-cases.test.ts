@@ -1,9 +1,6 @@
 import {
   RAFTicker,
-  OutputPipelineBuilder,
-  InputPipelineBuilder,
-  AsyncInputPipelineBuilder,
-  AsyncDuplexPipelineBuilder,
+  CompositeTransferBuilder,
   linkTransfers,
   createPassBridge,
   createConvertTransfer,
@@ -60,7 +57,7 @@ describe('README Use Cases: Real-time UI updates from API polling', () => {
       activated: true,
     });
 
-    const pipeline = OutputPipelineBuilder
+    const pipeline = CompositeTransferBuilder
       .start(polling)
       .to(createConvertTransfer<ServerState, ViewModel>({
         operator: createMapOperator((state) => toViewModel(state)),
@@ -99,7 +96,7 @@ describe('README Use Cases: Debounced search with error handling and empty-resul
       return [{ id: 1, title: q }];
     });
 
-    const pipeline = InputPipelineBuilder
+    const pipeline = CompositeTransferBuilder
       .start(input)
       .to(createConditionTransfer<string>({ shouldAccept: q => q.length >= 3 }))
       .to(createDisplaceTransfer<string, SearchResult[]>({
@@ -154,7 +151,7 @@ describe('README Use Cases: Debounced search with error handling and empty-resul
       });
     };
 
-    const pipeline = InputPipelineBuilder
+    const pipeline = CompositeTransferBuilder
       .start(input)
       .to(createConditionTransfer<string>({ shouldAccept: q => q.length >= 3 }))
       .to(createDisplaceTransfer<string, SearchResult[]>({
@@ -309,14 +306,16 @@ describe('README Use Cases: Debounced user input with async validation', () => {
     const input = createPushStoredChannelTransfer<string>();
 
     const saved: ValidationResult[] = [];
-    const pipeline = AsyncInputPipelineBuilder
+    const pipeline = CompositeTransferBuilder
       .start(input)
       .to(createDebounceTransfer<string>({ delay: 50 }))
       .to(createAsyncConditionTransfer<string>({ shouldAccept: async (s) => s.length > 0 }))
       .to(createAsyncConvertTransfer<string, ValidationResult>({
         operator: createAsyncMapOperator(async (s) => await validate(s)),
-      }))
-      .finish(createAsyncSinkTransfer<ValidationResult>({ callback: async (result) => { saved.push(result); } }));
+      }), { onLinkError: (e) => console.error(e) })
+      .finish(createAsyncSinkTransfer<ValidationResult>({
+        callback: async (result) => { saved.push(result); },
+      }), { onLinkError: (e) => console.error(e) });
 
     input.push('user@example.com');
     await wait(100);
@@ -359,12 +358,14 @@ describe('README Use Cases: Async data pipeline with storage', () => {
   it('pushes data, async transforms, notifies subscribers', async () => {
     const source = createPushStoredChannelTransfer<RawData>();
 
-    const pipeline = AsyncDuplexPipelineBuilder
+    const pipeline = CompositeTransferBuilder
       .start(source)
       .to(createAsyncConvertTransfer<RawData, ProcessedData>({
         operator: createAsyncMapOperator(async (raw) => ({ processed: raw.raw.toUpperCase() })),
-      }))
-      .finish(createPushStoredChannelTransfer<ProcessedData>());
+      }), { onLinkError: (e) => console.error(e) })
+      .finish(createPushStoredChannelTransfer<ProcessedData>(), {
+        onLinkError: (e) => console.error(e),
+      });
 
     const received: ProcessedData[] = [];
     pipeline.subscribe((data) => received.push(data));

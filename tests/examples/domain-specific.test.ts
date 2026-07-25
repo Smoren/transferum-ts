@@ -15,10 +15,7 @@ import {
   createAsyncConditionTransfer,
   createAsyncConvertTransfer,
   createAsyncMapOperator,
-  createAsyncSinkTransfer,
-  OutputPipelineBuilder,
-  DuplexPipelineBuilder,
-  AsyncDuplexPipelineBuilder,
+  CompositeTransferBuilder,
   linkTransfers,
 } from '../../src';
 import type {
@@ -138,7 +135,7 @@ describe('README Domain-Specific: IoT - Sensor Data Aggregation', () => {
       sources: [tempSensor, humiditySensor],
     });
 
-    const pipeline = OutputPipelineBuilder
+    const pipeline = CompositeTransferBuilder
       .start(aggregator)
       .to(createConditionTransfer<SensorData>({
         shouldAccept: (d) => d.temperature > 0 && d.humidity >= 0,
@@ -200,7 +197,7 @@ describe('README Domain-Specific: IoT - Monitoring & Alerts', () => {
 
     const TEMPERATURE_THRESHOLD = 95;
 
-    const alertPipeline = OutputPipelineBuilder
+    const alertPipeline = CompositeTransferBuilder
       .start(tempMonitor)
       .to(createConditionTransfer<number>({ shouldAccept: (temp) => temp > TEMPERATURE_THRESHOLD }))
       .to(createThrottleTransfer<number>({ interval: 500 }))
@@ -209,7 +206,7 @@ describe('README Domain-Specific: IoT - Monitoring & Alerts', () => {
       }));
 
     const alerts: Alert[] = [];
-    alertPipeline.subscribe((alert) => alerts.push(alert));
+    alertPipeline.subscribe((alert: unknown) => alerts.push(alert as Alert));
 
     await wait(100);
     tempMonitor.deactivate();
@@ -231,13 +228,15 @@ describe('README Domain-Specific: UI/UX - Reactive Forms', () => {
   it('debounces input, validates, async-transforms, stores results', async () => {
     const searchInput = createDebounceTransfer<string>({ delay: 50 });
 
-    const pipeline = AsyncDuplexPipelineBuilder
+    const pipeline = CompositeTransferBuilder
       .start(searchInput)
       .to(createAsyncConditionTransfer<string>({ shouldAccept: async (s) => s.length >= 3 }))
       .to(createAsyncConvertTransfer<string, SearchResult[]>({
         operator: createAsyncMapOperator(async (query) => [{ id: 1, title: query }]),
-      }))
-      .finish(createPushStoredChannelTransfer<SearchResult[]>());
+      }), { onLinkError: (e) => console.error(e) })
+      .finish(createPushStoredChannelTransfer<SearchResult[]>(), {
+        onLinkError: (e) => console.error(e),
+      });
 
     const received: SearchResult[][] = [];
     pipeline.subscribe((results) => received.push(results));
@@ -297,7 +296,7 @@ describe('README Domain-Specific: Financial - Stock Market Data Processing', () 
     const quoteStream = createPushChannelTransfer<Quote[]>();
     const thresholdChannel = createPushStoredChannelTransfer<number>({ initialValue: 100 });
 
-    const indicatorPipeline = DuplexPipelineBuilder
+    const indicatorPipeline = CompositeTransferBuilder
       .start(quoteStream)
       .to(createConvertTransfer<Quote[], TechnicalIndicator>({
         operator: createMapOperator((quotes): TechnicalIndicator => ({
