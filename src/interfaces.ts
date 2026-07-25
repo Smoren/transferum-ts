@@ -350,7 +350,7 @@ export interface CompositeTransferBuilderInterface<
   TCurrent,
   TStartTransfer extends OutputTransfer<unknown>,
 > {
-  to<TNextTransfer extends DuplexTransfer<TCurrent, any>>(
+  to<TNextTransfer extends DuplexTransfer<TCurrent, unknown>>(
     nextTransfer: TNextTransfer,
     options?: {
       owned?: boolean;

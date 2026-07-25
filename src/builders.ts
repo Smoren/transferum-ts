@@ -280,7 +280,7 @@ export class CompositeTransferBuilder<
    * @param startTransfer — initial output transfer
    * @returns A new CompositeTransferBuilder instance
    */
-  public static start<TStartTransfer extends OutputTransfer<any>>(
+  public static start<TStartTransfer extends OutputTransfer<unknown>>(
     startTransfer: TStartTransfer,
   ): CompositeTransferBuilderInterface<OutputTransferDataType<TStartTransfer>, TStartTransfer> {
     return new CompositeTransferBuilder<OutputTransferDataType<TStartTransfer>, TStartTransfer>(
@@ -307,7 +307,7 @@ export class CompositeTransferBuilder<
    *   `onRelayError` (error handler for async-push rejection, enables async linking)
    * @returns A new builder with the updated output data type
    */
-  public to<TNextTransfer extends DuplexTransfer<TCurrent, any>>(
+  public to<TNextTransfer extends DuplexTransfer<TCurrent, unknown>>(
     nextTransfer: TNextTransfer,
     options?: {
       owned?: boolean;
@@ -327,7 +327,7 @@ export class CompositeTransferBuilder<
 
     return new CompositeTransferBuilder<OutputTransferDataType<TNextTransfer>, TStartTransfer>(
       this._startTransfer,
-      nextTransfer,
+      nextTransfer as DuplexTransfer<unknown, OutputTransferDataType<TNextTransfer>>,
       nextOwnedResources,
     );
   }
