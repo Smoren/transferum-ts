@@ -121,6 +121,9 @@ import { LatestStorage, QueueStorage, StackStorage } from "./storages";
  * const channel = createPushChannelTransfer<number>();
  * channel.subscribe(x => console.log(x));
  * channel.push(42);
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createPushChannelTransfer<T>(): Transfer<T, [Pushable, Subscribable]> {
   return new PushChannelTransfer<T>();
@@ -136,6 +139,9 @@ export function createPushChannelTransfer<T>(): Transfer<T, [Pushable, Subscriba
  * const channel = createPushStoredChannelTransfer<number>({ initialValue: 0 });
  * channel.push(42);
  * console.log(channel.pull()); // 42
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createPushStoredChannelTransfer<T>(
   config?: BaseStateTransferConfig<T>,
@@ -153,6 +159,9 @@ export function createPushStoredChannelTransfer<T>(
  * const channel = createDelayedPushChannelTransfer<number>({ delay: 100 });
  * channel.subscribe(x => console.log(x));
  * channel.push(42); // 42 will be logged after 100 ms
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createDelayedPushChannelTransfer<T>(
   config: DelayedPushChannelTransferConfig,
@@ -172,6 +181,9 @@ export function createDelayedPushChannelTransfer<T>(
  * channel.push(1); // resets the timer
  * channel.push(2); // resets the timer
  * // after 200 ms of silence, subscribers receive 2
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createDebounceTransfer<T>(config: DebounceTransferConfig): Transfer<T, [Pushable, Subscribable]> {
   return new DebounceTransfer<T>(config);
@@ -189,6 +201,9 @@ export function createDebounceTransfer<T>(config: DebounceTransferConfig): Trans
  * channel.push(1); // emitted immediately (leading edge)
  * channel.push(2); // saved as pending
  * // after 100 ms subscribers receive 2 (trailing edge)
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createThrottleTransfer<T>(config: ThrottleTransferConfig): Transfer<T, [Pushable, Subscribable]> {
   return new ThrottleTransfer<T>(config);
@@ -207,6 +222,9 @@ export function createThrottleTransfer<T>(config: ThrottleTransferConfig): Trans
  * const buffer = createBufferTransfer<number>();
  * buffer.push(42);
  * console.log(buffer.pull()); // 42
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createBufferTransfer<T>(): Transfer<T, [Pushable, Pullable]> {
   return new BufferTransfer<T>();
@@ -222,6 +240,9 @@ export function createBufferTransfer<T>(): Transfer<T, [Pushable, Pullable]> {
  * buffer.push(42);
  * buffer.trigger();
  * console.log(buffer.pull()); // 42
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createManualBufferTransfer<T>(): Transfer<T, [Pushable, Pullable, Triggerable]> {
   return new ManualBufferTransfer<T>();
@@ -238,6 +259,9 @@ export function createManualBufferTransfer<T>(): Transfer<T, [Pushable, Pullable
  * flow.subscribe(x => console.log(x));
  * flow.push(42);
  * flow.trigger(); // 42
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createManualFlowTransfer<T>(
   config?: BaseStateTransferConfig<T>,
@@ -261,6 +285,9 @@ export function createManualFlowTransfer<T>(
  * gate.push(42); // passes through, since activated === true
  * gate.deactivate();
  * gate.push(100); // ignored
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createGateTransfer<T>(config: GateTransferConfig): Transfer<T, [Pushable, Subscribable, Gate]> {
   return new GateTransfer<T>(config);
@@ -281,6 +308,9 @@ export function createGateTransfer<T>(config: GateTransferConfig): Transfer<T, [
  * const source2 = createPushStoredChannelTransfer<number>();
  * const merge = createMergeTransfer<number>({ sources: [source1, source2] });
  * merge.subscribe(x => console.log(x));
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createMergeTransfer<T>(config: MergeTransferConfig<T>): Transfer<T, [Subscribable]> {
   return new MergeTransfer<T>(config);
@@ -297,6 +327,9 @@ export function createMergeTransfer<T>(config: MergeTransferConfig<T>): Transfer
  * const target2 = createPushStoredChannelTransfer<number>();
  * const split = createSplitTransfer<number>({ targets: [target1, target2] });
  * split.push(42); // sent to both targets
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createSplitTransfer<T>(config: SplitTransferConfig<T>): Transfer<T, [Pushable]> {
   return new SplitTransfer<T>(config);
@@ -319,6 +352,9 @@ export function createSplitTransfer<T>(config: SplitTransferConfig<T>): Transfer
  *   activated: true
  * });
  * polling.subscribe(x => console.log(x));
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createPollingSourceTransfer<T>(
   config: PollingSourceTransferConfig<T>,
@@ -338,6 +374,9 @@ export function createPollingSourceTransfer<T>(
  *   activated: true
  * });
  * // setFetcher is called via linkTransfers
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createPollingProxyTransfer<T>(
   config: PollingProxyTransferConfig<T>,
@@ -358,6 +397,9 @@ export function createPollingProxyTransfer<T>(
  *   activated: true
  * });
  * polling.subscribe(x => console.log(x));
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createPollingFlowTransfer<T>(
   config: PollingFlowTransferConfig<T>,
@@ -385,6 +427,9 @@ export function createPollingFlowTransfer<T>(
  * channel.subscribe(x => console.log(x));
  * channel.push(42); // notifies subscribers, resets idle timer
  * // after 5 seconds without push, polling starts every 1 second
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createIdlePollingTransfer<T>(
   config: IdlePollingTransferConfig<T>,
@@ -411,6 +456,9 @@ export function createIdlePollingTransfer<T>(
  *   destroy: () => {}
  * });
  * channel.subscribe(x => console.log(x));
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createChannelTransfer<T>(config: ChannelTransferConfig<T>): Transfer<T, [Subscribable]> {
   return new ChannelTransfer<T>(config);
@@ -432,6 +480,9 @@ export function createChannelTransfer<T>(config: ChannelTransferConfig<T>): Tran
  * });
  * console.log(channel.pull()); // last value
  * channel.subscribe(x => console.log(x));
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createStoredChannelTransfer<T>(
   config: StoredChannelTransferConfig<T>,
@@ -454,6 +505,9 @@ export function createStoredChannelTransfer<T>(
  *   callback: x => console.log('Received:', x)
  * });
  * sink.push(42);
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createSinkTransfer<T>(config: SinkTransferConfig<T>): Transfer<T, [Pushable]> {
   return new SinkTransfer<T>(config);
@@ -470,6 +524,9 @@ export function createSinkTransfer<T>(config: SinkTransferConfig<T>): Transfer<T
  *   flow: storage
  * });
  * writer.push(42); // storage.write(42)
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createWriteTransfer<T>(config: WriteTransferConfig<T>): Transfer<T, [Pushable]> {
   return new WriteTransfer<T>(config);
@@ -486,6 +543,9 @@ export function createWriteTransfer<T>(config: WriteTransferConfig<T>): Transfer
  *   flow: storage
  * });
  * console.log(reader.pull()); // storage.read()
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createReadTransfer<T>(config: ReadTransferConfig<T>): Transfer<T, [Pullable]> {
   return new ReadTransfer<T>(config);
@@ -507,6 +567,9 @@ export function createReadTransfer<T>(config: ReadTransferConfig<T>): Transfer<T
  * });
  * converter.subscribe(s => console.log(s));
  * converter.push(42); // "42"
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createConvertTransfer<TInput, TOutput>(
   config: ConvertTransferConfig<TInput, TOutput>,
@@ -528,6 +591,9 @@ export function createConvertTransfer<TInput, TOutput>(
  * condition.subscribe(x => console.log(x));
  * condition.push(42); // passes
  * condition.push(-1); // ignored
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createConditionTransfer<T>(config: ConditionTransferConfig<T>): Transfer<T, [Pushable, Subscribable]> {
   return new ConditionTransfer<T>(config);
@@ -554,6 +620,9 @@ export function createConditionTransfer<T>(config: ConditionTransferConfig<T>): 
  * displace.subscribe(result => render(result));
  * displace.push('hello'); // creates inner, pushes 'hello' into it
  * displace.push('world'); // displaces previous inner, creates new one
+ *
+ * @category Factories
+ * @category Transfers
  */
 export function createDisplaceTransfer<
   TInput,
@@ -585,6 +654,9 @@ export function createDisplaceTransfer<
  * source.push(42); // passes through the bridge
  * bridge.deactivate();
  * source.push(100); // ignored
+ *
+ * @category Factories
+ * @category Bridges
  */
 export function createPassBridge<T>(config: PassBridgeConfig<T>): PassBridge<T> {
   return new PassBridge<T>(config);
@@ -606,6 +678,9 @@ export function createPassBridge<T>(config: PassBridgeConfig<T>): PassBridge<T> 
  *   activated: true
  * });
  * source.push(42); // "42"
+ *
+ * @category Factories
+ * @category Bridges
  */
 export function createTransformBridge<TInput, TOutput>(
   config: TransformBridgeConfig<TInput, TOutput>,
@@ -632,6 +707,9 @@ export function createTransformBridge<TInput, TOutput>(
  * });
  * source.push(42); // passes
  * source.push(-5); // ignored
+ *
+ * @category Factories
+ * @category Bridges
  */
 export function createTransferBridge<TInput, TOutput>(
   config: TransferBridgeConfig<TInput, TOutput>
@@ -652,6 +730,9 @@ export function createTransferBridge<TInput, TOutput>(
  *   owned: false
  * });
  * aggregator.active; // true (all bridges active)
+ *
+ * @category Factories
+ * @category Bridges
  */
 export function createBridgeAggregator(config: BridgeAggregatorConfig): BridgeAggregator {
   return new BridgeAggregator(config);
@@ -672,6 +753,9 @@ export function createBridgeAggregator(config: BridgeAggregatorConfig): BridgeAg
  *   owned: false
  * });
  * selector.select('second'); // switches to the second bridge
+ *
+ * @category Factories
+ * @category Bridges
  */
 export function createBridgeSelector<TMap extends Record<BaseSelectorKey, BridgeInterface>>(
   config: BridgeSelectorConfig<TMap>
@@ -694,6 +778,9 @@ export function createBridgeSelector<TMap extends Record<BaseSelectorKey, Bridge
  *   owned: false
  * });
  * selector.check('second'); // adds the second bridge to active
+ *
+ * @category Factories
+ * @category Bridges
  */
 export function createBridgeMultiSelector<TMap extends Record<BaseSelectorKey, BridgeInterface>>(
   config: BridgeMultiSelectorConfig<TMap>
@@ -712,6 +799,9 @@ export function createBridgeMultiSelector<TMap extends Record<BaseSelectorKey, B
  * @example
  * const op = createTransparentOperator<number>();
  * op.apply(42); // 42
+ *
+ * @category Factories
+ * @category Operators
  */
 export function createTransparentOperator<T>(): TransparentOperator<T> {
   return new TransparentOperator<T>();
@@ -726,6 +816,9 @@ export function createTransparentOperator<T>(): TransparentOperator<T> {
  * @example
  * const op = createMapOperator<number, string>(n => n.toString());
  * op.apply(42); // "42"
+ *
+ * @category Factories
+ * @category Operators
  */
 export function createMapOperator<TInput, TOutput>(mapper: (data: TInput) => TOutput): MapOperator<TInput, TOutput> {
   return new MapOperator<TInput, TOutput>(mapper);
@@ -739,6 +832,9 @@ export function createMapOperator<TInput, TOutput>(mapper: (data: TInput) => TOu
  * @example
  * const op = createFilterOperator<number>(n => n % 2 === 0);
  * op.apply([1, 2, 3, 4]); // [2, 4]
+ *
+ * @category Factories
+ * @category Operators
  */
 export function createFilterOperator<T>(predicate: (item: T) => boolean): FilterOperator<T> {
   return new FilterOperator<T>(predicate);
@@ -754,6 +850,9 @@ export function createFilterOperator<T>(predicate: (item: T) => boolean): Filter
  * const op = createReducerOperator<number>((acc, curr) => acc + curr, 0);
  * op.apply([1, 2, 3]); // 6
  * op.apply([]); // 0
+ *
+ * @category Factories
+ * @category Operators
  */
 export function createReducerOperator<T>(reducer: (acc: T, curr: T) => T, defaultValue?: T): ReducerOperator<T> {
   return new ReducerOperator<T>(reducer, defaultValue);
@@ -768,6 +867,9 @@ export function createReducerOperator<T>(reducer: (acc: T, curr: T) => T, defaul
  * const op = createGuardOperator<number>(n => n > 0);
  * op.apply(42); // 42
  * op.apply(-1); // undefined
+ *
+ * @category Factories
+ * @category Operators
  */
 export function createGuardOperator<T>(validator: (data: T) => boolean): GuardOperator<T> {
   return new GuardOperator<T>(validator);
@@ -785,6 +887,9 @@ export function createGuardOperator<T>(validator: (data: T) => boolean): GuardOp
  *   createMapOperator<number, string>(n => n.toString()),
  * ]);
  * op.apply(21); // "42"
+ *
+ * @category Factories
+ * @category Operators
  */
 export function createPipelineOperator<TInput, TOutput>(
   operators: OperatorInterface<unknown, unknown>[]
@@ -807,6 +912,9 @@ export function createPipelineOperator<TInput, TOutput>(
  *   callback: async (n) => { await fetch('/api', { body: JSON.stringify(n) }); }
  * });
  * await sink.asyncPush(42);
+ *
+ * @category Factories
+ * @category Async Transfers
  */
 export function createAsyncSinkTransfer<T>(config: AsyncSinkTransferConfig<T>): Transfer<T, [AsyncPushable]> {
   return new AsyncSinkTransfer<T>(config);
@@ -818,6 +926,9 @@ export function createAsyncSinkTransfer<T>(config: AsyncSinkTransferConfig<T>): 
  * Capabilities: AsyncPushable
  *
  * @param config — configuration (flow, onError)
+ *
+ * @category Factories
+ * @category Async Transfers
  */
 export function createAsyncWriteTransfer<T>(config: AsyncWriteTransferConfig<T>): Transfer<T, [AsyncPushable]> {
   return new AsyncWriteTransfer<T>(config);
@@ -829,6 +940,9 @@ export function createAsyncWriteTransfer<T>(config: AsyncWriteTransferConfig<T>)
  * Capabilities: AsyncPullable
  *
  * @param config — configuration (flow, onError)
+ *
+ * @category Factories
+ * @category Async Transfers
  */
 export function createAsyncReadTransfer<T>(config: AsyncReadTransferConfig<T>): Transfer<T, [AsyncPullable]> {
   return new AsyncReadTransfer<T>(config);
@@ -840,6 +954,9 @@ export function createAsyncReadTransfer<T>(config: AsyncReadTransferConfig<T>): 
  * Capabilities: AsyncPullable, Subscribable, AsyncTriggerable, Gate
  *
  * @param config — configuration (fetcher, interval, activated, tickerFactory, onError)
+ *
+ * @category Factories
+ * @category Async Transfers
  */
 export function createAsyncPollingSourceTransfer<T>(
   config: AsyncPollingSourceTransferConfig<T>
@@ -853,6 +970,9 @@ export function createAsyncPollingSourceTransfer<T>(
  * Capabilities: AsyncPollingProxy, AsyncPullable, Subscribable, AsyncTriggerable, Gate
  *
  * @param config — configuration (interval, activated, tickerFactory, onError)
+ *
+ * @category Factories
+ * @category Async Transfers
  */
 export function createAsyncPollingProxyTransfer<T>(
   config: AsyncPollingProxyTransferConfig<T>
@@ -866,6 +986,9 @@ export function createAsyncPollingProxyTransfer<T>(
  * Capabilities: AsyncPullable, Subscribable, AsyncTriggerable, Gate
  *
  * @param config — configuration (flow, interval, activated, tickerFactory, onError)
+ *
+ * @category Factories
+ * @category Async Transfers
  */
 export function createAsyncPollingFlowTransfer<T>(
   config: AsyncPollingFlowTransferConfig<T>
@@ -879,6 +1002,9 @@ export function createAsyncPollingFlowTransfer<T>(
  * Capabilities: Pushable, Subscribable, AsyncPullable, AsyncTriggerable, Gate
  *
  * @param config — configuration (fetcher, timeout, interval, activated, initialValue, tickerFactory, onError)
+ *
+ * @category Factories
+ * @category Async Transfers
  */
 export function createAsyncIdlePollingTransfer<T>(
   config: AsyncIdlePollingTransferConfig<T>
@@ -892,6 +1018,9 @@ export function createAsyncIdlePollingTransfer<T>(
  * Capabilities: AsyncPushable, Subscribable
  *
  * @param config — configuration (operator: AsyncOperatorInterface, onError)
+ *
+ * @category Factories
+ * @category Async Transfers
  */
 export function createAsyncConvertTransfer<TInput, TOutput>(
   config: AsyncConvertTransferConfig<TInput, TOutput>
@@ -905,6 +1034,9 @@ export function createAsyncConvertTransfer<TInput, TOutput>(
  * Capabilities: AsyncPushable, Subscribable
  *
  * @param config — configuration (shouldAccept?, shouldEmit?, onAcceptError, onEmitError)
+ *
+ * @category Factories
+ * @category Async Transfers
  */
 export function createAsyncConditionTransfer<T>(
   config: AsyncConditionTransferConfig<T>
@@ -918,6 +1050,9 @@ export function createAsyncConditionTransfer<T>(
  * Capabilities: AsyncPullable, Subscribable, AsyncTriggerable
  *
  * @param config — configuration (setup, destroy, initialValue, onError handlers)
+ *
+ * @category Factories
+ * @category Async Transfers
  */
 export function createAsyncStoredChannelTransfer<T>(
   config: AsyncStoredChannelTransferConfig<T>
@@ -935,6 +1070,9 @@ export function createAsyncStoredChannelTransfer<T>(
  * @typeParam TInput — input data type
  * @typeParam TOutput — output data type
  * @param config — configuration (source, target, operator: AsyncOperatorInterface, activated, onError)
+ *
+ * @category Factories
+ * @category Async Bridges
  */
 export function createAsyncTransformBridge<TInput, TOutput>(
   config: AsyncTransformBridgeConfig<TInput, TOutput>
@@ -955,6 +1093,9 @@ export function createAsyncTransformBridge<TInput, TOutput>(
  * @example
  * const op = createAsyncMapOperator<number, string>(async (n) => (await fetch(`/api/${n}`)).text());
  * await op.apply(42); // fetch result
+ *
+ * @category Factories
+ * @category Async Operators
  */
 export function createAsyncMapOperator<TInput, TOutput>(
   mapper: (data: TInput) => Promise<TOutput>
@@ -970,6 +1111,9 @@ export function createAsyncMapOperator<TInput, TOutput>(
  * @example
  * const op = createAsyncGuardOperator<number>(async (n) => (await check(n)).valid);
  * const result = await op.apply(42); // 42 or undefined
+ *
+ * @category Factories
+ * @category Async Operators
  */
 export function createAsyncGuardOperator<T>(validator: (data: T) => Promise<boolean>): AsyncGuardOperator<T> {
   return new AsyncGuardOperator<T>(validator);
@@ -987,6 +1131,9 @@ export function createAsyncGuardOperator<T>(validator: (data: T) => Promise<bool
  *   createMapOperator<number, string>(n => n.toString()),
  * ]);
  * await op.apply(21); // "42"
+ *
+ * @category Factories
+ * @category Async Operators
  */
 export function createAsyncPipelineOperator<TInput, TOutput>(
   operators: (OperatorInterface<unknown, unknown> | AsyncOperatorInterface<unknown, unknown>)[]
@@ -1008,6 +1155,9 @@ export function createAsyncPipelineOperator<TInput, TOutput>(
  * storage.write(42);
  * storage.read(); // 42
  * storage.size; // 1
+ *
+ * @category Factories
+ * @category Storages
  */
 export function createLatestStorage<T>(defaultValue?: T): LatestStorage<T> {
   return new LatestStorage<T>(defaultValue);
@@ -1023,6 +1173,9 @@ export function createLatestStorage<T>(defaultValue?: T): LatestStorage<T> {
  * storage.write(1);
  * storage.write(2);
  * storage.read(); // 1 (first written)
+ *
+ * @category Factories
+ * @category Storages
  */
 export function createQueueStorage<T>(maxLength?: number): QueueStorage<T> {
   return new QueueStorage<T>(maxLength);
@@ -1038,6 +1191,9 @@ export function createQueueStorage<T>(maxLength?: number): QueueStorage<T> {
  * storage.write(1);
  * storage.write(2);
  * storage.read(); // 2 (last written)
+ *
+ * @category Factories
+ * @category Storages
  */
 export function createStackStorage<T>(maxLength?: number): StackStorage<T> {
   return new StackStorage<T>(maxLength);

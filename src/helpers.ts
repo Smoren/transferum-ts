@@ -1,7 +1,10 @@
 import type { DisposableInterface, SubscriberInterface } from "./interfaces";
 import type { DataHandler } from "./types";
 
-/** Wraps an unsubscribe callback into a managed subscription with active-state tracking and lifecycle hooks. */
+/**
+ * Wraps an unsubscribe callback into a managed subscription with active-state tracking and lifecycle hooks.
+ * @category Helpers
+ */
 export class Subscriber implements SubscriberInterface {
   private readonly _unsubscribe: (subscriber: SubscriberInterface) => void;
   private readonly _onUnsubscribeHandlers: Set<DataHandler<SubscriberInterface>> = new Set();
@@ -41,7 +44,10 @@ export class Subscriber implements SubscriberInterface {
   }
 }
 
-/** Manages a set of subscribers backed by a ProxyReference — notifies all listeners on sendState(). */
+/**
+ * Manages a set of subscribers backed by a ProxyReference — notifies all listeners on sendState().
+ * @category Helpers
+ */
 export class SubscriptionManager<T> implements DisposableInterface {
   private _state: ProxyReference<T>;
 
@@ -89,6 +95,8 @@ export class SubscriptionManager<T> implements DisposableInterface {
  * notify all subscribers with that value.
  *
  * Used to implement GateInterface.onStateChange().
+ *
+ * @category Helpers
  */
 export class StateSubscriptionManager<T> implements DisposableInterface {
   private readonly _ref: ProxyReference<T>;
@@ -112,7 +120,10 @@ export class StateSubscriptionManager<T> implements DisposableInterface {
   }
 }
 
-/** Adapts a SubscriberInterface into a DisposableInterface — destroy() delegates to unsubscribe(). */
+/**
+ * Adapts a SubscriberInterface into a DisposableInterface — destroy() delegates to unsubscribe().
+ * @category Helpers
+ */
 export class DisposableSubscriberAdapter implements DisposableInterface {
   private _subscriber: SubscriberInterface;
 
@@ -125,7 +136,10 @@ export class DisposableSubscriberAdapter implements DisposableInterface {
   }
 }
 
-/** Mutable reference wrapper — holds a single value with clear/extract semantics. */
+/**
+ * Mutable reference wrapper — holds a single value with clear/extract semantics.
+ * @category Helpers
+ */
 export class ProxyReference<T> {
   public value: T | undefined;
 
@@ -163,6 +177,8 @@ export class ProxyReference<T> {
  * - drain(handler) — emits all consecutively-numbered results starting
  *   from the expected sequence number
  * - clear() — discards all pending results (used on destroy)
+ *
+ * @category Helpers
  */
 export class PendingResultQueue<T> {
   private _nextSeq: number = 0;
@@ -215,6 +231,8 @@ export class PendingResultQueue<T> {
  * - Tasks are responsible for their own error handling (via handleError).
  * - The chain wraps each task in .catch(() => undefined) so that a
  *   throwing task does not break the chain for subsequent tasks.
+ *
+ * @category Helpers
  */
 export class OrderedExecutor {
   private _chain: Promise<void> = Promise.resolve();

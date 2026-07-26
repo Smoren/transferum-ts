@@ -95,9 +95,10 @@ import { PendingResultQueue, OrderedExecutor } from "./helpers";
  *
  * All flags default to false. Subclasses override the needed ones to true.
  *
- * ⚠️ POTENTIAL ISSUE: Abstract destroy() without implementation in the base class.
  * Each subclass must implement destroy(), which can lead to errors
  * if the developer forgets to call super.destroy() to clean up _state.
+ *
+ * @category Transfers
  */
 export abstract class BaseTransfer implements BaseTransferInterface {
   readonly isInput: boolean = false;
@@ -132,6 +133,8 @@ export abstract class BaseTransfer implements BaseTransferInterface {
  *
  * Subclasses use _state.value for writing, _state.pop() for extracting
  * with cleanup, _state.clear() for resetting without extraction.
+ *
+ * @category Transfers
  */
 export abstract class BaseStateTransfer<T> extends BaseTransfer {
   protected readonly _state: ProxyReference<T>;
@@ -185,6 +188,8 @@ export abstract class BaseStateTransfer<T> extends BaseTransfer {
  * - Integration with external event sources (WebSocket, DOM events)
  * - Adapting legacy API to pipeline
  * - Custom data sources with their own logic
+ *
+ * @category Transfers
  */
 export class ChannelTransfer<T> extends BaseStateTransfer<T> implements SubscribableTransferInterface<T> {
   override readonly isOutput = true;
@@ -272,6 +277,8 @@ export class ChannelTransfer<T> extends BaseStateTransfer<T> implements Subscrib
  * - Integration with external sources with caching
  * - Channel with the ability to re-read the last value
  * - Storing state from an external source
+ *
+ * @category Transfers
  */
 export class StoredChannelTransfer<T> extends BaseStateTransfer<T> implements SubscribableTransferInterface<T>, PullableTransferInterface<T>, TriggerableTransferInterface {
   override readonly isOutput = true;
@@ -345,6 +352,8 @@ export class StoredChannelTransfer<T> extends BaseStateTransfer<T> implements Su
  * - Fire-and-forget messaging between components
  * - Reactive events without state retention
  * - Analog of Observable with single emission per push()
+ *
+ * @category Transfers
  */
 export class PushChannelTransfer<T> extends BaseStateTransfer<T> implements PushableTransferInterface<T>, SubscribableTransferInterface<T> {
   override readonly isInput = true;
@@ -401,6 +410,8 @@ export class PushChannelTransfer<T> extends BaseStateTransfer<T> implements Push
  * - Caching the last value with reactive updates
  * - Component state with manual synchronization capability
  * - Buffer with subscription to changes
+ *
+ * @category Transfers
  */
 export class PushStoredChannelTransfer<T> extends BaseStateTransfer<T> implements PushableTransferInterface<T>, PullableTransferInterface<T>, SubscribableTransferInterface<T>, TriggerableTransferInterface {
   override readonly isInput = true;
@@ -471,6 +482,8 @@ export class PushStoredChannelTransfer<T> extends BaseStateTransfer<T> implement
  * - Delayed events (e.g., debounce-like delay without suppression)
  * - Asynchronous emission with a guaranteed delay
  * - Testing reactive chains with a time shift
+ *
+ * @category Transfers
  */
 export class DelayedPushChannelTransfer<T> extends BaseStateTransfer<T> implements PushableTransferInterface<T>, SubscribableTransferInterface<T> {
   override readonly isInput = true;
@@ -541,6 +554,8 @@ export class DelayedPushChannelTransfer<T> extends BaseStateTransfer<T> implemen
  * - Debouncing user input (search, autosave)
  * - Reducing event frequency to the "last" one after a pause
  * - Replacing manual clearTimeout/setTimeout pattern
+ *
+ * @category Transfers
  */
 export class DebounceTransfer<T> extends BaseStateTransfer<T> implements PushableTransferInterface<T>, SubscribableTransferInterface<T> {
   override readonly isInput = true;
@@ -617,6 +632,8 @@ export class DebounceTransfer<T> extends BaseStateTransfer<T> implements Pushabl
  * - Rate-limiting high-frequency events (mouse move, resize)
  * - Throttling sensor/tracking data to a fixed FPS
  * - Replacing setInterval pattern for periodic updates
+ *
+ * @category Transfers
  */
 export class ThrottleTransfer<T> extends BaseStateTransfer<T> implements PushableTransferInterface<T>, SubscribableTransferInterface<T> {
   override readonly isInput = true;
@@ -710,6 +727,8 @@ export class ThrottleTransfer<T> extends BaseStateTransfer<T> implements Pushabl
  * - One-time data transfer between processes
  * - Buffer for producer-consumer pattern without reactivity
  * - Synchronous data exchange on demand
+ *
+ * @category Transfers
  */
 export class BufferTransfer<T> extends BaseStateTransfer<T> implements PushableTransferInterface<T>, PullableTransferInterface<T> {
   override readonly isInput = true;
@@ -755,6 +774,8 @@ export class BufferTransfer<T> extends BaseStateTransfer<T> implements PushableT
  * - Synchronizing reads with an external event
  * - Buffer with a data-readiness condition
  * - Step-by-step data processing in a pipeline
+ *
+ * @category Transfers
  */
 export class ManualBufferTransfer<T> extends BaseStateTransfer<T> implements PushableTransferInterface<T>, PullableTransferInterface<T>, TriggerableTransferInterface {
   override readonly isInput = true;
@@ -814,6 +835,8 @@ export class ManualBufferTransfer<T> extends BaseStateTransfer<T> implements Pus
  * Use cases:
  * - Synchronizing emission with an external event (e.g., requestAnimationFrame)
  * - Manual control of the data emission moment
+ *
+ * @category Transfers
  */
 export class ManualFlowTransfer<T> extends BaseStateTransfer<T> implements PushableTransferInterface<T>, SubscribableTransferInterface<T>, TriggerableTransferInterface {
   override readonly isInput = true;
@@ -873,6 +896,8 @@ export class ManualFlowTransfer<T> extends BaseStateTransfer<T> implements Pusha
  * - Blocking data flow by condition (e.g., until the user is authenticated)
  * - Enabling/disabling event processing
  * - Implementing PassBridge and other bridges
+ *
+ * @category Transfers
  */
 export class GateTransfer<T> extends BaseStateTransfer<T> implements GateTransferInterface<T> {
   override readonly isInput = true;
@@ -964,6 +989,8 @@ export class GateTransfer<T> extends BaseStateTransfer<T> implements GateTransfe
  * - Merging events from multiple sources (e.g., clicks + touch + keyboard)
  * - Multicast: one subscriber to multiple transfers
  * - Implementing BridgeAggregator
+ *
+ * @category Transfers
  */
 export class MergeTransfer<T> extends BaseStateTransfer<T> implements SubscribableTransferInterface<T> {
   override readonly isOutput = true;
@@ -1021,6 +1048,8 @@ export class MergeTransfer<T> extends BaseStateTransfer<T> implements Subscribab
  * - Broadcasting: one event → multiple receivers
  * - Logging + processing: same data into two different streams
  * - Implementing publish-subscribe pattern at the transfer level
+ *
+ * @category Transfers
  */
 export class SplitTransfer<T> extends BaseTransfer implements PushableTransferInterface<T> {
   override readonly isInput = true;
@@ -1076,6 +1105,8 @@ export class SplitTransfer<T> extends BaseTransfer implements PushableTransferIn
  * - Periodic polling of an API or external source
  * - Timer emitting the current time
  * - Animation at a fixed FPS
+ *
+ * @category Transfers
  */
 export class PollingSourceTransfer<T> extends BaseStateTransfer<T> implements PollingSourceTransferInterface, SubscribableTransferInterface<T>, PullableTransferInterface<T>, TriggerableTransferInterface, GateInterface {
   override readonly isOutput = true;
@@ -1210,6 +1241,8 @@ export class PollingSourceTransfer<T> extends BaseStateTransfer<T> implements Po
  * - Intermediate polling node in a transfer chain
  * - Adapter between a pull-source and a subscribe-consumer
  * - Periodic reading from a buffer with emission into a stream
+ *
+ * @category Transfers
  */
 export class PollingProxyTransfer<T> extends BaseStateTransfer<T> implements PollingProxyTransferInterface<T>, PollingSourceTransferInterface, SubscribableTransferInterface<T>, PullableTransferInterface<T>, TriggerableTransferInterface, GateInterface {
   override readonly isInput = true;
@@ -1379,6 +1412,8 @@ export class PollingProxyTransfer<T> extends BaseStateTransfer<T> implements Pol
  * - Periodic reading from storage
  * - Polling state from shared storage
  * - Integration with external sources via FlowInterface
+ *
+ * @category Transfers
  */
 export class PollingFlowTransfer<T> extends BaseStateTransfer<T> implements PollingSourceTransferInterface, SubscribableTransferInterface<T>, PullableTransferInterface<T>, TriggerableTransferInterface, GateInterface {
   override readonly isOutput = true;
@@ -1510,6 +1545,8 @@ export class PollingFlowTransfer<T> extends BaseStateTransfer<T> implements Poll
  * - Refreshing data from an API when the external source stops sending events
  * - Heartbeat / keep-alive mechanism: polling on absence of incoming data
  * - Fallback data source when the main stream is idle
+ *
+ * @category Transfers
  */
 export class IdlePollingTransfer<T> extends BaseStateTransfer<T> implements PushableTransferInterface<T>, SubscribableTransferInterface<T>, PullableTransferInterface<T>, TriggerableTransferInterface, PollingSourceTransferInterface, GateInterface {
   override readonly isInput = true;
@@ -1704,6 +1741,8 @@ export class IdlePollingTransfer<T> extends BaseStateTransfer<T> implements Push
  * - Logging: writing data to console/file
  * - Side effects: sending metrics, analytics
  * - Finalization: saving the result to storage
+ *
+ * @category Transfers
  */
 export class SinkTransfer<T> extends BaseStateTransfer<T> implements PushableTransferInterface<T> {
   override readonly isInput = true;
@@ -1753,6 +1792,8 @@ export class SinkTransfer<T> extends BaseStateTransfer<T> implements PushableTra
  * - Writing data to Storage (LatestStorage, QueueStorage, StackStorage)
  * - Adapting an arbitrary object with write() to pipeline
  * - Finalization: saving the result to external storage
+ *
+ * @category Transfers
  */
 export class WriteTransfer<T> extends BaseTransfer implements PushableTransferInterface<T> {
   override readonly isInput = true;
@@ -1807,6 +1848,8 @@ export class WriteTransfer<T> extends BaseTransfer implements PushableTransferIn
  * - Reading data from Storage (LatestStorage, QueueStorage, StackStorage)
  * - Adapting an arbitrary object with read() to pipeline
  * - Data source for polling transfers
+ *
+ * @category Transfers
  */
 export class ReadTransfer<T> extends BaseTransfer implements PullableTransferInterface<T> {
   override readonly isOutput = true;
@@ -1872,6 +1915,8 @@ export class ReadTransfer<T> extends BaseTransfer implements PullableTransferInt
  * - Filtering via GuardOperator (undefined blocks emission)
  * - Real-time data mapping
  * - Implementing TransformBridge
+ *
+ * @category Transfers
  */
 export class ConvertTransfer<TInput, TOutput> extends BaseStateTransfer<TOutput> implements PushableTransferInterface<TInput>, SubscribableTransferInterface<TOutput> {
   override readonly isInput = true;
@@ -1945,6 +1990,8 @@ export class ConvertTransfer<TInput, TOutput> extends BaseStateTransfer<TOutput>
  * - Blocking duplicates (shouldEmit checks the previous value)
  * - Throttling/debouncing via time-based conditions
  * - Validating data before forwarding
+ *
+ * @category Transfers
  */
 export class ConditionTransfer<T> extends BaseStateTransfer<T> implements PushableTransferInterface<T>, SubscribableTransferInterface<T> {
   override readonly isInput = true;
@@ -2064,6 +2111,8 @@ export class ConditionTransfer<T> extends BaseStateTransfer<T> implements Pushab
  * - Per-value async operations (fetch, readFile) where only the latest result matters
  * - Per-value WebSocket/stream subscriptions with automatic cleanup
  * - Custom cancellation logic via onDisplace (abort, close, cancel) before inner is destroyed
+ *
+ * @category Transfers
  */
 export class DisplaceTransfer<
   TInput,
@@ -2165,6 +2214,8 @@ export class DisplaceTransfer<
  * - destroy: () => void
  * - initialValue?: T
  * - onError?, onDestroyError?: ErrorHandler
+ *
+ * @category Async Transfers
  */
 export class AsyncStoredChannelTransfer<T> extends BaseStateTransfer<T> implements SubscribableTransferInterface<T>, AsyncPullableTransferInterface<T>, AsyncTriggerableInterface {
   override readonly isOutput = true;
@@ -2256,6 +2307,8 @@ export class AsyncStoredChannelTransfer<T> extends BaseStateTransfer<T> implemen
  * Use cases:
  * - Asynchronous logging to file/database
  * - Side effects with async API (fetch, IndexedDB)
+ *
+ * @category Async Transfers
  */
 export class AsyncSinkTransfer<T> extends BaseStateTransfer<T> implements AsyncPushableTransferInterface<T> {
   override readonly isInput = true;
@@ -2370,6 +2423,8 @@ export class AsyncSinkTransfer<T> extends BaseStateTransfer<T> implements AsyncP
  * Use cases:
  * - Writing data to async storage (IndexedDB, API)
  * - Adapting an arbitrary object with async write() to pipeline
+ *
+ * @category Async Transfers
  */
 export class AsyncWriteTransfer<T> extends BaseTransfer implements AsyncPushableTransferInterface<T> {
   override readonly isInput = true;
@@ -2473,6 +2528,8 @@ export class AsyncWriteTransfer<T> extends BaseTransfer implements AsyncPushable
  * Use cases:
  * - Reading data from async storage (IndexedDB, API)
  * - Data source for async-polling transfers
+ *
+ * @category Async Transfers
  */
 export class AsyncReadTransfer<T> extends BaseTransfer implements AsyncPullableTransferInterface<T> {
   override readonly isOutput = true;
@@ -2531,6 +2588,8 @@ export class AsyncReadTransfer<T> extends BaseTransfer implements AsyncPullableT
  * - activated: boolean — initial polling state
  * - tickerFactory?: TickerFactory — custom ticker factory
  * - onError?: ErrorHandler — fetcher error handler
+ *
+ * @category Async Transfers
  */
 export class AsyncPollingSourceTransfer<T> extends BaseStateTransfer<T> implements PollingSourceTransferInterface, SubscribableTransferInterface<T>, AsyncPullableTransferInterface<T>, AsyncTriggerableInterface, GateInterface {
   override readonly isOutput = true;
@@ -2646,6 +2705,8 @@ export class AsyncPollingSourceTransfer<T> extends BaseStateTransfer<T> implemen
  * Configuration (AsyncPollingFlowTransferConfig):
  * - flow: AsyncOutputFlowInterface<T> — data source with async read()
  * - interval, activated, tickerFactory, onError — same as in AsyncPollingSourceTransfer
+ *
+ * @category Async Transfers
  */
 export class AsyncPollingFlowTransfer<T> extends BaseStateTransfer<T> implements PollingSourceTransferInterface, SubscribableTransferInterface<T>, AsyncPullableTransferInterface<T>, AsyncTriggerableInterface, GateInterface {
   override readonly isOutput = true;
@@ -2777,6 +2838,8 @@ export class AsyncPollingFlowTransfer<T> extends BaseStateTransfer<T> implements
  * - activated: boolean — initial polling state
  * - tickerFactory?: TickerFactory
  * - onError?: ErrorHandler
+ *
+ * @category Async Transfers
  */
 export class AsyncPollingProxyTransfer<T> extends BaseStateTransfer<T> implements AsyncPollingProxyTransferInterface<T>, PollingSourceTransferInterface, SubscribableTransferInterface<T>, AsyncPullableTransferInterface<T>, AsyncTriggerableInterface, GateInterface {
   override readonly isInput = true;
@@ -2952,6 +3015,8 @@ export class AsyncPollingProxyTransfer<T> extends BaseStateTransfer<T> implement
  * - initialValue?: T
  * - tickerFactory?: TickerFactory
  * - onError?: ErrorHandler
+ *
+ * @category Async Transfers
  */
 export class AsyncIdlePollingTransfer<T> extends BaseStateTransfer<T> implements PushableTransferInterface<T>, SubscribableTransferInterface<T>, AsyncPullableTransferInterface<T>, AsyncTriggerableInterface, PollingSourceTransferInterface, GateInterface {
   override readonly isInput = true;
@@ -3155,6 +3220,8 @@ export class AsyncIdlePollingTransfer<T> extends BaseStateTransfer<T> implements
  * - operator: AsyncOperatorInterface<TInput, TOutput | undefined>
  * - onError?: ErrorHandler
  * - maxConcurrency?, bufferSize?, onBufferOverflow? (BackpressureConfig)
+ *
+ * @category Async Transfers
  */
 export class AsyncConvertTransfer<TInput, TOutput> extends BaseStateTransfer<TOutput> implements AsyncPushableTransferInterface<TInput>, SubscribableTransferInterface<TOutput> {
   override readonly isInput = true;
@@ -3294,6 +3361,8 @@ export class AsyncConvertTransfer<TInput, TOutput> extends BaseStateTransfer<TOu
  * - onAcceptError?: ErrorHandler
  * - onEmitError?: ErrorHandler
  * - maxConcurrency?, bufferSize?, onBufferOverflow? (BackpressureConfig)
+ *
+ * @category Async Transfers
  */
 export class AsyncConditionTransfer<T> extends BaseStateTransfer<T> implements AsyncPushableTransferInterface<T>, SubscribableTransferInterface<T> {
   override readonly isInput = true;
@@ -3516,6 +3585,8 @@ export class AsyncConditionTransfer<T> extends BaseStateTransfer<T> implements A
  *   gate, // Explicitly specify gate
  *   owned: [gate],
  * });
+ *
+ * @category Transfers
  */
 export class UniversalCompositeTransfer<TInput, TOutput> implements UniversalDuplexInterface<TInput, TOutput> {
   private readonly _input: UniversalInputInterface<TInput>;

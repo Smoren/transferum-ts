@@ -1,6 +1,9 @@
 import type { StorageInterface } from "./interfaces";
 
-/** Storage that keeps only the latest written value, overwriting the previous one. */
+/**
+ * Storage that keeps only the latest written value, overwriting the previous one.
+ * @category Storages
+ */
 export class LatestStorage<T> implements StorageInterface<T, T> {
   private _value?: T;
   private readonly _defaultValue?: T;
@@ -31,7 +34,10 @@ export class LatestStorage<T> implements StorageInterface<T, T> {
   }
 }
 
-/** FIFO queue storage — read() removes and returns the oldest element. Supports optional max length. */
+/**
+ * FIFO queue storage — read() removes and returns the oldest element. Supports optional max length.
+ * @category Storages
+ */
 export class QueueStorage<T> implements StorageInterface<T, T> {
   private _queue: T[] = [];
   private readonly _maxLength?: number;
@@ -69,7 +75,10 @@ export class QueueStorage<T> implements StorageInterface<T, T> {
   }
 }
 
-/** LIFO stack storage — read() removes and returns the most recently added element. Supports optional max length. */
+/**
+ * LIFO stack storage — read() removes and returns the most recently added element. Supports optional max length.
+ * @category Storages
+ */
 export class StackStorage<T> implements StorageInterface<T, T> {
   private _stack: T[] = [];
   private readonly _maxLength?: number;

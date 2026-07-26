@@ -27,7 +27,11 @@ import { ConvertTransfer, GateTransfer, AsyncConvertTransfer } from "./transfers
 import { linkTransfers } from "./utils";
 import { StateSubscriptionManager } from "./helpers";
 
-/** Simple gated bridge — passes data from source to target through an internal GateTransfer. */
+/**
+ * Simple gated bridge — passes data from source to target through an internal GateTransfer.
+ *
+ * @category Bridges
+ */
 export class PassBridge<T> implements BridgeInterface {
   protected readonly _source: OutputTransfer<T>;
   protected readonly _target: InputTransfer<T>;
@@ -79,7 +83,11 @@ export class PassBridge<T> implements BridgeInterface {
   }
 }
 
-/** Gated bridge with synchronous data transformation — source → gate → converter → target. */
+/**
+ * Gated bridge with synchronous data transformation — source → gate → converter → target.
+ *
+ * @category Bridges
+ */
 export class TransformBridge<TInput, TOutput> implements BridgeInterface {
   protected readonly _source: OutputTransfer<TInput>;
   protected readonly _target: InputTransfer<TOutput>;
@@ -135,7 +143,11 @@ export class TransformBridge<TInput, TOutput> implements BridgeInterface {
   }
 }
 
-/** Gated bridge with an intermediate duplex transfer — source → gate → middle → target. */
+/**
+ * Gated bridge with an intermediate duplex transfer — source → gate → middle → target.
+ *
+ * @category Bridges
+ */
 export class TransferBridge<TInput, TOutput> implements BridgeInterface {
   protected readonly _source: OutputTransfer<TInput>;
   protected readonly _target: InputTransfer<TOutput>;
@@ -215,6 +227,8 @@ export class TransferBridge<TInput, TOutput> implements BridgeInterface {
  * - operator: AsyncOperatorInterface<TInput, TOutput | undefined>
  * - activated: boolean
  * - onError?: ErrorHandler — operator error handler
+ *
+ * @category Async Bridges
  */
 export class AsyncTransformBridge<TInput, TOutput> implements BridgeInterface {
   protected readonly _source: OutputTransfer<TInput>;
@@ -271,7 +285,11 @@ export class AsyncTransformBridge<TInput, TOutput> implements BridgeInterface {
   }
 }
 
-/** Aggregator bridge — controls multiple bridges as a group. Active only when ALL nested bridges are active. */
+/**
+ * Aggregator bridge — controls multiple bridges as a group. Active only when ALL nested bridges are active.
+ *
+ * @category Bridges
+ */
 export class BridgeAggregator implements BridgeInterface {
   protected _bridges: BridgeInterface[];
   protected readonly _owned: boolean;
@@ -337,7 +355,11 @@ export class BridgeAggregator implements BridgeInterface {
   }
 }
 
-/** Single-choice selector bridge — activates exactly one bridge from a map at a time. */
+/**
+ * Single-choice selector bridge — activates exactly one bridge from a map at a time.
+ *
+ * @category Bridges
+ */
 export class BridgeSelector<TMap extends Record<BaseSelectorKey, BridgeInterface>> implements BridgeSelectorInterface<TMap> {
   protected _bridges: TMap;
   protected _selectedKey: SelectorKey<TMap>;
@@ -474,7 +496,11 @@ export class BridgeSelector<TMap extends Record<BaseSelectorKey, BridgeInterface
   }
 }
 
-/** Multi-choice selector bridge — activates any subset of bridges from a map simultaneously. */
+/**
+ * Multi-choice selector bridge — activates any subset of bridges from a map simultaneously.
+ *
+ * @category Bridges
+ */
 export class BridgeMultiSelector<TMap extends Record<BaseSelectorKey, BridgeInterface>> implements BridgeMultiSelectorInterface<TMap> {
   protected _bridges: TMap;
   protected _selectedKeys: Set<SelectorKey<TMap>>;

@@ -10,6 +10,8 @@ import type { TickerConfig } from "./configs";
  * - Leading edge: the first callback is invoked in the first frame (via _startTime offset)
  * - Safe stop() inside callback: _startTime is recalculated BEFORE calling callback
  * - If callback calls stop() synchronously, the frame is not rescheduled
+ *
+ * @category Tickers
  */
 export class RAFTicker implements TickerInterface {
   private readonly _callback: TickerCallback;
@@ -133,6 +135,8 @@ export class RAFTicker implements TickerInterface {
  * - When interval === 0: setInterval(fn, 0) starts immediately (built-in leading-edge for 0)
  * - _timeoutId stores the setTimeout ID for leading-edge and is cleared in stop()
  * - active checks both timers: _timerId || _timeoutId
+ *
+ * @category Tickers
  */
 export class IntervalTicker implements TickerInterface {
   private readonly _callback: TickerCallback;

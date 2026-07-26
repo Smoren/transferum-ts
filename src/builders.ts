@@ -88,6 +88,7 @@ import { linkTransfers } from "./utils";
  * ```
  *
  * @typeParam TFlow — tuple of types [TInput0, TOutput1, TOutput2, ..., TOutputN]
+ * @category Builders
  */
 export class OperatorPipelineBuilder<TFlow extends readonly unknown[]> implements OperatorPipelineBuilderInterface<TFlow> {
   private readonly _operators: OperatorInterface<unknown, unknown>[] = []
@@ -161,6 +162,7 @@ export class OperatorPipelineBuilder<TFlow extends readonly unknown[]> implement
  * - build() returns AsyncPipelineOperator
  *
  * @typeParam TFlow — tuple of types [TInput0, TOutput1, TOutput2, ..., TOutputN]
+ * @category Builders
  */
 export class AsyncOperatorPipelineBuilder<TFlow extends readonly unknown[]> implements AsyncOperatorPipelineBuilderInterface<TFlow> {
   private readonly _operators: (OperatorInterface<unknown, unknown> | AsyncOperatorInterface<unknown, unknown>)[] = [];
@@ -251,6 +253,7 @@ export class AsyncOperatorPipelineBuilder<TFlow extends readonly unknown[]> impl
  *
  * @typeParam TCurrent — data type flowing through the current chain link
  * @typeParam TStartTransfer — type of the initial transfer (must be OutputTransfer)
+ * @category Builders
  */
 export class CompositeTransferBuilder<
   TCurrent,
@@ -478,6 +481,7 @@ export class CompositeTransferBuilder<
  *
  * @typeParam TCurrent — data type of the current chain link
  * @typeParam TStartTransfer — type of the initial transfer (must be InputTransfer)
+ * @category Builders
  */
 export class InputPipelineBuilder<
   TCurrent,
@@ -651,6 +655,8 @@ export class InputPipelineBuilder<
  * pipeline.subscribe(data => console.log(data));
  * pipeline.destroy();
  * ```
+ *
+ * @category Builders
  */
 export class OutputPipelineBuilder implements OutputPipelineBuilderInterface {
   private readonly _startTransfer: OutputTransfer<unknown>;
@@ -829,6 +835,7 @@ export class OutputPipelineBuilder implements OutputPipelineBuilderInterface {
  *
  * @typeParam TCurrent — data type of the current chain link
  * @typeParam TStartTransfer — type of the initial transfer (must be InputTransfer)
+ * @category Builders
  */
 export class DuplexPipelineBuilder<
   TCurrent,
@@ -980,6 +987,7 @@ export class DuplexPipelineBuilder<
  *
  * @typeParam TCurrent — data type of the current chain link
  * @typeParam TStartTransfer — type of the initial transfer (must be InputTransfer)
+ * @category Builders
  */
 export class AsyncInputPipelineBuilder<
   TCurrent,
@@ -1069,6 +1077,8 @@ export class AsyncInputPipelineBuilder<
  * Differences from OutputPipelineBuilder:
  * - linkTransfers is called with LinkConfig (onError for async-push rejection)
  * - finish() accepts asyncTriggerable in addition to triggerable
+ *
+ * @category Builders
  */
 export class AsyncOutputPipelineBuilder implements AsyncOutputPipelineBuilderInterface {
   private readonly _startTransfer: OutputTransfer<unknown>;
@@ -1161,6 +1171,7 @@ export class AsyncOutputPipelineBuilder implements AsyncOutputPipelineBuilderInt
  *
  * @typeParam TCurrent — data type of the current chain link
  * @typeParam TStartTransfer — type of the initial transfer (must be InputTransfer)
+ * @category Builders
  */
 export class AsyncDuplexPipelineBuilder<
   TCurrent,

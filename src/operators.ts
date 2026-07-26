@@ -1,13 +1,21 @@
 import type { OperatorInterface, AsyncOperatorInterface } from "./interfaces";
 
-/** Identity operator — returns data unchanged. */
+/**
+ * Identity operator — returns data unchanged.
+ *
+ * @category Operators
+ */
 export class TransparentOperator<T> implements OperatorInterface<T, T> {
   apply(data: T): T {
     return data;
   }
 }
 
-/** Transform operator — applies a mapper function to input data. */
+/**
+ * Transform operator — applies a mapper function to input data.
+ *
+ * @category Operators
+ */
 export class MapOperator<TInput, TOutput> implements OperatorInterface<TInput, TOutput> {
   private readonly _transformer: (data: TInput) => TOutput;
 
@@ -19,7 +27,11 @@ export class MapOperator<TInput, TOutput> implements OperatorInterface<TInput, T
   }
 }
 
-/** Array filter operator — filters elements by predicate, returning a new array. */
+/**
+ * Array filter operator — filters elements by predicate, returning a new array.
+ *
+ * @category Operators
+ */
 export class FilterOperator<T> implements OperatorInterface<T[], T[]> {
   private readonly _predicate: (item: T) => boolean;
 
@@ -31,7 +43,11 @@ export class FilterOperator<T> implements OperatorInterface<T[], T[]> {
   }
 }
 
-/** Array reduce operator — reduces an array to a single value. Returns defaultValue for empty arrays. */
+/**
+ * Array reduce operator — reduces an array to a single value. Returns defaultValue for empty arrays.
+ *
+ * @category Operators
+ */
 export class ReducerOperator<T> implements OperatorInterface<T[], T | undefined> {
   private readonly _reducer: (acc: T, curr: T) => T;
   private readonly _defaultValue?: T;
@@ -49,7 +65,11 @@ export class ReducerOperator<T> implements OperatorInterface<T[], T | undefined>
   }
 }
 
-/** Validation operator — passes data through if validator returns true, otherwise returns undefined. */
+/**
+ * Validation operator — passes data through if validator returns true, otherwise returns undefined.
+ *
+ * @category Operators
+ */
 export class GuardOperator<T> implements OperatorInterface<T, T | undefined> {
   private readonly _validator: (data: T) => boolean;
 
@@ -62,7 +82,11 @@ export class GuardOperator<T> implements OperatorInterface<T, T | undefined> {
   }
 }
 
-/** Composite operator — chains multiple operators sequentially, piping output of each into the next. */
+/**
+ * Composite operator — chains multiple operators sequentially, piping output of each into the next.
+ *
+ * @category Operators
+ */
 export class PipelineOperator<TInput, TOutput> implements OperatorInterface<TInput, TOutput> {
   private readonly _operators: readonly OperatorInterface<unknown, unknown>[]
 
@@ -86,6 +110,8 @@ export class PipelineOperator<TInput, TOutput> implements OperatorInterface<TInp
 /**
  * Async map operator.
  * The mapper can be synchronous or asynchronous (return a Promise).
+ *
+ * @category Async Operators
  */
 export class AsyncMapOperator<TInput, TOutput> implements AsyncOperatorInterface<TInput, TOutput> {
   private readonly _transformer: (data: TInput) => Promise<TOutput> | TOutput;
@@ -103,6 +129,8 @@ export class AsyncMapOperator<TInput, TOutput> implements AsyncOperatorInterface
  * Async guard operator.
  * The validator can be synchronous or asynchronous (return a Promise<boolean>).
  * Passes data through if the predicate is true, otherwise returns undefined.
+ *
+ * @category Async Operators
  */
 export class AsyncGuardOperator<T> implements AsyncOperatorInterface<T, T | undefined> {
   private readonly _validator: (data: T) => Promise<boolean> | boolean;
@@ -121,6 +149,8 @@ export class AsyncGuardOperator<T> implements AsyncOperatorInterface<T, T | unde
  * Async operator pipeline.
  * Accepts both synchronous (OperatorInterface) and asynchronous (AsyncOperatorInterface) operators.
  * Each step is executed via await — a sync operator is unwrapped as a no-op.
+ *
+ * @category Async Operators
  */
 export class AsyncPipelineOperator<TInput, TOutput> implements AsyncOperatorInterface<TInput, TOutput> {
   private readonly _operators: readonly (OperatorInterface<unknown, unknown> | AsyncOperatorInterface<unknown, unknown>)[];

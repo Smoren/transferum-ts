@@ -24,49 +24,108 @@ import type {
 } from "./interfaces";
 import type { TickerConfig } from "./configs";
 
-/** Extracts the first element type from a readonly tuple. */
+/**
+ * Extracts the first element type from a readonly tuple.
+ * @category Types
+ */
 export type First<T extends readonly unknown[]> = T extends readonly [infer Head, ...unknown[]] ? Head : never;
-/** Extracts the last element type from a readonly tuple. */
+/**
+ * Extracts the last element type from a readonly tuple.
+ * @category Types
+ */
 export type Last<T extends readonly unknown[]> = T extends readonly [...unknown[], infer Tail] ? Tail : never;
 
-/** Synchronous data handler — called with a value of type T. */
+/**
+ * Synchronous data handler — called with a value of type T.
+ * @category Types
+ */
 export type DataHandler<T> = (data: T) => void;
-/** Synchronous data fetcher — returns a value of type T or undefined. */
+/**
+ * Synchronous data fetcher — returns a value of type T or undefined.
+ * @category Types
+ */
 export type DataFetcher<T> = () => T | undefined;
-/** Asynchronous data handler — may return a Promise or void. */
+/**
+ * Asynchronous data handler — may return a Promise or void.
+ * @category Types
+ */
 export type AsyncDataHandler<T> = (data: T) => Promise<void> | void;
-/** Asynchronous data fetcher — returns a Promise of T or undefined. */
+/**
+ * Asynchronous data fetcher — returns a Promise of T or undefined.
+ * @category Types
+ */
 export type AsyncDataFetcher<T> = () => Promise<T | undefined>;
-/** Error handler — receives an Error and returns void. */
+/**
+ * Error handler — receives an Error and returns void.
+ * @category Types
+ */
 export type ErrorHandler<TSource> = (e: Error, source: TSource) => void;
-/** Callback invoked by a Ticker on each tick. */
+/**
+ * Callback invoked by a Ticker on each tick.
+ * @category Types
+ */
 export type TickerCallback = () => void;
-/** Factory function that creates a TickerInterface from a TickerConfig. */
+/**
+ * Factory function that creates a TickerInterface from a TickerConfig.
+ * @category Types
+ */
 export type TickerFactory = (config: TickerConfig) => TickerInterface;
 
-/** Branded type: PushableInterface with the `isPushable` flag set to true. */
+/**
+ * Branded type: PushableInterface with the `isPushable` flag set to true.
+ * @category Types
+ */
 export type Pushable<T = any> = PushableInterface<T> & { readonly isPushable: true };
-/** Branded type: PollingProxyInterface with the `isPollingProxy` flag set to true. */
+/**
+ * Branded type: PollingProxyInterface with the `isPollingProxy` flag set to true.
+ * @category Types
+ */
 export type PollingProxy<T = any> = PollingProxyInterface<T> & { readonly isPollingProxy: true };
-/** Branded type: PullableInterface with the `isPullable` flag set to true. */
+/**
+ * Branded type: PullableInterface with the `isPullable` flag set to true.
+ * @category Types
+ */
 export type Pullable<T = any> = PullableInterface<T> & { readonly isPullable: true };
-/** Branded type: SubscribableInterface with the `isSubscribable` flag set to true. */
+/**
+ * Branded type: SubscribableInterface with the `isSubscribable` flag set to true.
+ * @category Types
+ */
 export type Subscribable<T = any> = SubscribableInterface<T> & { readonly isSubscribable: true };
-/** Branded type: TriggerableInterface with the `isTriggerable` flag set to true. */
+/**
+ * Branded type: TriggerableInterface with the `isTriggerable` flag set to true.
+ * @category Types
+ */
 export type Triggerable = TriggerableInterface & { readonly isTriggerable: true };
-/** Branded type: GateInterface with the `isGate` flag set to true. */
+/**
+ * Branded type: GateInterface with the `isGate` flag set to true.
+ * @category Types
+ */
 export type Gate = GateInterface & { readonly isGate: true };
 
-/** Branded type: AsyncPushableInterface with the `isAsyncPushable` flag set to true. */
+/**
+ * Branded type: AsyncPushableInterface with the `isAsyncPushable` flag set to true.
+ * @category Types
+ */
 export type AsyncPushable<T = any> = AsyncPushableInterface<T> & { readonly isAsyncPushable: true };
-/** Branded type: AsyncPollingProxyInterface with the `isAsyncPollingProxy` flag set to true. */
+/**
+ * Branded type: AsyncPollingProxyInterface with the `isAsyncPollingProxy` flag set to true.
+ * @category Types
+ */
 export type AsyncPollingProxy<T = any> = AsyncPollingProxyInterface<T> & { readonly isAsyncPollingProxy: true };
-/** Branded type: AsyncPullableInterface with the `isAsyncPullable` flag set to true. */
+/**
+ * Branded type: AsyncPullableInterface with the `isAsyncPullable` flag set to true.
+ * @category Types
+ */
 export type AsyncPullable<T = any> = AsyncPullableInterface<T> & { readonly isAsyncPullable: true };
-/** Branded type: AsyncTriggerableInterface with the `isAsyncTriggerable` flag set to true. */
+/**
+ * Branded type: AsyncTriggerableInterface with the `isAsyncTriggerable` flag set to true.
+ * @category Types
+ */
 export type AsyncTriggerable = AsyncTriggerableInterface & { readonly isAsyncTriggerable: true };
 
-/** Maps a single feature flag to its corresponding branded interface and direction flags. */
+/**
+ * Maps a single feature flag to its corresponding branded interface and direction flags.
+ */
 type FeatureMap<TIn, TOut, F> =
   F extends { readonly isPushable: true } ? Pushable<TIn> & { readonly isInput: true } :
   F extends { readonly isPollingProxy: true } ? PollingProxy<TIn> & { readonly isInput: true, readonly isOutput: true } :
@@ -80,21 +139,29 @@ type FeatureMap<TIn, TOut, F> =
   F extends { readonly isAsyncTriggerable: true } ? AsyncTriggerable :
   unknown;
 
-/** Converts a union type into an intersection type via contravariant function parameter inference. */
+/**
+ * Converts a union type into an intersection type via contravariant function parameter inference.
+ */
 type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never;
 
-/** Resolves an array of feature flags into a single intersection of all corresponding branded interfaces. */
+/**
+ * Resolves an array of feature flags into a single intersection of all corresponding branded interfaces.
+ */
 type ResolveFeatures<TIn, TOut, Features extends any[]> = UnionToIntersection<{
   [K in keyof Features]: FeatureMap<TIn, TOut, Features[K]>
 }[number]>;
 
-/** Adds `isDuplex: true` when the resolved features include both input and output direction. */
+/**
+ * Adds `isDuplex: true` when the resolved features include both input and output direction.
+ */
 type IsDuplexFeatures<Features extends any[]> =
   ResolveFeatures<any, any, Features> extends { readonly isInput: true, readonly isOutput: true }
     ? { readonly isDuplex: true }
     : unknown;
 
-/** Resolves a transfer with explicit feature flags into a concrete intersection type with BaseTransferInterface and duplex flag. */
+/**
+ * Resolves a transfer with explicit feature flags into a concrete intersection type with BaseTransferInterface and duplex flag.
+ */
 type ExplicitTransfer<TIn, TOut, Features extends any[]> = BaseTransferInterface
   & ResolveFeatures<TIn, TOut, Features>
   & IsDuplexFeatures<Features>;
@@ -105,6 +172,8 @@ type ExplicitTransfer<TIn, TOut, Features extends any[]> = BaseTransferInterface
  *
  * - Two arguments (T, T, Features[]): single-type duplex transfer.
  * - Three arguments (TIn, TOut, Features[]): dual-type transfer.
+ *
+ * @category Types
  */
 export type Transfer<
   TInOrAll,
@@ -116,18 +185,30 @@ export type Transfer<
     ? ExplicitTransfer<TInOrAll, TInOrAll, TOutOrFeatures>
     : never;
 
-/** Union of all transfer interfaces that can act as a pipeline input (push/poll/gate/async variants). */
+/**
+ * Union of all transfer interfaces that can act as a pipeline input (push/poll/gate/async variants).
+ * @category Types
+ */
 export type InputTransfer<T> = PushableTransferInterface<T> | PollingProxyTransferInterface<T> | AsyncPushableTransferInterface<T> | AsyncPollingProxyTransferInterface<T> | GateTransferInterface<T>;
 
-/** Union of all transfer interfaces that can act as a pipeline output (pull/subscribe/gate/async variants). */
+/**
+ * Union of all transfer interfaces that can act as a pipeline output (pull/subscribe/gate/async variants).
+ * @category Types
+ */
 export type OutputTransfer<T> = PullableTransferInterface<T> | SubscribableTransferInterface<T> | AsyncPullableTransferInterface<T> | GateTransferInterface<T>;
 
-/** A transfer that is both an input and an output (duplex). */
+/**
+ * A transfer that is both an input and an output (duplex).
+ * @category Types
+ */
 export type DuplexTransfer<TInput, TOutput = TInput> = InputTransfer<TInput> & OutputTransfer<TOutput> & {
   isDuplex: true;
 }
 
-/** Extracts the input data type from an InputTransfer. */
+/**
+ * Extracts the input data type from an InputTransfer.
+ * @category Types
+ */
 export type InputTransferDataType<T> = T extends PushableInterface<infer U> ? U
   : T extends PollingProxyInterface<infer U> ? U
   : T extends AsyncPushableInterface<infer U> ? U
@@ -135,7 +216,10 @@ export type InputTransferDataType<T> = T extends PushableInterface<infer U> ? U
   : T extends GateTransferInterface<infer U> ? U
   : never;
 
-/** Extracts the output data type from an OutputTransfer. */
+/**
+ * Extracts the output data type from an OutputTransfer.
+ * @category Types
+ */
 export type OutputTransferDataType<T> = T extends PullableTransferInterface<infer U> ? U
   : T extends SubscribableInterface<infer U> ? U
   : T extends PullableInterface<infer U> ? U
@@ -143,9 +227,15 @@ export type OutputTransferDataType<T> = T extends PullableTransferInterface<infe
   : T extends GateTransferInterface<infer U> ? U
   : never;
 
-/** Base type for selector keys — string, number, or symbol. */
+/**
+ * Base type for selector keys — string, number, or symbol.
+ * @category Types
+ */
 export type BaseSelectorKey = string | number | symbol;
-/** Extracts the key type from a bridge map. */
+/**
+ * Extracts the key type from a bridge map.
+ * @category Types
+ */
 export type SelectorKey<TMap extends Record<BaseSelectorKey, BridgeInterface>> = keyof TMap;
 
 /** Filters `never` elements out of a tuple type, preserving order of the remaining elements. */
@@ -165,6 +255,8 @@ type FilterNever<T extends any[], Acc extends any[] = []> =
  *
  * The result is a `Transfer<TInput, TOutput, [...Flags]>` — the same computed type used
  * by all transfer factories, with compile-time literal flags guaranteeing method existence.
+ *
+ * @category Types
  */
 export type CompositeTransfer<
   TInput,
@@ -200,6 +292,8 @@ export type CompositeTransfer<
  * @deprecated Use `CompositeTransfer` instead. Will be removed in the next major release.
  *
  * Composite transfer type produced by InputPipelineBuilder — exposes input capabilities plus optional trigger/gate.
+ *
+ * @category Types
  */
 export type CompositeInputTransfer<
   TStart,
@@ -218,6 +312,8 @@ export type CompositeInputTransfer<
  * @deprecated Use `CompositeTransfer` instead. Will be removed in the next major release.
  *
  * Composite transfer type produced by OutputPipelineBuilder — exposes output capabilities plus optional trigger/gate.
+ *
+ * @category Types
  */
 export type CompositeOutputTransfer<
   TFinish,
@@ -236,6 +332,8 @@ export type CompositeOutputTransfer<
  * @deprecated Use `CompositeTransfer` instead. Will be removed in the next major release.
  *
  * Composite transfer type produced by DuplexPipelineBuilder — exposes both input and output capabilities plus optional trigger/gate.
+ *
+ * @category Types
  */
 export type CompositeDuplexTransfer<
   TStart,

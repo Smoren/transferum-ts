@@ -48,6 +48,8 @@ import { Subscriber } from "./helpers";
  * @param rhs — input transfer (sink)
  * @param options — optional link config (onError for async-push rejection)
  * @returns SubscriberInterface for breaking the link
+ *
+ * @category Utilities
  */
 export function linkTransfers<T, RTransfer extends InputTransfer<T>>(
   lhs: OutputTransfer<T>,
@@ -199,6 +201,8 @@ export function linkTransfers<T, RTransfer extends InputTransfer<T>>(
  * Universal error handler.
  * If onError is provided — calls it and suppresses the exception.
  * If onError is not provided — rethrows the exception.
+ *
+ * @category Utilities
  */
 export function handleError<TSource>(error: unknown, source: TSource, onError?: ErrorHandler<TSource>): void {
   const err = error instanceof Error ? error : new Error(String(error));

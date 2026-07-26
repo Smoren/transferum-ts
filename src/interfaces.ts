@@ -10,60 +10,90 @@ import type {
   OutputTransfer,
   SelectorKey,
   CompositeTransfer,
-  CompositeDuplexTransfer,
-  CompositeInputTransfer,
-  CompositeOutputTransfer,
   OutputTransferDataType,
   InputTransferDataType,
   ErrorHandler,
+  CompositeDuplexTransfer,
+  CompositeInputTransfer,
+  CompositeOutputTransfer,
 } from "./types";
 
-/** Write-only flow — accepts data via write(). */
+/**
+ * Write-only flow — accepts data via write().
+ * @category Interfaces
+ */
 export interface InputFlowInterface<T> {
   write(data: T): void;
 }
 
-/** Read-only flow — yields data via read(). */
+/**
+ * Read-only flow — yields data via read().
+ * @category Interfaces
+ */
 export interface OutputFlowInterface<T> {
   read(): T | undefined;
 }
 
-/** Bidirectional flow — combines read and write. */
+/**
+ * Bidirectional flow — combines read and write.
+ * @category Interfaces
+ */
 export interface IOFlowInterface<TInput, TOutput> extends InputFlowInterface<TInput>, OutputFlowInterface<TOutput> {}
 
-/** Bidirectional storage with size tracking, clear, and reset. */
+/**
+ * Bidirectional storage with size tracking, clear, and reset.
+ * @category Interfaces
+ */
 export interface StorageInterface<TInput, TOutput> extends IOFlowInterface<TInput, TOutput> {
   readonly size: number;
   clear(): void;
   reset(): void;
 }
 
-/** Asynchronous write-only flow — accepts data via async write(). */
+/**
+ * Asynchronous write-only flow — accepts data via async write().
+ * @category Interfaces
+ */
 export interface AsyncInputFlowInterface<T> {
   write(data: T): Promise<void>;
 }
 
-/** Asynchronous read-only flow — yields data via async read(). */
+/**
+ * Asynchronous read-only flow — yields data via async read().
+ * @category Interfaces
+ */
 export interface AsyncOutputFlowInterface<T> {
   read(): Promise<T | undefined>;
 }
 
-/** Asynchronous bidirectional flow — combines async read and write. */
+/**
+ * Asynchronous bidirectional flow — combines async read and write.
+ * @category Interfaces
+ */
 export interface AsyncIOFlowInterface<TInput, TOutput> extends AsyncInputFlowInterface<TInput>, AsyncOutputFlowInterface<TOutput> {}
 
-/** Asynchronous bidirectional storage with async clear/reset. */
+/**
+ * Asynchronous bidirectional storage with async clear/reset.
+ * @category Interfaces
+ */
 export interface AsyncStorageInterface<TInput, TOutput> extends AsyncIOFlowInterface<TInput, TOutput> {
   readonly size: number;
   clear(): Promise<void>;
   reset(): Promise<void>;
 }
 
-/** Synchronous data transformation operator — maps TInput to TOutput. */
+/**
+ * Synchronous data transformation operator — maps TInput to TOutput.
+ * @category Interfaces
+ */
 export interface OperatorInterface<TInput, TOutput> {
   apply(data: TInput): TOutput;
 }
 
-/** Asynchronous data transformation operator — maps TInput to Promise<TOutput>. */
+/**
+ * Asynchronous data transformation operator — maps TInput to Promise<TOutput>.
+ * @category Interfaces
+ */
 export interface AsyncOperatorInterface<TInput, TOutput> {
   apply(data: TInput): Promise<TOutput>;
 }
@@ -71,6 +101,8 @@ export interface AsyncOperatorInterface<TInput, TOutput> {
 /**
  * Ticker interface — an abstraction over periodic callback invocation.
  * Two implementations: RAFTicker (browser, requestAnimationFrame) and IntervalTicker (Node.js, setInterval).
+ *
+ * @category Interfaces
  */
 export interface TickerInterface {
   /** Interval in milliseconds */
@@ -90,7 +122,10 @@ export interface TickerInterface {
   updateInterval(delay: number): void;
 }
 
-/** Subscription handle — tracks active state and supports unsubscribe lifecycle hooks. */
+/**
+ * Subscription handle — tracks active state and supports unsubscribe lifecycle hooks.
+ * @category Interfaces
+ */
 export interface SubscriberInterface {
   readonly active: boolean;
   unsubscribe(): void;
@@ -98,12 +133,18 @@ export interface SubscriberInterface {
   offUnsubscribe(handler: DataHandler<SubscriberInterface>): SubscriberInterface;
 }
 
-/** Resource cleanup contract — destroy() releases all held resources. */
+/**
+ * Resource cleanup contract — destroy() releases all held resources.
+ * @category Interfaces
+ */
 export interface DisposableInterface {
   destroy(): void;
 }
 
-/** Flow control contract — activate/deactivate/toggle with state-change subscriptions. */
+/**
+ * Flow control contract — activate/deactivate/toggle with state-change subscriptions.
+ * @category Interfaces
+ */
 export interface GateInterface {
   readonly active: boolean;
   activate(): void;
@@ -112,68 +153,107 @@ export interface GateInterface {
   onStateChange(handler: DataHandler<GateInterface>): SubscriberInterface;
 }
 
-/** Pushable contract — accepts data via push(). */
+/**
+ * Pushable contract — accepts data via push().
+ * @category Interfaces
+ */
 export interface PushableInterface<T> {
   push(data: T): void;
 }
 
-/** Pullable contract — yields data via pull(). */
+/**
+ * Pullable contract — yields data via pull().
+ * @category Interfaces
+ */
 export interface PullableInterface<T> {
   pull(): T | undefined;
 }
 
-/** Subscribable contract — registers a handler that is called on each emitted value. */
+/**
+ * Subscribable contract — registers a handler that is called on each emitted value.
+ * @category Interfaces
+ */
 export interface SubscribableInterface<T> {
   subscribe(handler: DataHandler<T>): SubscriberInterface;
 }
 
-/** Triggerable contract — manually triggers emission of the current value to subscribers. */
+/**
+ * Triggerable contract — manually triggers emission of the current value to subscribers.
+ * @category Interfaces
+ */
 export interface TriggerableInterface {
   trigger(): void;
 }
 
-/** Polling proxy contract — receives a fetcher from the upstream transfer and manages its lifecycle via set/clear. */
+/**
+ * Polling proxy contract — receives a fetcher from the upstream transfer and manages its lifecycle via set/clear.
+ * @category Interfaces
+ */
 export interface PollingProxyInterface<T> {
   setFetcher(fetcher: DataFetcher<T>): void;
   clearFetcher(): void;
 }
 
-/** Asynchronous pushable contract — accepts data via asyncPush() returning a Promise. */
+/**
+ * Asynchronous pushable contract — accepts data via asyncPush() returning a Promise.
+ * @category Interfaces
+ */
 export interface AsyncPushableInterface<T> {
   asyncPush(data: T): Promise<void>;
 }
 
-/** Asynchronous pullable contract — yields data via asyncPull() returning a Promise. */
+/**
+ * Asynchronous pullable contract — yields data via asyncPull() returning a Promise.
+ * @category Interfaces
+ */
 export interface AsyncPullableInterface<T> {
   asyncPull(): Promise<T | undefined>;
 }
 
-/** Asynchronous triggerable contract — triggers emission via asyncTrigger() returning a Promise. */
+/**
+ * Asynchronous triggerable contract — triggers emission via asyncTrigger() returning a Promise.
+ * @category Interfaces
+ */
 export interface AsyncTriggerableInterface {
   asyncTrigger(): Promise<void>;
 }
 
-/** Async polling proxy contract — receives an async fetcher from the upstream transfer and manages its lifecycle. */
+/**
+ * Async polling proxy contract — receives an async fetcher from the upstream transfer and manages its lifecycle.
+ * @category Interfaces
+ */
 export interface AsyncPollingProxyInterface<T> {
   setAsyncFetcher(fetcher: AsyncDataFetcher<T>): void;
   clearAsyncFetcher(): void;
 }
 
-/** Universal input interface — aggregates all sync and async input capabilities (push, poll, trigger, gate, async variants). */
+/**
+ * Universal input interface — aggregates all sync and async input capabilities (push, poll, trigger, gate, async variants).
+ * @category Interfaces
+ */
 export interface UniversalInputInterface<T> extends
   BaseTransferInterface, PushableInterface<T>, PollingProxyInterface<T>, TriggerableInterface, GateInterface,
   AsyncPushableInterface<T>, AsyncPollingProxyInterface<T>, AsyncTriggerableInterface {}
 
-/** Universal output interface — aggregates all sync and async output capabilities (pull, subscribe, trigger, gate, async variants). */
+/**
+ * Universal output interface — aggregates all sync and async output capabilities (pull, subscribe, trigger, gate, async variants).
+ * @category Interfaces
+ */
 export interface UniversalOutputInterface<T> extends
   BaseTransferInterface, PullableInterface<T>, SubscribableInterface<T>, TriggerableInterface, GateInterface,
   AsyncPullableInterface<T>, AsyncTriggerableInterface {}
 
-/** Universal duplex interface — combines all input and output capabilities. */
+/**
+ * Universal duplex interface — combines all input and output capabilities.
+ * @category Interfaces
+ */
 export interface UniversalDuplexInterface<TInput, TOutput> extends
   UniversalInputInterface<TInput>, UniversalOutputInterface<TOutput> {}
 
-/** Contract of capability flags — boolean properties that determine which interfaces and methods a transfer supports. */
+/**
+ * Contract of capability flags — boolean properties that determine which interfaces and methods a transfer supports.
+ * @category Interfaces
+ */
 interface CommunicationContractInterface {
   // Direction and nature of the flow
   readonly isInput: boolean;        // can act as an input
@@ -196,10 +276,16 @@ interface CommunicationContractInterface {
   readonly isAsyncPollingProxy: boolean;   // can asynchronously poll another transfer
 }
 
-/** Base transfer interface — combines capability flags with disposable lifecycle. */
+/**
+ * Base transfer interface — combines capability flags with disposable lifecycle.
+ * @category Interfaces
+ */
 export interface BaseTransferInterface extends CommunicationContractInterface, DisposableInterface {}
 
-/** Transfer with gate-controlled push/subscribe — data flows only when the gate is active. */
+/**
+ * Transfer with gate-controlled push/subscribe — data flows only when the gate is active.
+ * @category Interfaces
+ */
 export interface GateTransferInterface<T> extends GateInterface, PushableTransferInterface<T>, SubscribableTransferInterface<T> {
   readonly isInput: true;
   readonly isOutput: true;
@@ -209,55 +295,82 @@ export interface GateTransferInterface<T> extends GateInterface, PushableTransfe
   readonly isGate: true;
 }
 
-/** Pushable transfer — input transfer that supports synchronous data push via push(). */
+/**
+ * Pushable transfer — input transfer that supports synchronous data push via push().
+ * @category Interfaces
+ */
 export interface PushableTransferInterface<T> extends PushableInterface<T>, BaseTransferInterface {
   readonly isInput: true;
   readonly isPushable: true;
 }
 
-/** Polling source transfer — fetcher is passed via config at construction time. Output-only (cannot be an input). */
+/**
+ * Polling source transfer — fetcher is passed via config at construction time. Output-only (cannot be an input).
+ * @category Interfaces
+ */
 export interface PollingSourceTransferInterface extends BaseTransferInterface, GateInterface {
   readonly isOutput: true;
   readonly isPollingSource: true;
   readonly isGate: true;
 }
 
-/** Polling proxy transfer — fetcher is connected from the upstream transfer in the chain. At least an input. */
+/**
+ * Polling proxy transfer — fetcher is connected from the upstream transfer in the chain. At least an input.
+ * @category Interfaces
+ */
 export interface PollingProxyTransferInterface<T> extends PollingProxyInterface<T>, BaseTransferInterface, GateInterface {
   readonly isInput: true;
   readonly isPollingProxy: true;
 }
 
-/** Pullable transfer — output transfer that supports synchronous data extraction via pull(). */
+/**
+ * Pullable transfer — output transfer that supports synchronous data extraction via pull().
+ * @category Interfaces
+ */
 export interface PullableTransferInterface<T> extends PullableInterface<T>, BaseTransferInterface {
   readonly isOutput: true;
   readonly isPullable: true;
 }
 
-/** Subscribable transfer — output transfer that supports reactive subscription via subscribe(). */
+/**
+ * Subscribable transfer — output transfer that supports reactive subscription via subscribe().
+ * @category Interfaces
+ */
 export interface SubscribableTransferInterface<T> extends SubscribableInterface<T>, BaseTransferInterface {
   readonly isOutput: true;
   readonly isSubscribable: true;
 }
 
-/** Triggerable transfer — transfer that supports manual emission via trigger(). */
+/**
+ * Triggerable transfer — transfer that supports manual emission via trigger().
+ * @category Interfaces
+ */
 export interface TriggerableTransferInterface extends TriggerableInterface, BaseTransferInterface {
   readonly isTriggerable: true;
 }
 
-/** Async pushable transfer — input transfer that supports asynchronous data push via asyncPush(). */
+/**
+ * Async pushable transfer — input transfer that supports asynchronous data push via asyncPush().
+ * @category Interfaces
+ */
 export interface AsyncPushableTransferInterface<T> extends AsyncPushableInterface<T>, BaseTransferInterface {
   readonly isInput: true;
   readonly isAsyncPushable: true;
 }
 
-/** Async pullable transfer — output transfer that supports asynchronous data extraction via asyncPull(). */
+/**
+ * Async pullable transfer — output transfer that supports asynchronous data extraction via asyncPull().
+ * @category Interfaces
+ */
 export interface AsyncPullableTransferInterface<T> extends AsyncPullableInterface<T>, BaseTransferInterface {
   readonly isOutput: true;
   readonly isAsyncPullable: true;
 }
 
-/** Async polling proxy transfer — input transfer that supports async polling of an upstream transfer via setAsyncFetcher/clearAsyncFetcher. */
+/**
+ * Async polling proxy transfer — input transfer that supports async polling of an upstream transfer via setAsyncFetcher/clearAsyncFetcher.
+ * @category Interfaces
+ */
 export interface AsyncPollingProxyTransferInterface<T> extends AsyncPollingProxyInterface<T>, BaseTransferInterface, GateInterface {
   readonly isInput: true;
   readonly isAsyncPollingProxy: true;
@@ -266,6 +379,8 @@ export interface AsyncPollingProxyTransferInterface<T> extends AsyncPollingProxy
 /**
  * Operator pipeline builder interface — type-safe chaining of operators
  * with tuple-based type inference. Each add() appends the output type to TFlow.
+ *
+ * @category Interfaces
  */
 export interface OperatorPipelineBuilderInterface<TFlow extends readonly unknown[]> {
   /**
@@ -299,6 +414,8 @@ export interface OperatorPipelineBuilderInterface<TFlow extends readonly unknown
  * Async operator pipeline builder interface — like OperatorPipelineBuilderInterface,
  * but accepts both sync and async operators. Async overloads are listed first to avoid
  * TOutput being inferred as Promise<TOut>.
+ *
+ * @category Interfaces
  */
 export interface AsyncOperatorPipelineBuilderInterface<TFlow extends readonly unknown[]> {
   // Async overload first: AsyncMapOperator<TIn, TOut> is structurally
@@ -345,6 +462,8 @@ export interface AsyncOperatorPipelineBuilderInterface<TFlow extends readonly un
  * - Triggerable, AsyncTriggerable, Gate from explicit options or extracted by UniversalCompositeTransfer.
  *
  * Works for both sync and async pipelines — `onLinkError` in finish() options enables async error handling.
+ *
+ * @category Interfaces
  */
 export interface CompositeTransferBuilderInterface<
   TCurrent,
@@ -383,17 +502,29 @@ export interface CompositeTransferBuilderInterface<
   >;
 }
 
-/** Bridge contract — a gated, disposable connection between two transfers. */
+/**
+ * Bridge contract — a gated, disposable connection between two transfers.
+ *
+ * @category Interfaces
+ */
 export interface BridgeInterface extends GateInterface, DisposableInterface {}
 
-/** Selector bridge interface — single-active-bridge selection from a keyed map. */
+/**
+ * Selector bridge interface — single-active-bridge selection from a keyed map.
+ *
+ * @category Interfaces
+ */
 export interface BridgeSelectorInterface<TMap extends Record<BaseSelectorKey, BridgeInterface>> extends BridgeInterface {
   readonly selectedKey: SelectorKey<TMap>;
   readonly selectedBridge: BridgeInterface;
   select(key: SelectorKey<TMap>): void;
 }
 
-/** Multi-selector bridge interface — multi-active-bridge selection with check/uncheck granularity. */
+/**
+ * Multi-selector bridge interface — multi-active-bridge selection with check/uncheck granularity.
+ *
+ * @category Interfaces
+ */
 export interface BridgeMultiSelectorInterface<TMap extends Record<BaseSelectorKey, BridgeInterface>> extends BridgeInterface {
   readonly selectedKeys: SelectorKey<TMap>[];
   readonly selectedBridges: BridgeInterface[];
@@ -413,6 +544,8 @@ export interface BridgeMultiSelectorInterface<TMap extends Record<BaseSelectorKe
  *
  * Pipeline structure: TStartTransfer [→ DuplexTransfer → …] → InputTransfer.
  * The start transfer must be duplex; the finish transfer is input-only (no output methods exposed).
+ *
+ * @category Interfaces
  */
 export interface InputPipelineBuilderInterface<TCurrent, TStartTransfer extends InputTransfer<unknown>> {
   to<TNext>(
@@ -440,6 +573,8 @@ export interface InputPipelineBuilderInterface<TCurrent, TStartTransfer extends 
  *
  * Pipeline structure: OutputTransfer [→ DuplexTransfer → …] → TFinishTransfer.
  * The start transfer must be output-only; the finish transfer is duplex. Input methods are not exposed.
+ *
+ * @category Interfaces
  */
 export interface OutputPipelineBuilderInterface {
   to(
@@ -468,6 +603,8 @@ export interface OutputPipelineBuilderInterface {
  *
  * Pipeline structure: TStartTransfer [→ DuplexTransfer → …] → TFinishTransfer.
  * Both start and finish transfers are duplex; both input and output methods are exposed.
+ *
+ * @category Interfaces
  */
 export interface DuplexPipelineBuilderInterface<
   TCurrent,
@@ -505,6 +642,8 @@ export interface DuplexPipelineBuilderInterface<
  *
  * Async input pipeline builder interface — like InputPipelineBuilderInterface,
  * but supports async triggerable and linkOnError for async-push rejection handling.
+ *
+ * @category Interfaces
  */
 export interface AsyncInputPipelineBuilderInterface<TCurrent, TStartTransfer extends InputTransfer<unknown>> {
   to<TNext>(
@@ -533,6 +672,8 @@ export interface AsyncInputPipelineBuilderInterface<TCurrent, TStartTransfer ext
  *
  * Async output pipeline builder interface — like OutputPipelineBuilderInterface,
  * but supports async triggerable and linkOnError for async-push rejection handling.
+ *
+ * @category Interfaces
  */
 export interface AsyncOutputPipelineBuilderInterface {
   to(
@@ -562,6 +703,8 @@ export interface AsyncOutputPipelineBuilderInterface {
  *
  * Async duplex pipeline builder interface — like DuplexPipelineBuilderInterface,
  * but supports async triggerable and linkOnError for async-push rejection handling.
+ *
+ * @category Interfaces
  */
 export interface AsyncDuplexPipelineBuilderInterface<
   TCurrent,
