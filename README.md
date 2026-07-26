@@ -7,6 +7,7 @@
 ![Build and test](https://github.com/Smoren/transferum-ts/actions/workflows/test.yml/badge.svg)
 [![Minified Size](https://badgen.net/bundlephobia/minzip/transferum)](https://bundlephobia.com/result?p=transferum)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![API Docs](https://img.shields.io/badge/API-Docs-blue)](https://smoren.github.io/transferum-ts)
 
 ![Transferum Logo](docs/images/transferum-logo.png)
 
@@ -1426,8 +1427,7 @@ When linking a `Subscribable` source to an `AsyncPushable` target, `asyncPush()`
 | Async polling          | AsyncPollingSourceTransfer, AsyncPollingProxyTransfer, AsyncPollingFlowTransfer, AsyncIdlePollingTransfer      | Async periodic source polling                          |
 | Async external sources | AsyncStoredChannelTransfer                                                                                     | Integration via `setup`/`destroy` with async interface |
 
-### PushChannelTransfer
-
+### [PushChannelTransfer](https://smoren.github.io/transferum-ts/classes/PushChannelTransfer.html)
 Reactive channel with automatic emission to subscribers on `push()`. Data is not retained after emission.
 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`
@@ -1442,8 +1442,7 @@ channel.push(42); // → 42
 // After push() state is cleared
 ```
 
-### DelayedPushChannelTransfer
-
+### [DelayedPushChannelTransfer](https://smoren.github.io/transferum-ts/classes/DelayedPushChannelTransfer.html)
 Reactive channel with delayed emission to subscribers on `push()`. Each `push()` schedules its own timer for `delay` ms, upon expiration of which data is sent to subscribers and state is cleared. Multiple `push()` calls create independent delayed notifications.
 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`
@@ -1464,8 +1463,7 @@ channel.push(2);
 
 `destroy()` clears all pending timers — delayed notifications are canceled.
 
-### DebounceTransfer
-
+### [DebounceTransfer](https://smoren.github.io/transferum-ts/classes/DebounceTransfer.html)
 Reactive channel with debounced emission to subscribers on `push()`. Each `push()` resets the previous timer; subscribers are notified only after `delay` ms of silence following the last `push()`. Only the last value is emitted.
 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`
@@ -1489,8 +1487,7 @@ channel.push(30);
 
 `destroy()` cancels the pending timer — the delayed notification will not fire.
 
-### ThrottleTransfer
-
+### [ThrottleTransfer](https://smoren.github.io/transferum-ts/classes/ThrottleTransfer.html)
 Reactive channel with throttled emission to subscribers on `push()`. The first `push()` passes immediately (leading edge), subsequent ones within `interval` are ignored, but the last value is emitted after the interval ends (trailing edge). No value is lost.
 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`
@@ -1512,8 +1509,7 @@ channel.push(4); // → 4 (immediately)
 
 `destroy()` cancels the pending timer and clears pending — the trailing notification will not fire.
 
-### PushStoredChannelTransfer
-
+### [PushStoredChannelTransfer](https://smoren.github.io/transferum-ts/classes/PushStoredChannelTransfer.html)
 Reactive channel with last-value retention. The value is available for `pull()` after `push()`.
 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isPullable`, `isSubscribable`, `isTriggerable`
@@ -1530,8 +1526,7 @@ console.log(channel.pull()); // 42
 channel.trigger(); // re-emit current value to subscribers
 ```
 
-### BufferTransfer
-
+### [BufferTransfer](https://smoren.github.io/transferum-ts/classes/BufferTransfer.html)
 Passive buffer with push/pull mechanics (no notifications). `pull()` extracts the value with cleanup.
 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isPullable`
@@ -1546,8 +1541,7 @@ console.log(buffer.pull()); // 42
 console.log(buffer.pull()); // undefined (buffer empty)
 ```
 
-### ManualBufferTransfer
-
+### [ManualBufferTransfer](https://smoren.github.io/transferum-ts/classes/ManualBufferTransfer.html)
 Buffer with manual read control via `trigger()`. `pull()` returns data only after `trigger()`.
 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isPullable`, `isTriggerable`
@@ -1564,8 +1558,7 @@ buffer.trigger();
 console.log(buffer.pull()); // 42
 ```
 
-### ManualFlowTransfer
-
+### [ManualFlowTransfer](https://smoren.github.io/transferum-ts/classes/ManualFlowTransfer.html)
 Reactive stream with manual emission control. `push()` writes the value, `trigger()` emits to subscribers.
 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`, `isTriggerable`
@@ -1580,8 +1573,7 @@ flow.push(42); // subscribers NOT notified
 flow.trigger(); // → 42
 ```
 
-### GateTransfer
-
+### [GateTransfer](https://smoren.github.io/transferum-ts/classes/GateTransfer.html)
 Transfer with state management (gate). Passes data only when `active === true`.
 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`, `isGate`
@@ -1620,8 +1612,7 @@ gate.deactivate(); // → "Gate state changed: active=false"
 
 `onStateChange()` returns `SubscriberInterface` for unsubscription. The subscriber receives `GateInterface` (the transfer itself) in the callback.
 
-### MergeTransfer
-
+### [MergeTransfer](https://smoren.github.io/transferum-ts/classes/MergeTransfer.html)
 Aggregator of multiple sources into a single stream. Automatically subscribes to all sources.
 
 **Capabilities:** `isOutput`, `isPushable`, `isSubscribable`
@@ -1639,8 +1630,7 @@ source1.push(1); // → 1
 source2.push(2); // → 2
 ```
 
-### SplitTransfer
-
+### [SplitTransfer](https://smoren.github.io/transferum-ts/classes/SplitTransfer.html)
 Stream splitter to multiple targets (broadcast). `push()` sends data to all targets.
 
 **Capabilities:** `isInput`, `isPushable`
@@ -1656,8 +1646,7 @@ const split = createSplitTransfer<number>({ targets: [target1, target2] });
 split.push(42); // sent to target1 and target2
 ```
 
-### PollingSourceTransfer
-
+### [PollingSourceTransfer](https://smoren.github.io/transferum-ts/classes/PollingSourceTransfer.html)
 Output transfer with internal polling of a data source. A `Ticker` calls `trigger()` at a specified interval.
 
 **Capabilities:** `isOutput`, `isPollingSource`, `isPullable`, `isSubscribable`, `isTriggerable`, `isGate`
@@ -1690,8 +1679,7 @@ const polling = createPollingSourceTransfer<number>({
 
 All polling transfers (`PollingSourceTransfer`, `PollingProxyTransfer`, `PollingFlowTransfer`, `IdlePollingTransfer`) also support `onStateChange()` for subscribing to `active` state changes.
 
-### PollingProxyTransfer
-
+### [PollingProxyTransfer](https://smoren.github.io/transferum-ts/classes/PollingProxyTransfer.html)
 Duplex transfer with polling that receives its `fetcher` from the previous node in the chain. The `fetcher` is set via `setFetcher()` (usually called by `linkTransfers`).
 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPollingProxy`, `isPollingSource`, `isPullable`, `isSubscribable`, `isTriggerable`, `isGate`
@@ -1712,8 +1700,7 @@ poller.activate(); // start polling
 
 **Error handling:** Same as `PollingSourceTransfer` — `onError` suppresses fetcher errors in `trigger()` and `pull()`. Without `onError` (or if it throws) — `trigger()` rethrows and ticker stops; `pull()` rethrows to caller without affecting the ticker.
 
-### PollingFlowTransfer
-
+### [PollingFlowTransfer](https://smoren.github.io/transferum-ts/classes/PollingFlowTransfer.html)
 Output transfer with polling from `OutputFlowInterface` (e.g., Storage).
 
 **Capabilities:** `isOutput`, `isPollingSource`, `isPullable`, `isSubscribable`, `isTriggerable`, `isGate`
@@ -1734,8 +1721,7 @@ storage.write(42); // after interval → 42
 
 **Error handling:** If `flow.read()` throws in `trigger()`, `onError` is called. With `onError` — suppressed, polling continues. Without `onError` (or if it throws) — `trigger()` rethrows, ticker stops. `pull()` rethrows to caller without affecting the ticker.
 
-### IdlePollingTransfer
-
+### [IdlePollingTransfer](https://smoren.github.io/transferum-ts/classes/IdlePollingTransfer.html)
 Reactive channel with fallback polling on idle. If no data arrived via `push()` for longer than `timeout` ms, periodic polling of `fetcher` starts with `interval` ms. When new data arrives, polling stops and the idle timer resets.
 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isPullable`, `isSubscribable`, `isPollingSource`, `isTriggerable`, `isGate`
@@ -1757,8 +1743,7 @@ channel.push(42);  // → subscribers notified, idle timer reset
 
 **Error handling:** If `fetcher()` throws during polling, `onError` is called. With `onError` — suppressed, polling continues. Without `onError` (or if it throws) — exception rethrown, polling stops. `pull()` rethrows to caller without affecting polling.
 
-### ChannelTransfer
-
+### [ChannelTransfer](https://smoren.github.io/transferum-ts/classes/ChannelTransfer.html)
 Output channel with external management via `setup`/`destroy` callbacks. Used for integration with external event sources.
 
 **Capabilities:** `isOutput`, `isSubscribable`
@@ -1781,8 +1766,7 @@ const channel = createChannelTransfer<number>({
 channel.subscribe((data) => console.log(data));
 ```
 
-### StoredChannelTransfer
-
+### [StoredChannelTransfer](https://smoren.github.io/transferum-ts/classes/StoredChannelTransfer.html)
 Channel with last-value retention and external management. The value is available for `pull()` and `trigger()`.
 
 **Capabilities:** `isOutput`, `isPullable`, `isTriggerable`, `isSubscribable`
@@ -1807,8 +1791,7 @@ console.log(channel.pull()); // 42
 channel.trigger(); // re-emit
 ```
 
-### SinkTransfer
-
+### [SinkTransfer](https://smoren.github.io/transferum-ts/classes/SinkTransfer.html)
 Terminal destination — calls a callback on receiving data.
 
 **Capabilities:** `isInput`, `isPushable`
@@ -1823,8 +1806,7 @@ const sink = createSinkTransfer<number>({
 sink.push(42); // → "Received: 42"
 ```
 
-### WriteTransfer
-
+### [WriteTransfer](https://smoren.github.io/transferum-ts/classes/WriteTransfer.html)
 Write adapter for an arbitrary `InputFlowInterface` (e.g., Storage).
 
 **Capabilities:** `isInput`, `isPushable`
@@ -1838,8 +1820,7 @@ const writer = createWriteTransfer<number>({ flow: storage });
 writer.push(42); // storage.write(42)
 ```
 
-### ReadTransfer
-
+### [ReadTransfer](https://smoren.github.io/transferum-ts/classes/ReadTransfer.html)
 Read adapter for an arbitrary `OutputFlowInterface` (e.g., Storage).
 
 **Capabilities:** `isOutput`, `isPullable`
@@ -1854,8 +1835,7 @@ const reader = createReadTransfer<number>({ flow: storage });
 console.log(reader.pull()); // 42
 ```
 
-### ConvertTransfer
-
+### [ConvertTransfer](https://smoren.github.io/transferum-ts/classes/ConvertTransfer.html)
 Converter transfer: transforms input data via an `Operator` and sends the result to subscribers. If the operator returns `undefined`, subscribers are not notified.
 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`
@@ -1871,8 +1851,7 @@ converter.subscribe((data) => console.log(data));
 converter.push(42); // → "val_42"
 ```
 
-### ConditionTransfer
-
+### [ConditionTransfer](https://smoren.github.io/transferum-ts/classes/ConditionTransfer.html)
 Transfer with conditional filtering on input (`shouldAccept`) and output (`shouldEmit`).
 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`
@@ -1891,8 +1870,7 @@ condition.push(50);  // passed both filters → 50
 condition.push(150); // passed shouldAccept, rejected by shouldEmit
 ```
 
-### DisplaceTransfer
-
+### [DisplaceTransfer](https://smoren.github.io/transferum-ts/classes/DisplaceTransfer.html)
 Switch-map transfer: for each input value, creates a new inner async-pushable + subscribable transfer via a factory function, pushes the value into it via `asyncPush()`, and forwards the inner's emissions to outer subscribers. On each new `push()`, the previous inner subscription is unsubscribed and the previous inner transfer is destroyed — only the latest inner's emissions pass through.
 
 The outer `push()` is **synchronous**. The factory receives **no arguments** — it is purely declarative. `DisplaceTransfer` handles data delivery by calling `inner.asyncPush(data)` internally (fire-and-forget). The async work happens inside the inner transfer; results arrive via subscription callbacks.
@@ -1968,8 +1946,7 @@ displace.push('world'); // onDisplace aborts 'hello' fetch, then destroys the in
 - Per-value WebSocket/stream subscriptions with automatic cleanup
 - Custom cancellation via `onDisplace` (abort requests, close connections) before inner is destroyed
 
-### UniversalCompositeTransfer
-
+### [UniversalCompositeTransfer](https://smoren.github.io/transferum-ts/classes/UniversalCompositeTransfer.html)
 Universal composite transfer — combines an input and an output transfer into a single duplex interface. Automatically extracts `triggerable` and `gate` from the provided transfers (or accepts them explicitly).
 
 **Extraction priorities:**
@@ -2022,8 +1999,7 @@ Async transfers provide asynchronous interfaces (`asyncPush`, `asyncPull`, `asyn
 
 > **Why separate async classes?** `Promise<T>` and `T` are different programming models — mixing them in one class blurs contracts and complicates error handling. Transferum keeps sync and async as distinct transfer families (e.g., `ConvertTransfer` vs. `AsyncConvertTransfer`, `ConditionTransfer` vs. `AsyncConditionTransfer`). This increases the class count but makes each transfer's contract unambiguous: a sync transfer's `push()` returns `void`, an async transfer's `asyncPush()` returns `Promise<void>`. The type system enforces the difference — you cannot accidentally call `await` on a sync transfer or forget `await` on an async one.
 
-### AsyncSinkTransfer
-
+### [AsyncSinkTransfer](https://smoren.github.io/transferum-ts/classes/AsyncSinkTransfer.html)
 Async terminal sink — calls a callback on receiving data via `asyncPush`.
 
 **Capabilities:** `isInput`, `isAsyncPushable`
@@ -2045,8 +2021,7 @@ const sink = createAsyncSinkTransfer<number>({
 await sink.asyncPush(42); // → await callback(42)
 ```
 
-### AsyncWriteTransfer
-
+### [AsyncWriteTransfer](https://smoren.github.io/transferum-ts/classes/AsyncWriteTransfer.html)
 Async write adapter for `AsyncInputFlowInterface` (or synchronous `InputFlowInterface`).
 
 **Capabilities:** `isInput`, `isAsyncPushable`
@@ -2063,8 +2038,7 @@ const writer = createAsyncWriteTransfer<number>({ flow: asyncStorage });
 await writer.asyncPush(42); // → await flow.write(42)
 ```
 
-### AsyncReadTransfer
-
+### [AsyncReadTransfer](https://smoren.github.io/transferum-ts/classes/AsyncReadTransfer.html)
 Async read adapter for `AsyncOutputFlowInterface` (or synchronous `OutputFlowInterface`).
 
 **Capabilities:** `isOutput`, `isAsyncPullable`
@@ -2077,8 +2051,7 @@ const reader = createAsyncReadTransfer<number>({ flow: asyncStorage });
 const value = await reader.asyncPull(); // → await flow.read()
 ```
 
-### AsyncConvertTransfer
-
+### [AsyncConvertTransfer](https://smoren.github.io/transferum-ts/classes/AsyncConvertTransfer.html)
 Async converter transfer: transforms input data via an `AsyncOperator` and sends the result to subscribers. If the operator returns `undefined`, subscribers are not notified.
 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isAsyncPushable`, `isSubscribable`
@@ -2098,8 +2071,7 @@ converter.subscribe((data) => console.log(data));
 await converter.asyncPush(42); // → "val_42"
 ```
 
-### AsyncConditionTransfer
-
+### [AsyncConditionTransfer](https://smoren.github.io/transferum-ts/classes/AsyncConditionTransfer.html)
 Transfer with asynchronous conditional filtering. The `shouldAccept` and `shouldEmit` predicates can be sync or async (return `Promise<boolean> | boolean`).
 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isAsyncPushable`, `isSubscribable`
@@ -2120,8 +2092,7 @@ condition.subscribe((data) => console.log(data));
 await condition.asyncPush(42); // → passes both filters → 42
 ```
 
-### AsyncPollingSourceTransfer
-
+### [AsyncPollingSourceTransfer](https://smoren.github.io/transferum-ts/classes/AsyncPollingSourceTransfer.html)
 Output transfer with asynchronous internal polling. The ticker calls `asyncTrigger()` (fire-and-forget). The `_polling` flag prevents overlapping calls with a slow fetcher.
 
 **Capabilities:** `isOutput`, `isPollingSource`, `isAsyncPullable`, `isSubscribable`, `isAsyncTriggerable`, `isGate`
@@ -2150,8 +2121,7 @@ const polling = createAsyncPollingSourceTransfer<number>({
 });
 ```
 
-### AsyncPollingProxyTransfer
-
+### [AsyncPollingProxyTransfer](https://smoren.github.io/transferum-ts/classes/AsyncPollingProxyTransfer.html)
 Duplex transfer with async polling that receives its fetcher from the previous node. `setAsyncFetcher()` is set via `linkTransfers` (async strategies 5–7).
 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isAsyncPollingProxy`, `isPollingSource`, `isAsyncPullable`, `isSubscribable`, `isAsyncTriggerable`, `isGate`
@@ -2172,8 +2142,7 @@ poller.activate(); // start polling
 
 **Error handling:** Same as `AsyncPollingSourceTransfer` — `onError` suppresses fetcher errors in `asyncTrigger()` and `asyncPull()`. Without `onError` (or if it throws) — `asyncTrigger()` rethrows, ticker stops, **unhandled promise rejection**. `asyncPull()` rethrows to caller without affecting the ticker.
 
-### AsyncPollingFlowTransfer
-
+### [AsyncPollingFlowTransfer](https://smoren.github.io/transferum-ts/classes/AsyncPollingFlowTransfer.html)
 Output transfer with async polling from `AsyncOutputFlowInterface`. Similar to `AsyncPollingSourceTransfer`, but the source is an interface with async `read()` instead of `AsyncDataFetcher`.
 
 **Capabilities:** `isOutput`, `isPollingSource`, `isAsyncPullable`, `isSubscribable`, `isAsyncTriggerable`, `isGate`
@@ -2192,8 +2161,7 @@ polling.subscribe((data) => console.log(data));
 
 **Error handling:** If `flow.read()` throws in `asyncTrigger()`, `onError` is called. With `onError` — suppressed, polling continues. Without `onError` (or if it throws) — rejection rethrown, ticker stops, **unhandled promise rejection**. `asyncPull()` rethrows to caller without affecting the ticker.
 
-### AsyncIdlePollingTransfer
-
+### [AsyncIdlePollingTransfer](https://smoren.github.io/transferum-ts/classes/AsyncIdlePollingTransfer.html)
 Reactive channel with async fallback polling on idle. `push()` is synchronous, but the fetcher is asynchronous — `asyncTrigger()` awaits `_doPoll()` (fetch + notify), `asyncPull()` awaits the fetcher directly. The `_polling` flag prevents overlapping. The ticker uses `_doPoll()` — fire-and-forget.
 
 **Capabilities:** `isInput`, `isOutput`, `isDuplex`, `isPushable`, `isSubscribable`, `isPollingSource`, `isAsyncPullable`, `isAsyncTriggerable`, `isGate`
@@ -2215,8 +2183,7 @@ channel.push(42);  // → subscribers notified synchronously, idle timer reset
 
 **Error handling:** If `fetcher()` throws during polling, `onError` is called. With `onError` — suppressed, polling continues. Without `onError` (or if it throws) — rejection rethrown, polling stops, **unhandled promise rejection** (ticker calls `_doPoll()` fire-and-forget). `asyncPull()` rethrows to caller without affecting polling.
 
-### AsyncStoredChannelTransfer
-
+### [AsyncStoredChannelTransfer](https://smoren.github.io/transferum-ts/classes/AsyncStoredChannelTransfer.html)
 Channel with value retention, external management, and async interface. `setup`/`emit`/`subscribe` are synchronous (like in `StoredChannelTransfer`), but `asyncPull()`/`asyncTrigger()` are async for integration with async pipelines.
 
 **Capabilities:** `isOutput`, `isSubscribable`, `isAsyncPullable`, `isAsyncTriggerable`
@@ -2450,8 +2417,7 @@ const tickerFactory: TickerFactory = (config) => new RAFTicker(config);
 
 ## Helpers
 
-### Subscriber
-
+### [Subscriber](https://smoren.github.io/transferum-ts/classes/Subscriber.html)
 Subscription management. Created via `SubscriptionManager.subscribe()`, not directly.
 
 ```typescript
@@ -2462,23 +2428,19 @@ subscriber.onUnsubscribe((s) => console.log('unsubscribed'));
 subscriber.unsubscribe(); // → "unsubscribed"
 ```
 
-### SubscriptionManager
-
+### [SubscriptionManager](https://smoren.github.io/transferum-ts/classes/SubscriptionManager.html)
 Manages a set of subscribers. `sendState()` notifies all subscribers with the current value (ignores `undefined`).
 
-### ProxyReference
-
+### [ProxyReference](https://smoren.github.io/transferum-ts/classes/ProxyReference.html)
 A wrapper around a value:
 - `value` — current value
 - `pop()` — extract with cleanup
 - `clear()` — clear without extraction
 
-### DisposableSubscriberAdapter
-
+### [DisposableSubscriberAdapter](https://smoren.github.io/transferum-ts/classes/DisposableSubscriberAdapter.html)
 Adapts `SubscriberInterface` → `DisposableInterface`. Used in builders to manage subscriptions via `destroy()`.
 
-### StateSubscriptionManager
-
+### [StateSubscriptionManager](https://smoren.github.io/transferum-ts/classes/StateSubscriptionManager.html)
 Subscription manager for object state changes. Reuses `ProxyReference` and `SubscriptionManager`.
 
 The value (usually the owning object itself) is set once in the constructor and never becomes `undefined`, so every `notify()` is guaranteed to notify all subscribers with that value.
@@ -2589,8 +2551,7 @@ source.push(100); // ignored
 bridge.destroy(); // breaks all links
 ```
 
-### BridgeSelector
-
+### [BridgeSelector](https://smoren.github.io/transferum-ts/classes/BridgeSelector.html)
 ```typescript
 import { createBridgeSelector, createPassBridge } from 'transferum';
 
@@ -2629,8 +2590,7 @@ bridges.slow.activate();
 console.log(selector.selectedKey); // 'slow'
 ```
 
-### BridgeMultiSelector
-
+### [BridgeMultiSelector](https://smoren.github.io/transferum-ts/classes/BridgeMultiSelector.html)
 ```typescript
 import { createBridgeMultiSelector } from 'transferum';
 
@@ -2669,8 +2629,7 @@ bridges.fast.deactivate();
 console.log(selector.selectedKeys); // ['slow']
 ```
 
-### AsyncTransformBridge
-
+### [AsyncTransformBridge](https://smoren.github.io/transferum-ts/classes/AsyncTransformBridge.html)
 Bridge with asynchronous data type transformation via `AsyncOperator`. Gate and subscription remain synchronous. `AsyncConvertTransfer` accepts data via `asyncPush` (the gate→converter link uses the async `linkTransfers` strategy), transforms via `await operator.apply()`, and notifies subscribers synchronously.
 
 **Flow structure:** source → gate → asyncConverter → target
@@ -2695,8 +2654,7 @@ source.push(42); // → async transformation → "val_42" at target's subscriber
 
 Builders provide a fluent API for assembling transfer chains with automatic linking via `linkTransfers`.
 
-### CompositeTransferBuilder
-
+### [CompositeTransferBuilder](https://smoren.github.io/transferum-ts/classes/CompositeTransferBuilder.html)
 `CompositeTransferBuilder` is the unified, type-safe builder that replaces `InputPipelineBuilder`, `OutputPipelineBuilder`, `DuplexPipelineBuilder`, and all async variants. A single builder covers all pipeline directions.
 
 **Pipeline structure:** `OutputTransfer [→ DuplexTransfer → …] → InputTransfer`
@@ -2810,8 +2768,7 @@ pipeline.subscribe((data) => console.log(data)); // → "42"
 
 `OperatorPipelineBuilder` and `AsyncOperatorPipelineBuilder` work with `OperatorInterface` / `AsyncOperatorInterface` (not `TransferInterface`) and remain non-deprecated.
 
-### OperatorPipelineBuilder
-
+### [OperatorPipelineBuilder](https://smoren.github.io/transferum-ts/classes/OperatorPipelineBuilder.html)
 Builds a chain of operators with type checking at each step.
 
 ```typescript
@@ -2827,8 +2784,7 @@ const operator = OperatorPipelineBuilder
 console.log(operator.apply(21)); // "42"
 ```
 
-### AsyncOperatorPipelineBuilder
-
+### [AsyncOperatorPipelineBuilder](https://smoren.github.io/transferum-ts/classes/AsyncOperatorPipelineBuilder.html)
 Accepts both sync and async operators, `build()` returns `AsyncPipelineOperator`.
 
 ```typescript
@@ -2887,8 +2843,7 @@ Full list of factories:
 
 ## Utilities
 
-### linkTransfers
-
+### [linkTransfers](https://smoren.github.io/transferum-ts/functions/linkTransfers.html)
 ```typescript
 function linkTransfers<T, RTransfer extends InputTransfer<T>>(
   lhs: OutputTransfer<T>,
@@ -2899,8 +2854,7 @@ function linkTransfers<T, RTransfer extends InputTransfer<T>>(
 
 Links an output transfer (LHS) to an input transfer (RHS). Returns `SubscriberInterface` for breaking the link. The strategy is determined by capability flags (see [Linking Transfers](#linking-transfers)). `options.onError` is used to intercept rejections in the async `subscribable → asyncPushable` strategy — invoked as `onError(error, target)` via `handleError()`. Without `onError`, rejections are rethrown by `handleError()` (unhandled promise rejection); the source's subscription remains active.
 
-### handleError
-
+### [handleError](https://smoren.github.io/transferum-ts/functions/handleError.html)
 ```typescript
 function handleError<TSource>(error: unknown, source: TSource, onError?: ErrorHandler<TSource>): void;
 ```
