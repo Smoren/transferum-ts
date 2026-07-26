@@ -1,5 +1,12 @@
 # Transferum Change Log
 
+## v1.5.1 - 2026-07-26
+
+### Documentation
+
+* **JSDoc `@category` tags** added to ~300 exported entities across all 12 source files. TypeDoc now groups API reference into 15 categories: Transfers, Async Transfers, Operators, Async Operators, Bridges, Async Bridges, Storages, Tickers, Builders, Factories (with domain sub-categories), Helpers, Utilities, Interfaces, Types, Configs.
+* **README:** Added API Docs badge linking to [https://smoren.github.io/transferum-ts](https://smoren.github.io/transferum-ts). All entity section headings (`### PushChannelTransfer`, `### linkTransfers`, etc.) are now clickable links to their TypeDoc API reference pages.
+
 ## v1.5.0 - 2026-07-26
 
 ### CompositeTransferBuilder — unified pipeline builder
