@@ -117,10 +117,10 @@ export type Transfer<
     : never;
 
 /** Union of all transfer interfaces that can act as a pipeline input (push/poll/gate/async variants). */
-export type InputTransfer<T> = PushableTransferInterface<T> | PollingProxyTransferInterface<T> | GateTransferInterface<T> | AsyncPushableTransferInterface<T> | AsyncPollingProxyTransferInterface<T>;
+export type InputTransfer<T> = PushableTransferInterface<T> | PollingProxyTransferInterface<T> | AsyncPushableTransferInterface<T> | AsyncPollingProxyTransferInterface<T> | GateTransferInterface<T>;
 
 /** Union of all transfer interfaces that can act as a pipeline output (pull/subscribe/gate/async variants). */
-export type OutputTransfer<T> = PullableTransferInterface<T> | SubscribableTransferInterface<T> | GateTransferInterface<T> | AsyncPullableTransferInterface<T>;
+export type OutputTransfer<T> = PullableTransferInterface<T> | SubscribableTransferInterface<T> | AsyncPullableTransferInterface<T> | GateTransferInterface<T>;
 
 /** A transfer that is both an input and an output (duplex). */
 export type DuplexTransfer<TInput, TOutput = TInput> = InputTransfer<TInput> & OutputTransfer<TOutput> & {
@@ -128,9 +128,20 @@ export type DuplexTransfer<TInput, TOutput = TInput> = InputTransfer<TInput> & O
 }
 
 /** Extracts the input data type from an InputTransfer. */
-export type InputTransferDataType<T> = T extends InputTransfer<infer U> ? U : never;
+export type InputTransferDataType<T> = T extends PushableInterface<infer U> ? U
+  : T extends PollingProxyInterface<infer U> ? U
+  : T extends AsyncPushableInterface<infer U> ? U
+  : T extends AsyncPollingProxyInterface<infer U> ? U
+  : T extends GateTransferInterface<infer U> ? U
+  : never;
+
 /** Extracts the output data type from an OutputTransfer. */
-export type OutputTransferDataType<T> = T extends OutputTransfer<infer U> ? U : never;
+export type OutputTransferDataType<T> = T extends PullableTransferInterface<infer U> ? U
+  : T extends SubscribableInterface<infer U> ? U
+  : T extends PullableInterface<infer U> ? U
+  : T extends AsyncPullableTransferInterface<infer U> ? U
+  : T extends GateTransferInterface<infer U> ? U
+  : never;
 
 /** Base type for selector keys — string, number, or symbol. */
 export type BaseSelectorKey = string | number | symbol;

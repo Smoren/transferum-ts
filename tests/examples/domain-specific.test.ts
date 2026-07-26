@@ -206,7 +206,7 @@ describe('README Domain-Specific: IoT - Monitoring & Alerts', () => {
       }));
 
     const alerts: Alert[] = [];
-    alertPipeline.subscribe((alert: unknown) => alerts.push(alert as Alert));
+    alertPipeline.subscribe((alert) => alerts.push(alert));
 
     await wait(100);
     tempMonitor.deactivate();
