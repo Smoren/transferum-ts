@@ -241,6 +241,10 @@ export class AsyncOperatorPipelineBuilder<TFlow extends readonly unknown[]> impl
  * Sync and async are unified: `onLinkError` in finish() options enables async error
  * handling when the chain contains async transfers.
  *
+ * Linking is performed via a {@link LinkerInterface} (defaults to `linkTransfers()`
+ * when no linker is provided). Pass a custom linker to `start()` to override
+ * linking behavior for the entire chain.
+ *
  * @example
  * ```typescript
  * const composite = CompositeTransferBuilder
@@ -251,6 +255,15 @@ export class AsyncOperatorPipelineBuilder<TFlow extends readonly unknown[]> impl
  *
  * composite.push(42);
  * composite.destroy();
+ * ```
+ *
+ * @example Using a custom linker
+ * ```typescript
+ * const linker = new DefaultLinker();
+ * const composite = linker
+ *   .start(new PushStoredChannelTransfer<number>())
+ *   .to(new BufferTransfer<number>())
+ *   .finish(new SinkTransfer<number>({ callback: console.log }));
  * ```
  *
  * @typeParam TCurrent — data type flowing through the current chain link
@@ -284,9 +297,12 @@ export class CompositeTransferBuilder<
    * The start transfer provides the output capabilities that feed data into the chain.
    * If it is also an InputTransfer (duplex), its input flags become the composite's input flags.
    *
+   * If a linker is provided, all subsequent `to()` and `finish()` calls will use it
+   * for linking. If omitted, linking falls back to `linkTransfers()` from `utils.ts`.
+   *
    * @typeParam TStartTransfer — type of the initial transfer (must be OutputTransfer)
    * @param startTransfer — initial output transfer
-   * @param linker — linker to use
+   * @param linker — optional linker for custom linking behavior
    * @returns A new CompositeTransferBuilder instance
    */
   public static start<TStartTransfer extends OutputTransfer<unknown>>(
@@ -304,8 +320,9 @@ export class CompositeTransferBuilder<
   /**
    * Adds an intermediate duplex transfer to the chain.
    *
-   * Links the current transfer to nextTransfer via linkage strategy, then returns
-   * a new builder with the next transfer's output data type as the current type.
+   * Links the current transfer to nextTransfer via the linker (or `linkTransfers()`
+   * if no linker was provided to `start()`), then returns a new builder with the
+   * next transfer's output data type as the current type.
    *
    * Options:
    * - owned — if true, nextTransfer will be destroyed on composite destroy()
@@ -347,7 +364,8 @@ export class CompositeTransferBuilder<
   /**
    * Completes the chain construction and creates a composite transfer.
    *
-   * Links the current transfer to lastTransfer, creates a UniversalCompositeTransfer
+   * Links the current transfer to lastTransfer via the linker (or `linkTransfers()`
+   * if no linker was provided to `start()`), creates a UniversalCompositeTransfer
    * with input = startTransfer, output = lastTransfer, and returns it typed as
    * CompositeTransfer with flags computed from start and finish transfers.
    *
@@ -423,6 +441,17 @@ export class CompositeTransferBuilder<
     >;
   }
 
+  /**
+   * Links two transfers using the injected linker, or falls back to
+   * `linkTransfers()` when no linker was provided to `start()`.
+   *
+   * @typeParam T — data type flowing through the link
+   * @typeParam RTransfer — type of the input transfer (RHS)
+   * @param lhs — output transfer (source)
+   * @param rhs — input transfer (sink)
+   * @param options — optional link config
+   * @returns SubscriberInterface for breaking the link
+   */
   private _link<T, RTransfer extends InputTransfer<T>>(
     lhs: OutputTransfer<T>,
     rhs: RTransfer,
