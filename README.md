@@ -43,6 +43,7 @@ Type-safe primitives — **transfers** (nodes), **bridges** (edges), **builders*
   - [Capability Flags System](#capability-flags-system)
   - [Transfers](#transfers)
   - [Linking Transfers](#linking-transfers)
+  - [Linkers](#linkers)
   - [Undefined Behavior in Data Flows](#undefined-behavior-in-data-flows)
   - [Error Handling](#error-handling)
 - [Transfers](#transfers-1)
@@ -154,6 +155,7 @@ This is a graph.
 | **Built-in backpressure**                 | Four async transfers (`AsyncSinkTransfer`, `AsyncWriteTransfer`, `AsyncConvertTransfer`, `AsyncConditionTransfer`) support optional `maxConcurrency`, `bufferSize`, and `onBufferOverflow` — limiting parallel async operations, queuing excess data, and handling overflow gracefully. Defaults are backward-compatible (unlimited). See [Backpressure](#backpressure).                                      |
 | **Ordered async execution**               | `AsyncSinkTransfer` and `AsyncWriteTransfer` support optional `ordered: true` — callback/write invocations are executed sequentially in data-arrival order, regardless of their async duration. `AsyncConvertTransfer` and `AsyncConditionTransfer` automatically enforce ordered emission when `maxConcurrency > 1` via an internal Sequence Guard (no config needed). See [Backpressure](#backpressure).    |
 | **No god-objects, no utility sprawl**     | `BaseTransfer` stays minimal — only capability declarations, no logic. Each transfer class models exactly one behavioral concept (buffering, gating, merging, polling...). No central object knows about every other component. Complexity is concentrated in the type layer; runtime code stays compact and readable.                                                                                        |
+| **Pluggable linking**                     | `LinkerInterface` lets you override how transfers are wired together — implement `link()` for custom logic (logging, validation, serialization, inter-process bridging) and inject it into `CompositeTransferBuilder.start(transfer, linker)`. The default `DefaultLinker` delegates to `linkTransfers()` — zero-config for existing code, plug-and-play for custom needs. See [Linkers](#linkers).           |
 
 ### Use Cases
 
@@ -1034,6 +1036,10 @@ import {
   BridgeMultiSelector,
   AsyncTransformBridge,
 
+  // Linkers
+  DefaultLinker,
+  LinkerInterface,
+
   // Builders
   InputPipelineBuilder,
   OutputPipelineBuilder,
@@ -1052,10 +1058,18 @@ import {
   createDebounceTransfer,
   createThrottleTransfer,
   createPushStoredChannelTransfer,
+  createDefaultLinker,
   // ... all create* functions (including createAsync*)
 
   // Utilities
   linkTransfers,
+  linkSubscribableToPushable,
+  linkPullableToPollingProxy,
+  linkSubscribableToPollingProxy,
+  linkSubscribableToAsyncPushable,
+  linkAsyncPullableToAsyncPollingProxy,
+  linkPullableToAsyncPollingProxy,
+  linkSubscribableToAsyncPollingProxy,
   handleError,
 } from 'transferum';
 ```
@@ -1272,6 +1286,68 @@ For async links (`subscribable → asyncPushable`), you can pass `options.onErro
 import { linkTransfers } from 'transferum';
 
 const link = linkTransfers(source, asyncTarget, { onError: (e) => console.error(e) });
+```
+
+### Linkers
+
+`LinkerInterface` is a facade that unifies two forms of linking:
+
+- **`link(lhs, rhs, options?)`** — directly connects an output transfer to an input transfer (same as `linkTransfers()`)
+- **`start(transfer)`** — creates a `CompositeTransferBuilder` with this linker injected, so every subsequent `to()` and `finish()` call uses the same linking strategy automatically
+
+`DefaultLinker` is the standard implementation: `link()` delegates to `linkTransfers()`, `start()` delegates to `CompositeTransferBuilder.start(transfer, this)`. It is the zero-config default — existing code works unchanged.
+
+```typescript
+import {
+  DefaultLinker,
+  createPushChannelTransfer,
+  createSinkTransfer,
+  createPushStoredChannelTransfer,
+  createBufferTransfer,
+} from 'transferum';
+
+const linker = new DefaultLinker();
+
+// Direct linking — equivalent to linkTransfers(source, target)
+const link = linker.link(source, target);
+
+// Builder-based linking — linker is injected automatically
+const pipeline = linker
+  .start(createPushStoredChannelTransfer<number>())
+  .to(createBufferTransfer<number>())
+  .finish(createSinkTransfer<number>({ callback: console.log }));
+
+pipeline.push(42); // → 42
+```
+
+You can also inject a custom linker via `CompositeTransferBuilder.start(transfer, linker)`:
+
+```typescript
+import { CompositeTransferBuilder, DefaultLinker } from 'transferum';
+
+const linker = new DefaultLinker();
+const pipeline = CompositeTransferBuilder
+  .start(createPushStoredChannelTransfer<number>(), linker)
+  .to(createBufferTransfer<number>())
+  .finish(createSinkTransfer<number>({ callback: console.log }));
+```
+
+Implement `LinkerInterface` to customize linking behavior — e.g., logging every link, validating combinations, serializing links across a network, or wrapping `linkTransfers()` with additional error handling. The builder calls `linker.link()` for every `to()` and `finish()`, so a single linker instance controls the entire pipeline's wiring.
+
+```typescript
+import type { LinkerInterface } from 'transferum';
+import { linkTransfers, CompositeTransferBuilder } from 'transferum';
+
+class LoggingLinker implements LinkerInterface {
+  link(lhs, rhs, options?) {
+    console.log(`Linking ${lhs.constructor.name} → ${rhs.constructor.name}`);
+    return linkTransfers(lhs, rhs, options);
+  }
+
+  start(transfer) {
+    return CompositeTransferBuilder.start(transfer, this);
+  }
+}
 ```
 
 ### Undefined Behavior in Data Flows
@@ -2652,7 +2728,7 @@ source.push(42); // → async transformation → "val_42" at target's subscriber
 
 ## Pipeline Builders
 
-Builders provide a fluent API for assembling transfer chains with automatic linking via `linkTransfers`.
+Builders provide a fluent API for assembling transfer chains with automatic linking via `linkTransfers`. A custom [LinkerInterface](#linkers) can be injected into `start()` to override linking behavior for the entire chain.
 
 ### [CompositeTransferBuilder](https://smoren.github.io/transferum-ts/classes/CompositeTransferBuilder.html)
 `CompositeTransferBuilder` is the unified, type-safe builder that replaces `InputPipelineBuilder`, `OutputPipelineBuilder`, `DuplexPipelineBuilder`, and all async variants. A single builder covers all pipeline directions.
@@ -2703,6 +2779,13 @@ duplex.destroy(); // destroys owned resources
 - Output flags (`Pullable`, `Subscribable`, `AsyncPullable`) are extracted from the **finish** transfer.
 - Triggerable, AsyncTriggerable, and Gate are inferred from explicit options or auto-extracted from the chain.
 
+**`start(startTransfer, linker?)`:**
+```typescript
+CompositeTransferBuilder.start(startTransfer, linker?)
+// linker?: LinkerInterface — custom linker for all to()/finish() calls
+//          if omitted, falls back to linkTransfers()
+```
+
 **`to(transfer, options)`:**
 ```typescript
 to(nextTransfer, {
@@ -2745,6 +2828,27 @@ const pipeline = CompositeTransferBuilder
 
 pipeline.push(42);
 pipeline.subscribe((data) => console.log(data)); // → "42"
+```
+
+**Custom linker:** Pass a `LinkerInterface` to `start()` to override linking for the entire chain. See [Linkers](#linkers).
+
+```typescript
+import {
+  CompositeTransferBuilder,
+  DefaultLinker,
+  createPushStoredChannelTransfer,
+  createBufferTransfer,
+  createSinkTransfer,
+} from 'transferum';
+
+const linker = new DefaultLinker();
+
+const pipeline = CompositeTransferBuilder
+  .start(createPushStoredChannelTransfer<number>(), linker)
+  .to(createBufferTransfer<number>())
+  .finish(createSinkTransfer<number>({ callback: console.log }));
+
+pipeline.push(42); // → 42
 ```
 
 ### The `owned` parameter
@@ -2830,6 +2934,7 @@ Full list of factories:
 | Sink / Flow                 | `createSinkTransfer`, `createWriteTransfer`, `createReadTransfer`                                                                                      |
 | Transformation              | `createConvertTransfer`, `createConditionTransfer`, `createDisplaceTransfer`                                                                           |
 | Bridges                     | `createPassBridge`, `createTransformBridge`, `createTransferBridge`, `createBridgeAggregator`, `createBridgeSelector`, `createBridgeMultiSelector`     |
+| Linkers                     | `createDefaultLinker`                                                                                                                                  |
 | Operators                   | `createTransparentOperator`, `createMapOperator`, `createFilterOperator`, `createReducerOperator`, `createGuardOperator`, `createPipelineOperator`     |
 | Storages                    | `createLatestStorage`, `createQueueStorage`, `createStackStorage`                                                                                      |
 | Async adapters              | `createAsyncSinkTransfer`, `createAsyncWriteTransfer`, `createAsyncReadTransfer`                                                                       |
@@ -2854,6 +2959,26 @@ function linkTransfers<T, RTransfer extends InputTransfer<T>>(
 
 Links an output transfer (LHS) to an input transfer (RHS). Returns `SubscriberInterface` for breaking the link. The strategy is determined by capability flags (see [Linking Transfers](#linking-transfers)). `options.onError` is used to intercept rejections in the async `subscribable → asyncPushable` strategy — invoked as `onError(error, target)` via `handleError()`. Without `onError`, rejections are rethrown by `handleError()` (unhandled promise rejection); the source's subscription remains active.
 
+Internally, `linkTransfers` dispatches to one of seven exported strategy functions based on capability flags. You can call these directly for the same result:
+
+| Strategy                               | LHS             | RHS                 | Behavior                                                 |
+|----------------------------------------|-----------------|---------------------|----------------------------------------------------------|
+| `linkSubscribableToPushable`           | `Subscribable`  | `Pushable`          | Reactive subscription: LHS notifies → RHS accepts        |
+| `linkPullableToPollingProxy`           | `Pullable`      | `PollingProxy`      | Active polling: RHS pulls via `setFetcher`               |
+| `linkSubscribableToPollingProxy`       | `Subscribable`  | `PollingProxy`      | Subscription + last-value buffering for the poller       |
+| `linkSubscribableToAsyncPushable`      | `Subscribable`  | `AsyncPushable`     | Subscription + `asyncPush` with `.catch()` (no ordering) |
+| `linkAsyncPullableToAsyncPollingProxy` | `AsyncPullable` | `AsyncPollingProxy` | Active async polling: RHS pulls via `setAsyncFetcher`    |
+| `linkPullableToAsyncPollingProxy`      | `Pullable`      | `AsyncPollingProxy` | Sync-pull wrapped in an async fetcher                    |
+| `linkSubscribableToAsyncPollingProxy`  | `Subscribable`  | `AsyncPollingProxy` | Subscription + buffer + async fetcher                    |
+
+Error helpers for unsupported combinations:
+
+| Function                                    | When                                                                                            |
+|---------------------------------------------|-------------------------------------------------------------------------------------------------|
+| `throwLinkAsyncPullableToPollingProxyError` | `AsyncPullable` → sync `PollingProxy` (cannot await)                                            |
+| `throwLinkPullableToPushableError`          | `Pullable`/`AsyncPullable` → `Pushable`/`AsyncPushable` (needs a Bridge or Triggerable adapter) |
+| `throwLinkUnsupportedError`                 | Any other incompatible combination                                                              |
+
 ### [handleError](https://smoren.github.io/transferum-ts/functions/handleError.html)
 ```typescript
 function handleError<TSource>(error: unknown, source: TSource, onError?: ErrorHandler<TSource>): void;
@@ -2876,6 +3001,7 @@ Key types are defined in `types.ts`:
 | `GateInterface`                                            | Flow control: `active`, `activate()`, `deactivate()`, `toggle()`, `onStateChange()`                       |
 | `SubscriberInterface`                                      | Subscription management: `active`, `unsubscribe()`, `onUnsubscribe()`, `offUnsubscribe()`                 |
 | `DisposableInterface`                                      | Resource cleanup: `destroy()`                                                                             |
+| `LinkerInterface`                                          | Facade for linking transfers and building pipelines: `link()`, `start()`                                  |
 | `InputTransfer<T>`                                         | `PushableTransferInterface \| PollingProxyTransferInterface \| GateTransferInterface`                     |
 | `OutputTransfer<T>`                                        | `PullableTransferInterface \| SubscribableTransferInterface \| GateTransferInterface`                     |
 | `DuplexTransfer<TIn, TOut>`                                | `InputTransfer<TIn> & OutputTransfer<TOut>`                                                               |
