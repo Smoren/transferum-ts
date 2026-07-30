@@ -107,6 +107,7 @@ import {
   AsyncPipelineOperator,
 } from "./operators";
 import { LatestStorage, QueueStorage, StackStorage } from "./storages";
+import { DefaultLinker } from "./linkers";
 
 // ═══════════════════════════════════════════════════════════════
 // Basic channels
@@ -1197,4 +1198,34 @@ export function createQueueStorage<T>(maxLength?: number): QueueStorage<T> {
  */
 export function createStackStorage<T>(maxLength?: number): StackStorage<T> {
   return new StackStorage<T>(maxLength);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Linkers
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Creates a DefaultLinker — a facade for linking transfers and building pipelines.
+ *
+ * The linker provides two methods:
+ * - `link(lhs, rhs, options?)` — directly links an output transfer to an input transfer
+ * - `start(transfer)` — creates a CompositeTransferBuilder with this linker injected
+ *
+ * @example
+ * const linker = createDefaultLinker();
+ *
+ * // Direct linking
+ * linker.link(source, target);
+ *
+ * // Builder-based linking (linker is injected automatically)
+ * const pipeline = linker
+ *   .start(source)
+ *   .to(intermediate)
+ *   .finish(sink);
+ *
+ * @category Factories
+ * @category Linkers
+ */
+export function createDefaultLinker(): DefaultLinker {
+  return new DefaultLinker();
 }
