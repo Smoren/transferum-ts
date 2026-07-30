@@ -17,6 +17,7 @@ import type {
   CompositeInputTransfer,
   CompositeOutputTransfer,
 } from "./types";
+import { LinkConfig } from "./configs";
 
 /**
  * Write-only flow — accepts data via write().
@@ -531,6 +532,18 @@ export interface BridgeMultiSelectorInterface<TMap extends Record<BaseSelectorKe
   select(keys: SelectorKey<TMap>[]): void;
   check(key: SelectorKey<TMap>): void;
   uncheck(key: SelectorKey<TMap>): void;
+}
+
+export interface LinkerInterface {
+  link<T, RTransfer extends InputTransfer<T>>(
+    lhs: OutputTransfer<T>,
+    rhs: RTransfer,
+    options?: LinkConfig<RTransfer>,
+  ): SubscriberInterface;
+
+  start<TStartTransfer extends OutputTransfer<unknown>>(
+    startTransfer: TStartTransfer,
+  ): CompositeTransferBuilderInterface<OutputTransferDataType<TStartTransfer>, TStartTransfer>;
 }
 
 // ═══════════════════════════════════════════════════════════════

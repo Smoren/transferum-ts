@@ -1,14 +1,22 @@
 import type {
-  PushableTransferInterface,
-  SubscribableTransferInterface,
-  SubscriberInterface,
-  PullableTransferInterface,
-  PollingProxyTransferInterface,
   AsyncPushableTransferInterface,
   AsyncPullableTransferInterface,
   AsyncPollingProxyTransferInterface,
+  PushableTransferInterface,
+  SubscriberInterface,
 } from "./interfaces";
-import type { ErrorHandler, InputTransfer, OutputTransfer } from "./types";
+import type {
+  AsyncPollingProxy,
+  AsyncPullable,
+  AsyncPushable,
+  ErrorHandler,
+  InputTransfer,
+  OutputTransfer,
+  PollingProxy,
+  Pullable,
+  Pushable,
+  Subscribable,
+} from "./types";
 import type { LinkConfig } from "./configs";
 import { Subscriber } from "./helpers";
 
@@ -62,44 +70,17 @@ export function linkTransfers<T, RTransfer extends InputTransfer<T>>(
 
   // CASE 1: Reactive Push (LHS streams data -> RHS accepts data)
   if (lhs.isSubscribable && rhs.isPushable) {
-    return (lhs as SubscribableTransferInterface<T>).subscribe((data) => {
-      (rhs as PushableTransferInterface<T>).push(data);
-    });
+    return linkSubscribableToPushable(lhs as Subscribable<T>, rhs as Pushable<T>);
   }
 
   // CASE 2: Active Polling on the input side (RHS pulls data itself)
   if (lhs.isPullable && rhs.isPollingProxy) {
-    const pullableLhs = lhs as PullableTransferInterface<T>;
-    const pollerRhs = rhs as PollingProxyTransferInterface<T>;
-
-    pollerRhs.setFetcher(() => pullableLhs.pull());
-
-    return new Subscriber(() => {
-      pollerRhs.clearFetcher();
-    });
+    return linkPullableToPollingProxy(lhs as Pullable<T>, rhs as PollingProxy<T>);
   }
 
   // CASE 3: Subscription + last-value buffer for the poller
   if (lhs.isSubscribable && rhs.isPollingProxy) {
-    const subscribableLhs = lhs as SubscribableTransferInterface<T>;
-    const pollerRhs = rhs as PollingProxyTransferInterface<T>;
-
-    let lastValue: T | undefined = undefined;
-
-    const sub = subscribableLhs.subscribe((data) => {
-      lastValue = data;
-    });
-
-    pollerRhs.setFetcher(() => {
-      const value = lastValue;
-      lastValue = undefined;
-      return value;
-    });
-
-    return new Subscriber(() => {
-      sub.unsubscribe();
-      pollerRhs.clearFetcher();
-    });
+    return linkSubscribableToPollingProxy(lhs as Subscribable<T>, rhs as PollingProxy<T>);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -111,65 +92,29 @@ export function linkTransfers<T, RTransfer extends InputTransfer<T>>(
   // No ordering guarantees: fast sync notifications can overtake
   // pending asyncPush calls.
   if (lhs.isSubscribable && rhs.isAsyncPushable) {
-    const subscribableLhs = lhs as SubscribableTransferInterface<T>;
-    const asyncPushableRhs = rhs as AsyncPushableTransferInterface<T>;
-    const onError = options?.onError;
-
-    return subscribableLhs.subscribe((data) => {
-      asyncPushableRhs.asyncPush(data).catch((e) => {
-        handleError(e, rhs, onError);
-      });
-    });
+    return linkSubscribableToAsyncPushable(
+      lhs as Subscribable<T>,
+      rhs as AsyncPushable<T>,
+      options?.onError as ErrorHandler<AsyncPushable<T>>,
+    );
   }
 
   // CASE 5: asyncPullable → asyncPollingProxy
   // Active polling: RHS pulls data via asyncPull.
   if (lhs.isAsyncPullable && rhs.isAsyncPollingProxy) {
-    const asyncPullableLhs = lhs as AsyncPullableTransferInterface<T>;
-    const asyncPollerRhs = rhs as AsyncPollingProxyTransferInterface<T>;
-
-    asyncPollerRhs.setAsyncFetcher(() => asyncPullableLhs.asyncPull());
-
-    return new Subscriber(() => {
-      asyncPollerRhs.clearAsyncFetcher();
-    });
+    return linkAsyncPullableToAsyncPollingProxy(lhs as AsyncPullable<T>, rhs as AsyncPollingProxy<T>);
   }
 
   // CASE 6: pullable → asyncPollingProxy
   // Sync-pull wrapped in an async fetcher for the async poller.
   if (lhs.isPullable && rhs.isAsyncPollingProxy) {
-    const pullableLhs = lhs as PullableTransferInterface<T>;
-    const asyncPollerRhs = rhs as AsyncPollingProxyTransferInterface<T>;
-
-    asyncPollerRhs.setAsyncFetcher(async () => pullableLhs.pull());
-
-    return new Subscriber(() => {
-      asyncPollerRhs.clearAsyncFetcher();
-    });
+    return linkPullableToAsyncPollingProxy(lhs as Pullable<T>, rhs as AsyncPollingProxy<T>);
   }
 
   // CASE 7: subscribable → asyncPollingProxy
   // Subscription + last-value buffer for the async poller.
   if (lhs.isSubscribable && rhs.isAsyncPollingProxy) {
-    const subscribableLhs = lhs as SubscribableTransferInterface<T>;
-    const asyncPollerRhs = rhs as AsyncPollingProxyTransferInterface<T>;
-
-    let lastValue: T | undefined = undefined;
-
-    const sub = subscribableLhs.subscribe((data) => {
-      lastValue = data;
-    });
-
-    asyncPollerRhs.setAsyncFetcher(async () => {
-      const value = lastValue;
-      lastValue = undefined;
-      return value;
-    });
-
-    return new Subscriber(() => {
-      sub.unsubscribe();
-      asyncPollerRhs.clearAsyncFetcher();
-    });
+    return linkSubscribableToAsyncPollingProxy(lhs as Subscribable<T>, rhs as AsyncPollingProxy<T>);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -179,21 +124,233 @@ export function linkTransfers<T, RTransfer extends InputTransfer<T>>(
   // CASE 8: asyncPullable → sync-pollingProxy — impossible
   // Sync poller calls fetcher() synchronously and cannot await.
   if (lhs.isAsyncPullable && rhs.isPollingProxy) {
-    throw new Error(
-      "Cannot link AsyncPullable source to sync PollingProxy. Use AsyncPollingProxyTransfer."
-    );
+    throwLinkAsyncPullableToPollingProxyError();
   }
 
   // CASE 9: pullable/asyncPullable → pushable/asyncPushable — needs a trigger
   if ((lhs.isPullable || lhs.isAsyncPullable) && (rhs.isPushable || rhs.isAsyncPushable)) {
-    throw new Error(
-      "Cannot directly link Pullable/AsyncPullable source to Pushable/AsyncPushable target. Use a Bridge or Triggerable adapter to pull and push data."
-    );
+    throwLinkPullableToPushableError();
   }
 
   // CASE 10: Incompatible or unfeasible configuration
+  throwLinkUnsupportedError(lhs, rhs);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Sync linking strategies
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Links a Subscribable source to a Pushable target via direct subscription.
+ * Every emitted value from lhs is pushed into rhs.
+ *
+ * @param lhs — subscribable source
+ * @param rhs — pushable target
+ * @returns SubscriberInterface for unsubscribing
+ *
+ * @category Utilities
+ */
+export function linkSubscribableToPushable<T>(lhs: Subscribable<T>, rhs: Pushable<T>): SubscriberInterface {
+  return lhs.subscribe((data) => rhs.push(data));
+}
+
+/**
+ * Links a Pullable source to a PollingProxy target.
+ * The poller's fetcher is set to pull from lhs on each tick.
+ *
+ * @param lhs — pullable source
+ * @param rhs — polling proxy target
+ * @returns SubscriberInterface for clearing the fetcher
+ *
+ * @category Utilities
+ */
+export function linkPullableToPollingProxy<T>(
+  lhs: Pullable<T>,
+  rhs: PollingProxy<T>,
+): SubscriberInterface {
+  rhs.setFetcher(() => lhs.pull());
+
+  return new Subscriber(() => {
+    rhs.clearFetcher();
+  });
+}
+
+/**
+ * Links a Subscribable source to a PollingProxy target.
+ * The last emitted value is buffered and served on each poller tick.
+ *
+ * @param lhs — subscribable source
+ * @param rhs — polling proxy target
+ * @returns SubscriberInterface for unsubscribing and clearing the fetcher
+ *
+ * @category Utilities
+ */
+export function linkSubscribableToPollingProxy<T>(
+  lhs: Subscribable<T>,
+  rhs: PollingProxy<T>,
+): SubscriberInterface {
+  let lastValue: T | undefined;
+
+  const sub = lhs.subscribe((data) => {
+    lastValue = data;
+  });
+
+  rhs.setFetcher(() => {
+    const value = lastValue;
+    lastValue = undefined;
+    return value;
+  });
+
+  return new Subscriber(() => {
+    sub.unsubscribe();
+    rhs.clearFetcher();
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Async linking strategies
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Links a Subscribable source to an AsyncPushable target.
+ * Each emitted value triggers asyncPush; rejections are handled via onError.
+ *
+ * No ordering guarantees — fast sync notifications can overtake
+ * pending asyncPush calls.
+ *
+ * @param lhs — subscribable source
+ * @param rhs — async pushable target
+ * @param onError — optional error handler for async-push rejections
+ * @returns SubscriberInterface for unsubscribing
+ *
+ * @category Utilities
+ */
+export function linkSubscribableToAsyncPushable<T>(
+  lhs: Subscribable<T>,
+  rhs: AsyncPushable<T>,
+  onError?: ErrorHandler<AsyncPushable<T>>,
+): SubscriberInterface {
+  return lhs.subscribe((data) => {
+    rhs.asyncPush(data).catch((e) => {
+      handleError(e, rhs, onError);
+    });
+  });
+}
+
+/**
+ * Links an AsyncPullable source to an AsyncPollingProxy target.
+ * The async poller's fetcher is set to asyncPull from lhs on each tick.
+ *
+ * @param lhs — async pullable source
+ * @param rhs — async polling proxy target
+ * @returns SubscriberInterface for clearing the async fetcher
+ *
+ * @category Utilities
+ */
+export function linkAsyncPullableToAsyncPollingProxy<T>(
+  lhs: AsyncPullable<T>,
+  rhs: AsyncPollingProxy<T>,
+): SubscriberInterface {
+  rhs.setAsyncFetcher(() => lhs.asyncPull());
+
+  return new Subscriber(() => {
+    rhs.clearAsyncFetcher();
+  });
+}
+
+/**
+ * Links a Pullable source to an AsyncPollingProxy target.
+ * Sync-pull is wrapped in an async fetcher for the async poller.
+ *
+ * @param lhs — pullable source
+ * @param rhs — async polling proxy target
+ * @returns SubscriberInterface for clearing the async fetcher
+ *
+ * @category Utilities
+ */
+export function linkPullableToAsyncPollingProxy<T>(
+  lhs: Pullable<T>,
+  rhs: AsyncPollingProxy<T>,
+): SubscriberInterface {
+  rhs.setAsyncFetcher(async () => lhs.pull());
+
+  return new Subscriber(() => {
+    rhs.clearAsyncFetcher();
+  });
+}
+
+/**
+ * Links a Subscribable source to an AsyncPollingProxy target.
+ * The last emitted value is buffered and served on each async poller tick.
+ *
+ * @param lhs — subscribable source
+ * @param rhs — async polling proxy target
+ * @returns SubscriberInterface for unsubscribing and clearing the async fetcher
+ *
+ * @category Utilities
+ */
+export function linkSubscribableToAsyncPollingProxy<T>(
+  lhs: Subscribable<T>,
+  rhs: AsyncPollingProxy<T>,
+): SubscriberInterface {
+  let lastValue: T | undefined;
+
+  const sub = lhs.subscribe((data) => {
+    lastValue = data;
+  });
+
+  rhs.setAsyncFetcher(async () => {
+    const value = lastValue;
+    lastValue = undefined;
+    return value;
+  });
+
+  return new Subscriber(() => {
+    sub.unsubscribe();
+    rhs.clearAsyncFetcher();
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Link error helpers
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Throws an error for an unsupported asyncPullable → sync-pollingProxy link.
+ *
+ * @category Utilities
+ */
+export function throwLinkAsyncPullableToPollingProxyError(): never {
   throw new Error(
-    `Unsupported transfer link combination: LHS(subscribable:${lhs.isSubscribable}, pullable:${lhs.isPullable}, asyncPullable:${lhs.isAsyncPullable}) -> RHS(pushable:${rhs.isPushable}, asyncPushable:${rhs.isAsyncPushable}, poller:${rhs.isPollingProxy}, asyncPoller:${rhs.isAsyncPollingProxy})`
+    "Cannot link AsyncPullable source to sync PollingProxy. Use AsyncPollingProxyTransfer.",
+  );
+}
+
+/**
+ * Throws an error for an unsupported pullable/asyncPullable → pushable/asyncPushable link.
+ *
+ * @category Utilities
+ */
+export function throwLinkPullableToPushableError(): never {
+  throw new Error(
+    "Cannot directly link Pullable/AsyncPullable source to Pushable/AsyncPushable target. Use a Bridge or Triggerable adapter to pull and push data.",
+  );
+}
+
+/**
+ * Throws an error for an incompatible or unfeasible transfer link combination.
+ *
+ * @param lhs — output transfer
+ * @param rhs — input transfer
+ *
+ * @category Utilities
+ */
+export function throwLinkUnsupportedError(
+  lhs: { isSubscribable: boolean; isPullable: boolean; isAsyncPullable: boolean },
+  rhs: { isPushable: boolean; isAsyncPushable: boolean; isPollingProxy: boolean; isAsyncPollingProxy: boolean },
+): never {
+  throw new Error(
+    `Unsupported transfer link combination: LHS(subscribable:${lhs.isSubscribable}, pullable:${lhs.isPullable}, asyncPullable:${lhs.isAsyncPullable}) -> RHS(pushable:${rhs.isPushable}, asyncPushable:${rhs.isAsyncPushable}, poller:${rhs.isPollingProxy}, asyncPoller:${rhs.isAsyncPollingProxy})`,
   );
 }
 
