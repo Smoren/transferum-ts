@@ -881,22 +881,22 @@ Node Streams and WHATWG Streams solve piping well, but they introduce a new **st
 
 ### Quick Comparison Table
 
-| Feature                    | Transferum                   | RxJS                                 | Most.js           | Bacon.js          | Kefir             | Node Streams       | WHATWG Streams     |
-|----------------------------|------------------------------|--------------------------------------|-------------------|-------------------|-------------------|--------------------|--------------------|
-| **Bundle size (minified)** | ~15 KB                       | ~35 KB                               | ~7 KB             | ~12 KB            | ~8 KB             | Built-in           | Built-in           |
-| **Dependencies**           | 0                            | 0                                    | 0                 | 0                 | 0                 | 0                  | 0                  |
-| **Pull-based**             | ✓                            | ✗                                    | ✗                 | ✗                 | ✗                 | ✓ (Readable)       | ✓ (Readable)       |
-| **Push-based**             | ✓                            | ✓                                    | ✓                 | ✓                 | ✓                 | ✓ (Writable)       | ✓ (Writable)       |
-| **Sync/Async unify**       | ✓                            | Partial                              | Partial           | Partial           | Partial           | Partial            | Partial            |
-| **Built-in polling**       | ✓ (Ticker)                   | ✗ (manual)                           | ✗                 | ✗                 | ✗                 | ✗                  | ✗                  |
-| **Gate/Flow control**      | ✓ (GateTransfer, Bridge)     | Manual                               | Manual            | Manual            | Manual            | Manual             | Manual             |
-| **Error handling**         | Local, non-fatal, fail-safe  | Stream-level (`catchError`, `retry`) | Stream terminates | Stream terminates | Stream terminates | Stream-level       | Stream-level       |
-| **Undefined suppression**  | ✓                            | ✗                                    | ✗                 | ✗                 | ✗                 | ✗                  | ✗                  |
-| **Operators count**        | ~10 (pure transforms)        | 100+                                 | ~40               | ~60               | ~50               | ~15 (Transform)    | ~10 (Transform)    |
-| **Flow-control as nodes**  | ✓ (transfers with lifecycle) | ✗ (operators only)                   | ✗                 | ✗                 | ✗                 | ✗                  | ✗                  |
-| **TypeScript support**     | Excellent                    | Excellent                            | Good              | Fair              | Fair              | Fair               | Fair               |
-| **Community size**         | Small                        | Very large                           | Medium            | Small             | Small             | Large              | Medium             |
-| **Maintenance status**     | Active                       | Active                               | Maintenance       | Maintenance       | Archived          | Active             | Active             |
+| Feature                    | Transferum                    | RxJS                                 | Most.js           | Bacon.js          | Kefir             | Node Streams    | WHATWG Streams  |
+|----------------------------|-------------------------------|--------------------------------------|-------------------|-------------------|-------------------|-----------------|-----------------|
+| **Bundle size (minified)** | ~15 KB                        | ~35 KB                               | ~7 KB             | ~12 KB            | ~8 KB             | Built-in        | Built-in        |
+| **Dependencies**           | 0                             | 0                                    | 0                 | 0                 | 0                 | 0               | 0               |
+| **Pull-based**             | ✓                            | ✗                                   | ✗                | ✗                | ✗                | ✓ (Readable)   | ✓ (Readable)   |
+| **Push-based**             | ✓                            | ✓                                   | ✓                | ✓                | ✓                | ✓ (Writable)   | ✓ (Writable)   |
+| **Sync/Async unify**       | ✓                            | Partial                              | Partial           | Partial           | Partial           | Partial         | Partial         |
+| **Built-in polling**       | ✓ (Ticker)                   | ✗ (manual)                          | ✗                | ✗                | ✗                | ✗              | ✗              |
+| **Gate/Flow control**      | ✓ (GateTransfer, Bridge)     | Manual                               | Manual            | Manual            | Manual            | Manual          | Manual          |
+| **Error handling**         | Local, non-fatal, fail-safe   | Stream-level (`catchError`, `retry`) | Stream terminates | Stream terminates | Stream terminates | Stream-level    | Stream-level    |
+| **Undefined suppression**  | ✓                            | ✗                                   | ✗                | ✗                | ✗                | ✗              | ✗              |
+| **Operators count**        | ~10 (pure transforms)         | 100+                                 | ~40               | ~60               | ~50               | ~15 (Transform) | ~10 (Transform) |
+| **Flow-control as nodes**  | ✓ (transfers with lifecycle) | ✗ (operators only)                  | ✗                | ✗                | ✗                | ✗              | ✗              |
+| **TypeScript support**     | Excellent                     | Excellent                            | Good              | Fair              | Fair              | Fair            | Fair            |
+| **Community size**         | Small                         | Very large                           | Medium            | Small             | Small             | Large           | Medium          |
+| **Maintenance status**     | Active                        | Active                               | Maintenance       | Maintenance       | Archived          | Active          | Active          |
 
 ---
 
@@ -1104,16 +1104,16 @@ Everything else — transfers, bridges, builders, operators — follows from thi
 
 **The invariants:**
 
-| Invariant                                       | What it means                                                                                                                                                                                                                                                                       | Where enforced                                                                        |
-|-------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
-| **Transfers don't know their neighbors**        | A transfer defines its own behavior (push, pull, subscribe, gate…) but never references, imports, or checks the class of another transfer. It doesn't know what's upstream or downstream — it only fulfills its own contract.                                                       | `BaseTransfer` and all descendants — no cross-references between transfer classes     |
-| **Bridges don't know concrete implementations** | A bridge inspects capability flags, never class names. There is no `instanceof` chain, no RTTI, no class-name switching. Any transfer with the right capabilities is bridgeable — including ones that don't exist yet.                                                              | `linkTransfers`, `PassBridge`, `BridgeSelector`, all bridge classes                   |
-| **Capabilities define the contract**            | Flags are the single source of truth. They determine the TypeScript interface (compile-time), the available methods (runtime), the linking strategy (`linkTransfers`), and the builder type compatibility. One piece of metadata, many readers.                                     | `interfaces.ts`, `types.ts`, `linkTransfers`, builders                                |
-| **`BaseTransfer` is minimal**                   | The base class contains only capability declarations — no state, no logic. State lives in `BaseStateTransfer<T>` (one level down). This prevents the god-object pattern where a base accumulates knowledge of all descendants.                                                      | `BaseTransfer` class hierarchy                                                        |
-| **One class, one behavior**                     | Each transfer models exactly one behavioral concept. There are no combinatorial mega-classes (`BufferedStoredGateTransfer`). Complex behavior emerges from composition, not from inheritance depth.                                                                                 | All transfer classes                                                                  |
-| **Operators are stateless transforms**          | Operators transform data (`apply(input) → output`) and hold no pipeline state. They live *inside* transfers (`ConvertTransfer`, `TransformBridge`), not as standalone pipeline nodes. The transfer owns the behavioral contract; the operator owns the data transformation.         | `OperatorInterface`, `AsyncOperatorInterface`                                         |
-| **`destroy()` is universal**                    | Every resource has an explicit cleanup path — `destroy()` for transfers, bridges, and subscription managers; `stop()` for tickers; `unsubscribe()` for subscriptions. Builders track `owned` resources and clean them up in one `destroy()` call. No resource lacks a cleanup path. | `DisposableInterface`, all transfers, all bridges, builders; `TickerInterface.stop()` |
-| **`undefined` never propagates**                | `undefined` means "no data," not "empty value." It is suppressed at `SubscriptionManager.sendState()` — subscribers are never notified with `undefined`. Use `null` for explicit empty markers.                                                                                     | `SubscriptionManager`, all transfers                                                  |
+| Invariant                                       | What it means                                                                                                                                                                                                                                                                       | Where enforced                                                                         |
+|-------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|
+| **Transfers don't know their neighbors**        | A transfer defines its own behavior (push, pull, subscribe, gate…) but never references, imports, or checks the class of another transfer. It doesn't know what's upstream or downstream — it only fulfills its own contract.                                                       | `BaseTransfer` and all descendants — no cross-references between transfer classes      |
+| **Bridges don't know concrete implementations** | A bridge inspects capability flags, never class names. There is no `instanceof` chain, no RTTI, no class-name switching. Any transfer with the right capabilities is bridgeable — including ones that don't exist yet.                                                              | `linkTransfers`, `LinkerInterface`, `PassBridge`, `BridgeSelector`, all bridge classes |
+| **Capabilities define the contract**            | Flags are the single source of truth. They determine the TypeScript interface (compile-time), the available methods (runtime), the linking strategy (`linkTransfers`), and the builder type compatibility. One piece of metadata, many readers.                                     | `interfaces.ts`, `types.ts`, `linkTransfers`, `LinkerInterface`, builders              |
+| **`BaseTransfer` is minimal**                   | The base class contains only capability declarations — no state, no logic. State lives in `BaseStateTransfer<T>` (one level down). This prevents the god-object pattern where a base accumulates knowledge of all descendants.                                                      | `BaseTransfer` class hierarchy                                                         |
+| **One class, one behavior**                     | Each transfer models exactly one behavioral concept. There are no combinatorial mega-classes (`BufferedStoredGateTransfer`). Complex behavior emerges from composition, not from inheritance depth.                                                                                 | All transfer classes                                                                   |
+| **Operators are stateless transforms**          | Operators transform data (`apply(input) → output`) and hold no pipeline state. They live *inside* transfers (`ConvertTransfer`, `TransformBridge`), not as standalone pipeline nodes. The transfer owns the behavioral contract; the operator owns the data transformation.         | `OperatorInterface`, `AsyncOperatorInterface`                                          |
+| **`destroy()` is universal**                    | Every resource has an explicit cleanup path — `destroy()` for transfers, bridges, and subscription managers; `stop()` for tickers; `unsubscribe()` for subscriptions. Builders track `owned` resources and clean them up in one `destroy()` call. No resource lacks a cleanup path. | `DisposableInterface`, all transfers, all bridges, builders; `TickerInterface.stop()`  |
+| **`undefined` never propagates**                | `undefined` means "no data," not "empty value." It is suppressed at `SubscriptionManager.sendState()` — subscribers are never notified with `undefined`. Use `null` for explicit empty markers.                                                                                     | `SubscriptionManager`, all transfers                                                   |
 
 > **Why these matter.** A new transfer, bridge, or operator that respects these invariants integrates without touching existing code — the architecture stays coherent as it grows.
 
@@ -1393,9 +1393,9 @@ The `source` parameter is the transfer instance where the error occurred, allowi
 
 | Scenario           | `onError` provided | `onError` behavior | Result                                    |
 |--------------------|--------------------|--------------------|-------------------------------------------|
-| Handler suppresses | ✓                  | Returns normally   | Exception suppressed, operation continues |
-| No handler         | ✗                  | —                  | Exception rethrown                        |
-| Handler throws     | ✓                  | Throws             | Handler's exception rethrown              |
+| Handler suppresses | ✓                 | Returns normally   | Exception suppressed, operation continues |
+| No handler         | ✗                 | —                  | Exception rethrown                        |
+| Handler throws     | ✓                 | Throws             | Handler's exception rethrown              |
 
 #### Per-transfer error handlers
 
@@ -1438,29 +1438,29 @@ When linking a `Subscribable` source to an `AsyncPushable` target, `asyncPush()`
 
 | Transfer                   | Push | Pull | Sub | Trig | Gate |  Poll   | In | Out | Purpose                                             |
 |----------------------------|:----:|:----:|:---:|:----:|:----:|:-------:|:--:|:---:|-----------------------------------------------------|
-| PushChannelTransfer        |  ✓   |  —   |  ✓  |  —   |  —   |    —    | ✓  |  ✓  | Reactive channel, data not retained                 |
-| DelayedPushChannelTransfer |  ✓   |  —   |  ✓  |  —   |  —   |    —    | ✓  |  ✓  | Channel with delayed emission to subscribers        |
-| DebounceTransfer           |  ✓   |  —   |  ✓  |  —   |  —   |    —    | ✓  |  ✓  | Channel with debounce emission (last after pause)   |
-| ThrottleTransfer           |  ✓   |  —   |  ✓  |  —   |  —   |    —    | ✓  |  ✓  | Channel with throttle emission (leading + trailing) |
-| PushStoredChannelTransfer  |  ✓   |  ✓   |  ✓  |  ✓   |  —   |    —    | ✓  |  ✓  | Channel with last-value caching                     |
-| BufferTransfer             |  ✓   |  ✓   |  —  |  —   |  —   |    —    | ✓  |  ✓  | Passive buffer (push/pull without notifications)    |
-| ManualBufferTransfer       |  ✓   |  ✓   |  —  |  ✓   |  —   |    —    | ✓  |  ✓  | Buffer with read only after `trigger()`             |
-| ManualFlowTransfer         |  ✓   |  —   |  ✓  |  ✓   |  —   |    —    | ✓  |  ✓  | Emission to subscribers only on `trigger()`         |
-| GateTransfer               |  ✓   |  —   |  ✓  |  —   |  ✓   |    —    | ✓  |  ✓  | Flow blocking by state (`active`)                   |
-| MergeTransfer              |  —   |  —   |  ✓  |  —   |  —   |    —    | —  |  ✓  | Merge multiple sources                              |
-| SplitTransfer              |  ✓   |  —   |  —  |  —   |  —   |    —    | ✓  |  —  | Broadcast to multiple targets (broadcast)           |
-| PollingSourceTransfer      |  —   |  ✓   |  ✓  |  ✓   |  ✓   |   Src   | —  |  ✓  | Poll external `fetcher` on a timer                  |
-| PollingProxyTransfer       |  —   |  ✓   |  ✓  |  ✓   |  ✓   | Src+Prx | ✓  |  ✓  | Poll previous node on a timer                       |
-| PollingFlowTransfer        |  —   |  ✓   |  ✓  |  ✓   |  ✓   |   Src   | —  |  ✓  | Poll from `OutputFlowInterface` (Storage)           |
-| IdlePollingTransfer        |  ✓   |  ✓   |  ✓  |  ✓   |  ✓   |   Src   | ✓  |  ✓  | Fallback polling on idle incoming data              |
-| ChannelTransfer            |  —   |  —   |  ✓  |  —   |  —   |    —    | —  |  ✓  | External source via `setup`/`destroy`               |
-| StoredChannelTransfer      |  —   |  ✓   |  ✓  |  ✓   |  —   |    —    | —  |  ✓  | Channel with storage + external source              |
-| SinkTransfer               |  ✓   |  —   |  —  |  —   |  —   |    —    | ✓  |  —  | Terminal sink (callback)                            |
-| WriteTransfer              |  ✓   |  —   |  —  |  —   |  —   |    —    | ✓  |  —  | Write to `InputFlowInterface` (Storage)             |
-| ReadTransfer               |  —   |  ✓   |  —  |  —   |  —   |    —    | —  |  ✓  | Read from `OutputFlowInterface` (Storage)           |
-| ConvertTransfer            |  ✓   |  —   |  ✓  |  —   |  —   |    —    | ✓  |  ✓  | Transform via `Operator`                            |
-| ConditionTransfer          |  ✓   |  —   |  ✓  |  —   |  —   |    —    | ✓  |  ✓  | Conditional filtering (`shouldAccept`/`shouldEmit`) |
-| DisplaceTransfer           |  ✓   |  —   |  ✓  |  —   |  —   |    —    | ✓  |  ✓  | Switch-map: new inner per value, previous displaced |
+| PushChannelTransfer        |  ✓  |  —   | ✓  |  —   |  —   |    —    | ✓ | ✓  | Reactive channel, data not retained                 |
+| DelayedPushChannelTransfer |  ✓  |  —   | ✓  |  —   |  —   |    —    | ✓ | ✓  | Channel with delayed emission to subscribers        |
+| DebounceTransfer           |  ✓  |  —   | ✓  |  —   |  —   |    —    | ✓ | ✓  | Channel with debounce emission (last after pause)   |
+| ThrottleTransfer           |  ✓  |  —   | ✓  |  —   |  —   |    —    | ✓ | ✓  | Channel with throttle emission (leading + trailing) |
+| PushStoredChannelTransfer  |  ✓  |  ✓  | ✓  |  ✓  |  —   |    —    | ✓ | ✓  | Channel with last-value caching                     |
+| BufferTransfer             |  ✓  |  ✓  |  —  |  —   |  —   |    —    | ✓ | ✓  | Passive buffer (push/pull without notifications)    |
+| ManualBufferTransfer       |  ✓  |  ✓  |  —  |  ✓  |  —   |    —    | ✓ | ✓  | Buffer with read only after `trigger()`             |
+| ManualFlowTransfer         |  ✓  |  —   | ✓  |  ✓  |  —   |    —    | ✓ | ✓  | Emission to subscribers only on `trigger()`         |
+| GateTransfer               |  ✓  |  —   | ✓  |  —   |  ✓  |    —    | ✓ | ✓  | Flow blocking by state (`active`)                   |
+| MergeTransfer              |  —   |  —   | ✓  |  —   |  —   |    —    | —  | ✓  | Merge multiple sources                              |
+| SplitTransfer              |  ✓  |  —   |  —  |  —   |  —   |    —    | ✓ |  —  | Broadcast to multiple targets (broadcast)           |
+| PollingSourceTransfer      |  —   |  ✓  | ✓  |  ✓  |  ✓  |   Src   | —  | ✓  | Poll external `fetcher` on a timer                  |
+| PollingProxyTransfer       |  —   |  ✓  | ✓  |  ✓  |  ✓  | Src+Prx | ✓ | ✓  | Poll previous node on a timer                       |
+| PollingFlowTransfer        |  —   |  ✓  | ✓  |  ✓  |  ✓  |   Src   | —  | ✓  | Poll from `OutputFlowInterface` (Storage)           |
+| IdlePollingTransfer        |  ✓  |  ✓  | ✓  |  ✓  |  ✓  |   Src   | ✓ | ✓  | Fallback polling on idle incoming data              |
+| ChannelTransfer            |  —   |  —   | ✓  |  —   |  —   |    —    | —  | ✓  | External source via `setup`/`destroy`               |
+| StoredChannelTransfer      |  —   |  ✓  | ✓  |  ✓  |  —   |    —    | —  | ✓  | Channel with storage + external source              |
+| SinkTransfer               |  ✓  |  —   |  —  |  —   |  —   |    —    | ✓ |  —  | Terminal sink (callback)                            |
+| WriteTransfer              |  ✓  |  —   |  —  |  —   |  —   |    —    | ✓ |  —  | Write to `InputFlowInterface` (Storage)             |
+| ReadTransfer               |  —   |  ✓  |  —  |  —   |  —   |    —    | —  | ✓  | Read from `OutputFlowInterface` (Storage)           |
+| ConvertTransfer            |  ✓  |  —   | ✓  |  —   |  —   |    —    | ✓ | ✓  | Transform via `Operator`                            |
+| ConditionTransfer          |  ✓  |  —   | ✓  |  —   |  —   |    —    | ✓ | ✓  | Conditional filtering (`shouldAccept`/`shouldEmit`) |
+| DisplaceTransfer           |  ✓  |  —   | ✓  |  —   |  —   |    —    | ✓ | ✓  | Switch-map: new inner per value, previous displaced |
 
 > **Legend:** Push = `isPushable`, Pull = `isPullable`, Sub = `isSubscribable`, Trig = `isTriggerable`, Gate = `isGate`, Poll = polling (`Src` = `isPollingSource`, `Prx` = `isPollingProxy`), In = `isInput`, Out = `isOutput`.
 
@@ -1470,16 +1470,16 @@ When linking a `Subscribable` source to an `AsyncPushable` target, `asyncPush()`
 
 | Transfer                   | aPush | aPull | aTrig | Sub | Gate |   Poll   | In | Out | BP | Purpose                                                  |
 |----------------------------|:-----:|:-----:|:-----:|:---:|:----:|:--------:|:--:|:---:|:--:|----------------------------------------------------------|
-| AsyncSinkTransfer          |   ✓   |   —   |   —   |  —  |  —   |    —     | ✓  |  —  | ✓  | Async terminal sink (callback)                           |
-| AsyncWriteTransfer         |   ✓   |   —   |   —   |  —  |  —   |    —     | ✓  |  —  | ✓  | Async write to `AsyncInputFlowInterface`                 |
-| AsyncReadTransfer          |   —   |   ✓   |   —   |  —  |  —   |    —     | —  |  ✓  | —  | Async read from `AsyncOutputFlowInterface`               |
-| AsyncConvertTransfer       |   ✓   |   —   |   —   |  ✓  |  —   |    —     | ✓  |  ✓  | ✓  | Async transform via `AsyncOperator`                      |
-| AsyncConditionTransfer     |   ✓   |   —   |   —   |  ✓  |  —   |    —     | ✓  |  ✓  | ✓  | Async conditional filtering (async predicates)           |
-| AsyncPollingSourceTransfer |   —   |   ✓   |   ✓   |  ✓  |  ✓   |   Src    | —  |  ✓  | —  | Async poll external `fetcher` on a timer                 |
-| AsyncPollingProxyTransfer  |   —   |   ✓   |   ✓   |  ✓  |  ✓   | Src+aPrx | ✓  |  ✓  | —  | Async poll previous node on a timer                      |
-| AsyncPollingFlowTransfer   |   —   |   ✓   |   ✓   |  ✓  |  ✓   |   Src    | —  |  ✓  | —  | Async poll from `AsyncOutputFlowInterface`               |
-| AsyncIdlePollingTransfer   |  ✓*   |   ✓   |   ✓   |  ✓  |  ✓   |   Src    | ✓  |  ✓  | —  | Fallback async polling on idle incoming data             |
-| AsyncStoredChannelTransfer |   —   |   ✓   |   ✓   |  ✓  |  —   |    —     | —  |  ✓  | —  | Channel with storage + external source + async interface |
+| AsyncSinkTransfer          |  ✓   |   —   |   —   |  —  |  —   |    —     | ✓ |  —  | ✓ | Async terminal sink (callback)                           |
+| AsyncWriteTransfer         |  ✓   |   —   |   —   |  —  |  —   |    —     | ✓ |  —  | ✓ | Async write to `AsyncInputFlowInterface`                 |
+| AsyncReadTransfer          |   —   |  ✓   |   —   |  —  |  —   |    —     | —  | ✓  | —  | Async read from `AsyncOutputFlowInterface`               |
+| AsyncConvertTransfer       |  ✓   |   —   |   —   | ✓  |  —   |    —     | ✓ | ✓  | ✓ | Async transform via `AsyncOperator`                      |
+| AsyncConditionTransfer     |  ✓   |   —   |   —   | ✓  |  —   |    —     | ✓ | ✓  | ✓ | Async conditional filtering (async predicates)           |
+| AsyncPollingSourceTransfer |   —   |  ✓   |  ✓   | ✓  |  ✓  |   Src    | —  | ✓  | —  | Async poll external `fetcher` on a timer                 |
+| AsyncPollingProxyTransfer  |   —   |  ✓   |  ✓   | ✓  |  ✓  | Src+aPrx | ✓ | ✓  | —  | Async poll previous node on a timer                      |
+| AsyncPollingFlowTransfer   |   —   |  ✓   |  ✓   | ✓  |  ✓  |   Src    | —  | ✓  | —  | Async poll from `AsyncOutputFlowInterface`               |
+| AsyncIdlePollingTransfer   |  ✓*  |  ✓   |  ✓   | ✓  |  ✓  |   Src    | ✓ | ✓  | —  | Fallback async polling on idle incoming data             |
+| AsyncStoredChannelTransfer |   —   |  ✓   |  ✓   | ✓  |  —   |    —     | —  | ✓  | —  | Channel with storage + external source + async interface |
 
 > **Legend:** aPush = `isAsyncPushable`, aPull = `isAsyncPullable`, aTrig = `isAsyncTriggerable`, aPrx = `isAsyncPollingProxy`, BP = Backpressure (`maxConcurrency` / `bufferSize` / `onBufferOverflow`). `✓*` — method is synchronous (`push`), but fetcher is asynchronous.
 >
@@ -2400,24 +2400,24 @@ Storages implement `StorageInterface<TInput, TOutput>` (write/read/clear/reset/s
 
 ### Storage Comparison Table
 
-| Storage            | Structure    | Read order                 |      `maxLength`       | `size`        | `reset()`               | Purpose                |
-|--------------------|--------------|----------------------------|:----------------------:|---------------|-------------------------|------------------------|
-| `LatestStorage<T>` | Single value | — (last written)           |           —            | 0 or 1        | Restores `defaultValue` | Last-value cache       |
+| Storage            | Structure    | Read order                 |       `maxLength`       | `size`        | `reset()`               | Purpose                |
+|--------------------|--------------|----------------------------|:-----------------------:|---------------|-------------------------|------------------------|
+| `LatestStorage<T>` | Single value | — (last written)           |            —            | 0 or 1        | Restores `defaultValue` | Last-value cache       |
 | `QueueStorage<T>`  | Array (FIFO) | First written → first read |   ✓ (evicts oldest)    | Element count | Clears (`clear()`)      | FIFO buffer with limit |
 | `StackStorage<T>`  | Array (LIFO) | Last written → first read  | ✓ (evicts from bottom) | Element count | Clears (`clear()`)      | LIFO stack with limit  |
 
 **Behavior comparison:**
 
-| Characteristic                |     `LatestStorage`      |       `QueueStorage`        |         `StackStorage`         |
-|-------------------------------|:------------------------:|:---------------------------:|:------------------------------:|
-| Stores multiple values        |            —             |              ✓              |               ✓                |
-| Read order                    |           Last           | FIFO (first in — first out) |   LIFO (last in — first out)   |
-| `write()` overwrites          |        ✓ (always)        |   ✓ (only at `maxLength`)   |    ✓ (only at `maxLength`)     |
-| `read()` clears value         | — (available repeatedly) |  ✓ (extracts and removes)   |    ✓ (extracts and removes)    |
-| `defaultValue` in constructor |            ✓             |              —              |               —                |
-| `reset()`                     | Restores `defaultValue`  |           Clears            |             Clears             |
-| `maxLength`                   |            —             |     ✓ (removes oldest)      | ✓ (removes oldest from bottom) |
-| `size` after `clear()`        |            0             |              0              |               0                |
+| Characteristic                |     `LatestStorage`      |       `QueueStorage`        |         `StackStorage`          |
+|-------------------------------|:------------------------:|:---------------------------:|:-------------------------------:|
+| Stores multiple values        |            —             |             ✓              |               ✓                |
+| Read order                    |           Last           | FIFO (first in — first out) |   LIFO (last in — first out)    |
+| `write()` overwrites          |       ✓ (always)        |  ✓ (only at `maxLength`)   |    ✓ (only at `maxLength`)     |
+| `read()` clears value         | — (available repeatedly) |  ✓ (extracts and removes)  |    ✓ (extracts and removes)    |
+| `defaultValue` in constructor |            ✓            |              —              |                —                |
+| `reset()`                     | Restores `defaultValue`  |           Clears            |             Clears              |
+| `maxLength`                   |            —             |     ✓ (removes oldest)     | ✓ (removes oldest from bottom) |
+| `size` after `clear()`        |            0             |              0              |                0                |
 
 **Choosing a storage:**
 
@@ -2449,8 +2449,8 @@ console.log(queue.size);   // 2
 
 Tickers implement `TickerInterface` and provide periodic callback invocation with a configurable interval. Two implementations for different environments:
 
-| Ticker           | Based on                |     Leading edge      | Environment                         |
-|------------------|-------------------------|:---------------------:|-------------------------------------|
+| Ticker           | Based on                |      Leading edge      | Environment                         |
+|------------------|-------------------------|:----------------------:|-------------------------------------|
 | `RAFTicker`      | `requestAnimationFrame` |    ✓ (first frame)    | Browser / SSR (setTimeout fallback) |
 | `IntervalTicker` | `setInterval`           | ✓ (setTimeout(fn, 0)) | Node.js / tests (fake timers)       |
 
@@ -2558,18 +2558,19 @@ Bridges implement `BridgeInterface` (active/activate/deactivate/toggle/destroy) 
 
 ### Bridge Comparison Table
 
-| Bridge                            | Connects                  |     Transformation      |              Intermediate transfer              |       Gate        | Owned | Purpose                                  |
-|-----------------------------------|---------------------------|:-----------------------:|:-----------------------------------------------:|:-----------------:|:-----:|------------------------------------------|
-| `PassBridge<T>`                   | Output → Input            |            —            |                        —                        |         ✓         |   —   | Simple bridge with flow control          |
+| Bridge                            | Connects                  |      Transformation      |              Intermediate transfer              |        Gate        | Owned | Purpose                                  |
+|-----------------------------------|---------------------------|:------------------------:|:-----------------------------------------------:|:------------------:|:-----:|------------------------------------------|
+| `PassBridge<T>`                   | Output → Input            |            —             |                        —                        |         ✓         |   —   | Simple bridge with flow control          |
 | `TransformBridge<TIn, TOut>`      | Output → Input            |   ✓ (via `Operator`)    |          `ConvertTransfer` (internal)           |         ✓         |   —   | Bridge with data type transformation     |
-| `TransferBridge<TIn, TOut>`       | Output → Input            |            —            | `DuplexTransfer` (external, opt. `middleOwned`) |         ✓         |   ✓   | Bridge with intermediate duplex transfer |
+| `TransferBridge<TIn, TOut>`       | Output → Input            |            —             | `DuplexTransfer` (external, opt. `middleOwned`) |         ✓         |  ✓   | Bridge with intermediate duplex transfer |
 | `AsyncTransformBridge<TIn, TOut>` | Output → Input            | ✓ (via `AsyncOperator`) |        `AsyncConvertTransfer` (internal)        |         ✓         |   —   | Bridge with async type transformation    |
-| `BridgeAggregator`                | Group of bridges          |            —            |                        —                        |  ✓ (all at once)  |   ✓   | Synchronous group control of bridges     |
-| `BridgeSelector<TMap>`            | One from a bridge map     |            —            |                        —                        | ✓ (only selected) |   ✓   | Select one active bridge                 |
-| `BridgeMultiSelector<TMap>`       | Several from a bridge map |            —            |                        —                        |   ✓ (selected)    |   ✓   | Select multiple active bridges           |
+| `BridgeAggregator`                | Group of bridges          |            —             |                        —                        |  ✓ (all at once)  |  ✓   | Synchronous group control of bridges     |
+| `BridgeSelector<TMap>`            | One from a bridge map     |            —             |                        —                        | ✓ (only selected) |  ✓   | Select one active bridge                 |
+| `BridgeMultiSelector<TMap>`       | Several from a bridge map |            —             |                        —                        |   ✓ (selected)    |  ✓   | Select multiple active bridges           |
 
 > **Gate** — all bridges have an internal `GateTransfer` for flow control. `activate()` / `deactivate()` / `toggle()` delegate to the gate.
 > **Owned** — the `owned` parameter controls whether nested bridges are destroyed on `destroy()`.
+> **Linker** — `PassBridge`, `TransformBridge`, `TransferBridge`, and `AsyncTransformBridge` accept an optional `linker?: LinkerInterface` in their config. When provided, all internal links (source → gate → converter → target) are created via `linker.link()` instead of `linkTransfers()`. This allows custom linkers to control bridge-internal wiring consistently with `CompositeTransferBuilder`. See [Linkers](#linkers).
 > **onStateChange()** — all bridges support state change subscription via `onStateChange()`. In `PassBridge`, `TransformBridge`, `TransferBridge` the notification fires on `activate()` / `deactivate()` / `toggle()`. In `BridgeAggregator` — on direct state changes (does not listen to children). In `BridgeSelector` — on `_active` or `_selectedKey` changes (including `select()`). In `BridgeMultiSelector` — on `_active` or `_selectedKeys` changes (including `select()`, `check()`, `uncheck()`). When `syncWithChildren` is enabled, `BridgeSelector` and `BridgeMultiSelector` also fire `onStateChange()` when a child bridge's state changes externally — the selector reacts by updating its selection and notifying its own subscribers.
 
 **Comparison by flow structure:**
@@ -2578,7 +2579,7 @@ Bridges implement `BridgeInterface` (active/activate/deactivate/toggle/destroy) 
 |---------------------|:----------------------:|:----------------------------------:|:-----------------------------------------:|
 | Connects            |    source → target     |          source → target           |              source → target              |
 | Intermediate layer  |           —            |         `ConvertTransfer`          |         External `DuplexTransfer`         |
-| Data transformation |           —            |           ✓ (`Operator`)           |             Depends on middle             |
+| Data transformation |           —            |          ✓ (`Operator`)           |             Depends on middle             |
 | Data types          |       `T` → `T`        |           `TIn` → `TOut`           |              `TIn` → `TOut`               |
 | Middle management   |           —            |    Internal (created by bridge)    | External (`middleOwned` controls destroy) |
 | Link chain          | source → gate → target | source → gate → converter → target |      source → gate → middle → target      |
@@ -2593,7 +2594,7 @@ Bridges implement `BridgeInterface` (active/activate/deactivate/toggle/destroy) 
 | Switching          | `activate()` / `deactivate()` all |     `select(key)` switches      |       `check()` / `uncheck()` add/remove       |
 | Extraction         |                 —                 | `selectedKey`, `selectedBridge` |       `selectedKeys`, `selectedBridges`        |
 | `owned`            |  Controls destroy of all bridges  | Controls destroy of all bridges |        Controls destroy of all bridges         |
-| `syncWithChildren` |                 —                 |  ✓ (optional, default `false`)  |         ✓ (optional, default `false`)          |
+| `syncWithChildren` |                 —                 | ✓ (optional, default `false`)  |         ✓ (optional, default `false`)         |
 | `toggle()`         |     Activates/deactivates all     |       Toggles common flag       |              Toggles common flag               |
 
 **Choosing a bridge:**
@@ -3053,9 +3054,9 @@ Configs are defined in `configs.ts`. All configs are types (not classes), passed
 | `ConvertTransferConfig<TIn, TOut>`    | `ConvertTransfer`            | `operator`                                                          |
 | `ConditionTransferConfig<T>`          | `ConditionTransfer`          | — (predicates are optional), `onAcceptError?`, `onEmitError?`       |
 | `CompositeTransferConfig<TIn, TOut>`  | `UniversalCompositeTransfer` | `input`, `output`                                                   |
-| `PassBridgeConfig<T>`                 | `PassBridge`                 | `source`, `target`, `activated`                                     |
-| `TransformBridgeConfig<TIn, TOut>`    | `TransformBridge`            | `source`, `target`, `operator`, `activated`                         |
-| `TransferBridgeConfig<TIn, TOut>`     | `TransferBridge`             | `source`, `target`, `middle`, `middleOwned`, `activated`            |
+| `PassBridgeConfig<T>`                 | `PassBridge`                 | `source`, `target`, `activated`, `linker?`                          |
+| `TransformBridgeConfig<TIn, TOut>`    | `TransformBridge`            | `source`, `target`, `operator`, `activated`, `linker?`              |
+| `TransferBridgeConfig<TIn, TOut>`     | `TransferBridge`             | `source`, `target`, `middle`, `middleOwned`, `activated`, `linker?` |
 | `BridgeAggregatorConfig`              | `BridgeAggregator`           | `bridges`, `activated`, `owned`                                     |
 | `BridgeSelectorConfig<TMap>`          | `BridgeSelector`             | `bridges`, `initialKey`, `activated`, `owned`, `syncWithChildren?`  |
 | `BridgeMultiSelectorConfig<TMap>`     | `BridgeMultiSelector`        | `bridges`, `initialKeys`, `activated`, `owned`, `syncWithChildren?` |
@@ -3074,7 +3075,7 @@ Configs are defined in `configs.ts`. All configs are types (not classes), passed
 | `AsyncConvertTransferConfig<TIn, TOut>` | `AsyncConvertTransfer`             | `operator` (AsyncOperatorInterface), `onError?`, `maxConcurrency?`, `bufferSize?`, `onBufferOverflow?`                              |
 | `AsyncConditionTransferConfig<T>`       | `AsyncConditionTransfer`           | — (predicates are optional, sync or async), `onAcceptError?`, `onEmitError?`, `maxConcurrency?`, `bufferSize?`, `onBufferOverflow?` |
 | `AsyncStoredChannelTransferConfig<T>`   | `AsyncStoredChannelTransfer`       | `setup`, `destroy`, `onError?`, `onDestroyError?`                                                                                   |
-| `AsyncTransformBridgeConfig<TIn, TOut>` | `AsyncTransformBridge`             | `source`, `target`, `operator`, `activated`                                                                                         |
+| `AsyncTransformBridgeConfig<TIn, TOut>` | `AsyncTransformBridge`             | `source`, `target`, `operator`, `activated`, `onError?`, `linker?`                                                                  |
 | `LinkConfig<TTargetTransfer>`           | `linkTransfers` (async strategies) | `onError?`                                                                                                                          |
 
 All polling transfers support an optional `tickerFactory?: TickerFactory` to replace the default ticker (`RAFTicker.factory`).
