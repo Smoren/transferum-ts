@@ -340,6 +340,7 @@ export class CompositeTransferBuilder<
       this._startTransfer,
       nextTransfer as DuplexTransfer<unknown, OutputTransferDataType<TNextTransfer>>,
       nextOwnedResources,
+      this._linker,
     );
   }
 
