@@ -8,6 +8,8 @@ import type {
   AsyncOperatorPipelineBuilderInterface,
   AsyncTriggerableInterface,
   AsyncOperatorInterface,
+  LinkerInterface,
+  SubscriberInterface,
   InputPipelineBuilderInterface,
   OutputPipelineBuilderInterface,
   DuplexPipelineBuilderInterface,
@@ -262,15 +264,18 @@ export class CompositeTransferBuilder<
   private readonly _startTransfer: TStartTransfer;
   private readonly _currentTransfer: DuplexTransfer<unknown, TCurrent>;
   private readonly _ownedResources: DisposableInterface[];
+  private readonly _linker?: LinkerInterface;
 
   private constructor(
     startTransfer: TStartTransfer,
     currentTransfer: DuplexTransfer<unknown, TCurrent>,
     ownedResources: DisposableInterface[] = [],
+    linker?: LinkerInterface,
   ) {
     this._startTransfer = startTransfer;
     this._currentTransfer = currentTransfer;
     this._ownedResources = ownedResources;
+    this._linker = linker;
   }
 
   /**
@@ -281,22 +286,25 @@ export class CompositeTransferBuilder<
    *
    * @typeParam TStartTransfer — type of the initial transfer (must be OutputTransfer)
    * @param startTransfer — initial output transfer
+   * @param linker — linker to use
    * @returns A new CompositeTransferBuilder instance
    */
   public static start<TStartTransfer extends OutputTransfer<unknown>>(
     startTransfer: TStartTransfer,
+    linker?: LinkerInterface,
   ): CompositeTransferBuilderInterface<OutputTransferDataType<TStartTransfer>, TStartTransfer> {
     return new CompositeTransferBuilder<OutputTransferDataType<TStartTransfer>, TStartTransfer>(
       startTransfer,
       startTransfer as DuplexTransfer<unknown, any>,
       [],
+      linker,
     );
   }
 
   /**
    * Adds an intermediate duplex transfer to the chain.
    *
-   * Links the current transfer to nextTransfer via linkTransfers(), then returns
+   * Links the current transfer to nextTransfer via linkage strategy, then returns
    * a new builder with the next transfer's output data type as the current type.
    *
    * Options:
@@ -321,7 +329,7 @@ export class CompositeTransferBuilder<
       ? { onError: options.onLinkError }
       : undefined;
 
-    const subscriber = linkTransfers(this._currentTransfer, nextTransfer, linkConfig);
+    const subscriber = this._link(this._currentTransfer, nextTransfer, linkConfig);
     const nextOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
 
     if (options?.owned) {
@@ -384,7 +392,7 @@ export class CompositeTransferBuilder<
       ? { onError: options.onLinkError }
       : undefined;
 
-    const subscriber = linkTransfers(this._currentTransfer, lastTransfer, linkConfig);
+    const subscriber = this._link(this._currentTransfer, lastTransfer, linkConfig);
     const finalOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
 
     if (options?.owned) {
@@ -412,6 +420,17 @@ export class CompositeTransferBuilder<
       TAsyncTriggerable,
       TGate
     >;
+  }
+
+  private _link<T, RTransfer extends InputTransfer<T>>(
+    lhs: OutputTransfer<T>,
+    rhs: RTransfer,
+    options?: LinkConfig<RTransfer>,
+  ): SubscriberInterface {
+    if (this._linker !== undefined) {
+      return this._linker.link(lhs, rhs, options);
+    }
+    return linkTransfers(lhs, rhs, options);
   }
 }
 
