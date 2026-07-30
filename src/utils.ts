@@ -1,10 +1,4 @@
-import type {
-  AsyncPushableTransferInterface,
-  AsyncPullableTransferInterface,
-  AsyncPollingProxyTransferInterface,
-  PushableTransferInterface,
-  SubscriberInterface,
-} from "./interfaces";
+import type { SubscriberInterface } from "./interfaces";
 import type {
   AsyncPollingProxy,
   AsyncPullable,
@@ -56,6 +50,14 @@ import { Subscriber } from "./helpers";
  * @param rhs — input transfer (sink)
  * @param options — optional link config (onError for async-push rejection)
  * @returns SubscriberInterface for breaking the link
+ *
+ * @see {@link linkSubscribableToPushable} — Case 1
+ * @see {@link linkPullableToPollingProxy} — Case 2
+ * @see {@link linkSubscribableToPollingProxy} — Case 3
+ * @see {@link linkSubscribableToAsyncPushable} — Case 4
+ * @see {@link linkAsyncPullableToAsyncPollingProxy} — Case 5
+ * @see {@link linkPullableToAsyncPollingProxy} — Case 6
+ * @see {@link linkSubscribableToAsyncPollingProxy} — Case 7
  *
  * @category Utilities
  */

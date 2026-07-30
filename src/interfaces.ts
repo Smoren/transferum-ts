@@ -534,13 +534,65 @@ export interface BridgeMultiSelectorInterface<TMap extends Record<BaseSelectorKe
   uncheck(key: SelectorKey<TMap>): void;
 }
 
+/**
+ * Facade for linking transfers and building composite pipelines.
+ *
+ * A linker provides two complementary forms of linking:
+ * - `link()` — directly connects an output transfer to an input transfer
+ * - `start()` — creates a {@link CompositeTransferBuilderInterface} with this linker
+ *   injected, so that every subsequent `to()` and `finish()` call uses the same
+ *   linking strategy automatically
+ *
+ * Implementations can override either method to customize linking behavior
+ * (e.g., logging, serialization, custom error handling for unsupported combinations).
+ *
+ * @example
+ * ```typescript
+ * const linker = new DefaultLinker();
+ *
+ * // Direct linking
+ * linker.link(source, target);
+ *
+ * // Builder-based linking — linker is injected automatically
+ * const pipeline = linker
+ *   .start(source)
+ *   .to(intermediate)
+ *   .finish(sink);
+ * ```
+ *
+ * @category Interfaces
+ */
 export interface LinkerInterface {
+  /**
+   * Links an output transfer (LHS) to an input transfer (RHS).
+   *
+   * The linking strategy is determined by the capability flags of both transfers.
+   * Sync strategies take priority over async ones.
+   *
+   * @typeParam T — data type flowing through the link
+   * @typeParam RTransfer — type of the input transfer (RHS)
+   * @param lhs — output transfer (source)
+   * @param rhs — input transfer (sink)
+   * @param options — optional link config (onError for async-push rejection)
+   * @returns SubscriberInterface for breaking the link
+   */
   link<T, RTransfer extends InputTransfer<T>>(
     lhs: OutputTransfer<T>,
     rhs: RTransfer,
     options?: LinkConfig<RTransfer>,
   ): SubscriberInterface;
 
+  /**
+   * Creates a {@link CompositeTransferBuilderInterface} with this linker injected.
+   *
+   * Every `to()` and `finish()` call on the resulting builder will use this
+   * linker's `link()` method, ensuring consistent linking behavior throughout
+   * the pipeline.
+   *
+   * @typeParam TStartTransfer — type of the initial transfer (must be OutputTransfer)
+   * @param startTransfer — initial output transfer
+   * @returns A new CompositeTransferBuilder instance with this linker injected
+   */
   start<TStartTransfer extends OutputTransfer<unknown>>(
     startTransfer: TStartTransfer,
   ): CompositeTransferBuilderInterface<OutputTransferDataType<TStartTransfer>, TStartTransfer>;
