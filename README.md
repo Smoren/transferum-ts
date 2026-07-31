@@ -43,7 +43,7 @@ Type-safe primitives — **transfers** (nodes), **bridges** (edges), **builders*
   - [Capability Flags System](#capability-flags-system)
   - [Transfers](#transfers)
   - [Linking Transfers](#linking-transfers)
-  - [Linkers](#linkers)
+  - [Linking](#linking)
   - [Undefined Behavior in Data Flows](#undefined-behavior-in-data-flows)
   - [Error Handling](#error-handling)
 - [Transfers](#transfers-1)
@@ -142,20 +142,20 @@ This is a graph.
 
 ### Key Benefits
 
-| Benefit                                   | How                                                                                                                                                                                                                                                                                                                                                                                                           |
-|-------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Type-safe pipelines**                   | Each transfer and operator carries its input/output types. Builders enforce type compatibility at compile time — a mismatch is a compile error, not a runtime crash.                                                                                                                                                                                                                                          |
-| **Uniform capability model**              | Every transfer declares its capabilities via flags (`isPushable`, `isSubscribable`, `isGate`, …). `linkTransfers` automatically selects the correct wiring strategy — no manual glue code. Flags also define the transfer's TypeScript interface at compile time — methods like `push()` or `subscribe()` are type-guaranteed, not runtime-guessed (see [Capability Flags System](#capability-flags-system)). |
-| **Sync + async in one system**            | Sync and async transfers coexist. `linkTransfers` prefers sync when possible and falls back to async strategies when needed. No separate "async world."                                                                                                                                                                                                                                                       |
-| **Composable architecture**               | Transfers link into chains, bridges connect chains with gate control, builders assemble chains fluently, operators transform data — all orthogonal and reusable.                                                                                                                                                                                                                                              |
-| **Explicit lifecycle**                    | Every resource has an explicit cleanup method — `destroy()` for transfers, bridges, and subscription managers; `stop()` for tickers; `unsubscribe()` for subscriptions. Builders track `owned` resources and clean them up in one call. No leaked timers or subscriptions.                                                                                                                                    |
-| **Reactive by default, pull when needed** | Most transfers are subscribable (push-based reactivity). Polling transfers add pull-based data acquisition on the same foundation. Use the right model per stage without switching libraries.                                                                                                                                                                                                                 |
-| **Local, fail-safe error handling**       | Errors are local to each transfer — one stage's failure doesn't kill the pipeline. With `onError` — suppressed, stream continues. Without — visible (exception/rejection), and polling stops (no zombie tickers). Per-stage granularity (`onAcceptError`/`onEmitError`, `onDestroyError`). Typed `ErrorHandler<TSource>` passes the transfer instance. No silent swallowing.                                  |
-| **Undefined suppression**                 | `undefined` never propagates through the chain of transfers — it means "no data", not "empty value." Use `null` as an explicit empty marker when needed. This eliminates an entire class of null-check bugs in downstream consumers.                                                                                                                                                                          |
-| **Built-in backpressure**                 | Four async transfers (`AsyncSinkTransfer`, `AsyncWriteTransfer`, `AsyncConvertTransfer`, `AsyncConditionTransfer`) support optional `maxConcurrency`, `bufferSize`, and `onBufferOverflow` — limiting parallel async operations, queuing excess data, and handling overflow gracefully. Defaults are backward-compatible (unlimited). See [Backpressure](#backpressure).                                      |
-| **Ordered async execution**               | `AsyncSinkTransfer` and `AsyncWriteTransfer` support optional `ordered: true` — callback/write invocations are executed sequentially in data-arrival order, regardless of their async duration. `AsyncConvertTransfer` and `AsyncConditionTransfer` automatically enforce ordered emission when `maxConcurrency > 1` via an internal Sequence Guard (no config needed). See [Backpressure](#backpressure).    |
-| **No god-objects, no utility sprawl**     | `BaseTransfer` stays minimal — only capability declarations, no logic. Each transfer class models exactly one behavioral concept (buffering, gating, merging, polling...). No central object knows about every other component. Complexity is concentrated in the type layer; runtime code stays compact and readable.                                                                                        |
-| **Pluggable linking**                     | `LinkStrategyInterface` lets you override how transfers are wired together — implement `link()` for custom logic (logging, validation, serialization, inter-process bridging) and inject it into `CompositeTransferBuilder.start(transfer, linker)`. The default `DefaultLinkStrategy` delegates to `linkTransfers()` — zero-config for existing code, plug-and-play for custom needs. See [Linkers](#linkers).           |
+| Benefit                                   | How                                                                                                                                                                                                                                                                                                                                                                                                                   |
+|-------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Type-safe pipelines**                   | Each transfer and operator carries its input/output types. Builders enforce type compatibility at compile time — a mismatch is a compile error, not a runtime crash.                                                                                                                                                                                                                                                  |
+| **Uniform capability model**              | Every transfer declares its capabilities via flags (`isPushable`, `isSubscribable`, `isGate`, …). `linkTransfers` automatically selects the correct wiring strategy — no manual glue code. Flags also define the transfer's TypeScript interface at compile time — methods like `push()` or `subscribe()` are type-guaranteed, not runtime-guessed (see [Capability Flags System](#capability-flags-system)).         |
+| **Sync + async in one system**            | Sync and async transfers coexist. `linkTransfers` prefers sync when possible and falls back to async strategies when needed. No separate "async world."                                                                                                                                                                                                                                                               |
+| **Composable architecture**               | Transfers link into chains, bridges connect chains with gate control, builders assemble chains fluently, operators transform data — all orthogonal and reusable.                                                                                                                                                                                                                                                      |
+| **Explicit lifecycle**                    | Every resource has an explicit cleanup method — `destroy()` for transfers, bridges, and subscription managers; `stop()` for tickers; `unsubscribe()` for subscriptions. Builders track `owned` resources and clean them up in one call. No leaked timers or subscriptions.                                                                                                                                            |
+| **Reactive by default, pull when needed** | Most transfers are subscribable (push-based reactivity). Polling transfers add pull-based data acquisition on the same foundation. Use the right model per stage without switching libraries.                                                                                                                                                                                                                         |
+| **Local, fail-safe error handling**       | Errors are local to each transfer — one stage's failure doesn't kill the pipeline. With `onError` — suppressed, stream continues. Without — visible (exception/rejection), and polling stops (no zombie tickers). Per-stage granularity (`onAcceptError`/`onEmitError`, `onDestroyError`). Typed `ErrorHandler<TSource>` passes the transfer instance. No silent swallowing.                                          |
+| **Undefined suppression**                 | `undefined` never propagates through the chain of transfers — it means "no data", not "empty value." Use `null` as an explicit empty marker when needed. This eliminates an entire class of null-check bugs in downstream consumers.                                                                                                                                                                                  |
+| **Built-in backpressure**                 | Four async transfers (`AsyncSinkTransfer`, `AsyncWriteTransfer`, `AsyncConvertTransfer`, `AsyncConditionTransfer`) support optional `maxConcurrency`, `bufferSize`, and `onBufferOverflow` — limiting parallel async operations, queuing excess data, and handling overflow gracefully. Defaults are backward-compatible (unlimited). See [Backpressure](#backpressure).                                              |
+| **Ordered async execution**               | `AsyncSinkTransfer` and `AsyncWriteTransfer` support optional `ordered: true` — callback/write invocations are executed sequentially in data-arrival order, regardless of their async duration. `AsyncConvertTransfer` and `AsyncConditionTransfer` automatically enforce ordered emission when `maxConcurrency > 1` via an internal Sequence Guard (no config needed). See [Backpressure](#backpressure).            |
+| **No god-objects, no utility sprawl**     | `BaseTransfer` stays minimal — only capability declarations, no logic. Each transfer class models exactly one behavioral concept (buffering, gating, merging, polling...). No central object knows about every other component. Complexity is concentrated in the type layer; runtime code stays compact and readable.                                                                                                |
+| **Pluggable linking**                     | `LinkStrategyInterface` lets you override how transfers are wired together — implement `link()` for custom logic (logging, validation, serialization, inter-process bridging) and inject it into `CompositeTransferBuilder.start(transfer, linkStrategy)`. The default `DefaultLinkStrategy` delegates to `linkTransfers()` — zero-config for existing code, plug-and-play for custom needs. See [Linking](#linking). |
 
 ### Use Cases
 
@@ -1036,9 +1036,9 @@ import {
   BridgeMultiSelector,
   AsyncTransformBridge,
 
-  // Linkers
-  DefaultLinker,
-  LinkerInterface,
+  // Linking
+  DefaultLinkStrategy,
+  LinkStrategyInterface,
 
   // Builders
   InputPipelineBuilder,
@@ -1058,7 +1058,7 @@ import {
   createDebounceTransfer,
   createThrottleTransfer,
   createPushStoredChannelTransfer,
-  createDefaultLinker,
+  createDefaultLinkStrategy,
   // ... all create* functions (including createAsync*)
 
   // Utilities
@@ -1104,16 +1104,16 @@ Everything else — transfers, bridges, builders, operators — follows from thi
 
 **The invariants:**
 
-| Invariant                                       | What it means                                                                                                                                                                                                                                                                       | Where enforced                                                                         |
-|-------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|
-| **Transfers don't know their neighbors**        | A transfer defines its own behavior (push, pull, subscribe, gate…) but never references, imports, or checks the class of another transfer. It doesn't know what's upstream or downstream — it only fulfills its own contract.                                                       | `BaseTransfer` and all descendants — no cross-references between transfer classes      |
+| Invariant                                       | What it means                                                                                                                                                                                                                                                                       | Where enforced                                                                               |
+|-------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------|
+| **Transfers don't know their neighbors**        | A transfer defines its own behavior (push, pull, subscribe, gate…) but never references, imports, or checks the class of another transfer. It doesn't know what's upstream or downstream — it only fulfills its own contract.                                                       | `BaseTransfer` and all descendants — no cross-references between transfer classes            |
 | **Bridges don't know concrete implementations** | A bridge inspects capability flags, never class names. There is no `instanceof` chain, no RTTI, no class-name switching. Any transfer with the right capabilities is bridgeable — including ones that don't exist yet.                                                              | `linkTransfers`, `LinkStrategyInterface`, `PassBridge`, `BridgeSelector`, all bridge classes |
 | **Capabilities define the contract**            | Flags are the single source of truth. They determine the TypeScript interface (compile-time), the available methods (runtime), the linking strategy (`linkTransfers`), and the builder type compatibility. One piece of metadata, many readers.                                     | `interfaces.ts`, `types.ts`, `linkTransfers`, `LinkStrategyInterface`, builders              |
-| **`BaseTransfer` is minimal**                   | The base class contains only capability declarations — no state, no logic. State lives in `BaseStateTransfer<T>` (one level down). This prevents the god-object pattern where a base accumulates knowledge of all descendants.                                                      | `BaseTransfer` class hierarchy                                                         |
-| **One class, one behavior**                     | Each transfer models exactly one behavioral concept. There are no combinatorial mega-classes (`BufferedStoredGateTransfer`). Complex behavior emerges from composition, not from inheritance depth.                                                                                 | All transfer classes                                                                   |
-| **Operators are stateless transforms**          | Operators transform data (`apply(input) → output`) and hold no pipeline state. They live *inside* transfers (`ConvertTransfer`, `TransformBridge`), not as standalone pipeline nodes. The transfer owns the behavioral contract; the operator owns the data transformation.         | `OperatorInterface`, `AsyncOperatorInterface`                                          |
-| **`destroy()` is universal**                    | Every resource has an explicit cleanup path — `destroy()` for transfers, bridges, and subscription managers; `stop()` for tickers; `unsubscribe()` for subscriptions. Builders track `owned` resources and clean them up in one `destroy()` call. No resource lacks a cleanup path. | `DisposableInterface`, all transfers, all bridges, builders; `TickerInterface.stop()`  |
-| **`undefined` never propagates**                | `undefined` means "no data," not "empty value." It is suppressed at `SubscriptionManager.sendState()` — subscribers are never notified with `undefined`. Use `null` for explicit empty markers.                                                                                     | `SubscriptionManager`, all transfers                                                   |
+| **`BaseTransfer` is minimal**                   | The base class contains only capability declarations — no state, no logic. State lives in `BaseStateTransfer<T>` (one level down). This prevents the god-object pattern where a base accumulates knowledge of all descendants.                                                      | `BaseTransfer` class hierarchy                                                               |
+| **One class, one behavior**                     | Each transfer models exactly one behavioral concept. There are no combinatorial mega-classes (`BufferedStoredGateTransfer`). Complex behavior emerges from composition, not from inheritance depth.                                                                                 | All transfer classes                                                                         |
+| **Operators are stateless transforms**          | Operators transform data (`apply(input) → output`) and hold no pipeline state. They live *inside* transfers (`ConvertTransfer`, `TransformBridge`), not as standalone pipeline nodes. The transfer owns the behavioral contract; the operator owns the data transformation.         | `OperatorInterface`, `AsyncOperatorInterface`                                                |
+| **`destroy()` is universal**                    | Every resource has an explicit cleanup path — `destroy()` for transfers, bridges, and subscription managers; `stop()` for tickers; `unsubscribe()` for subscriptions. Builders track `owned` resources and clean them up in one `destroy()` call. No resource lacks a cleanup path. | `DisposableInterface`, all transfers, all bridges, builders; `TickerInterface.stop()`        |
+| **`undefined` never propagates**                | `undefined` means "no data," not "empty value." It is suppressed at `SubscriptionManager.sendState()` — subscribers are never notified with `undefined`. Use `null` for explicit empty markers.                                                                                     | `SubscriptionManager`, all transfers                                                         |
 
 > **Why these matter.** A new transfer, bridge, or operator that respects these invariants integrates without touching existing code — the architecture stays coherent as it grows.
 
@@ -1288,64 +1288,53 @@ import { linkTransfers } from 'transferum';
 const link = linkTransfers(source, asyncTarget, { onError: (e) => console.error(e) });
 ```
 
-### Linkers
+### Linking
 
-`LinkStrategyInterface` is a facade that unifies two forms of linking:
+`LinkStrategyInterface` is a lightweight facade for linking transfers:
 
 - **`link(lhs, rhs, options?)`** — directly connects an output transfer to an input transfer (same as `linkTransfers()`)
-- **`start(transfer)`** — creates a `CompositeTransferBuilder` with this linker injected, so every subsequent `to()` and `finish()` call uses the same linking strategy automatically
 
-`DefaultLinkStrategy` is the standard implementation: `link()` delegates to `linkTransfers()`, `start()` delegates to `CompositeTransferBuilder.start(transfer, this)`. It is the zero-config default — existing code works unchanged.
+`DefaultLinkStrategy` is the standard implementation: `link()` delegates to `linkTransfers()`. It is the zero-config default — existing code works unchanged.
 
 ```typescript
 import {
-  DefaultLinker,
+  DefaultLinkStrategy,
   createPushChannelTransfer,
   createSinkTransfer,
   createPushStoredChannelTransfer,
   createBufferTransfer,
 } from 'transferum';
 
-const linker = new DefaultLinker();
+const linkStrategy = new DefaultLinkStrategy();
 
 // Direct linking — equivalent to linkTransfers(source, target)
-const link = linker.link(source, target);
+const link = linkStrategy.link(source, target);
+```
 
-// Builder-based linking — linker is injected automatically
-const pipeline = linker
-  .start(createPushStoredChannelTransfer<number>())
+For builder-based pipelines, pass a link strategy to `CompositeTransferBuilder.start()`:
+
+```typescript
+import { CompositeTransferBuilder, DefaultLinkStrategy } from 'transferum';
+
+const linkStrategy = new DefaultLinkStrategy();
+const pipeline = CompositeTransferBuilder
+  .start(createPushStoredChannelTransfer<number>(), linkStrategy)
   .to(createBufferTransfer<number>())
   .finish(createSinkTransfer<number>({ callback: console.log }));
 
 pipeline.push(42); // → 42
 ```
 
-You can also inject a custom linker via `CompositeTransferBuilder.start(transfer, linker)`:
+Implement `LinkStrategyInterface` to customize linking behavior — e.g., logging every link, validating combinations, serializing links across a network, or wrapping `linkTransfers()` with additional error handling. The builder calls `linkStrategy.link()` for every `to()` and `finish()`, so a single strategy instance controls the entire pipeline's wiring.
 
 ```typescript
-import { CompositeTransferBuilder, DefaultLinker } from 'transferum';
-
-const linker = new DefaultLinker();
-const pipeline = CompositeTransferBuilder
-  .start(createPushStoredChannelTransfer<number>(), linker)
-  .to(createBufferTransfer<number>())
-  .finish(createSinkTransfer<number>({ callback: console.log }));
-```
-
-Implement `LinkStrategyInterface` to customize linking behavior — e.g., logging every link, validating combinations, serializing links across a network, or wrapping `linkTransfers()` with additional error handling. The builder calls `linker.link()` for every `to()` and `finish()`, so a single linker instance controls the entire pipeline's wiring.
-
-```typescript
-import type { LinkerInterface } from 'transferum';
+import type { LinkStrategyInterface } from 'transferum';
 import { linkTransfers, CompositeTransferBuilder } from 'transferum';
 
-class LoggingLinker implements LinkerInterface {
+class LoggingLinkStrategy implements LinkStrategyInterface {
   link(lhs, rhs, options?) {
     console.log(`Linking ${lhs.constructor.name} → ${rhs.constructor.name}`);
     return linkTransfers(lhs, rhs, options);
-  }
-
-  start(transfer) {
-    return CompositeTransferBuilder.start(transfer, this);
   }
 }
 ```
@@ -2570,7 +2559,7 @@ Bridges implement `BridgeInterface` (active/activate/deactivate/toggle/destroy) 
 
 > **Gate** — all bridges have an internal `GateTransfer` for flow control. `activate()` / `deactivate()` / `toggle()` delegate to the gate.
 > **Owned** — the `owned` parameter controls whether nested bridges are destroyed on `destroy()`.
-> **Linker** — `PassBridge`, `TransformBridge`, `TransferBridge`, and `AsyncTransformBridge` accept an optional `linker?: LinkerInterface` in their config. When provided, all internal links (source → gate → converter → target) are created via `linker.link()` instead of `linkTransfers()`. This allows custom linkers to control bridge-internal wiring consistently with `CompositeTransferBuilder`. See [Linkers](#linkers).
+> **Link Strategy** — `PassBridge`, `TransformBridge`, `TransferBridge`, and `AsyncTransformBridge` accept an optional `linkStrategy?: LinkStrategyInterface` in their config. When provided, all internal links (source → gate → converter → target) are created via `linkStrategy.link()` instead of `linkTransfers()`. This allows custom link strategies to control bridge-internal wiring consistently with `CompositeTransferBuilder`. See [Linking](#linking).
 > **onStateChange()** — all bridges support state change subscription via `onStateChange()`. In `PassBridge`, `TransformBridge`, `TransferBridge` the notification fires on `activate()` / `deactivate()` / `toggle()`. In `BridgeAggregator` — on direct state changes (does not listen to children). In `BridgeSelector` — on `_active` or `_selectedKey` changes (including `select()`). In `BridgeMultiSelector` — on `_active` or `_selectedKeys` changes (including `select()`, `check()`, `uncheck()`). When `syncWithChildren` is enabled, `BridgeSelector` and `BridgeMultiSelector` also fire `onStateChange()` when a child bridge's state changes externally — the selector reacts by updating its selection and notifying its own subscribers.
 
 **Comparison by flow structure:**
@@ -2729,7 +2718,7 @@ source.push(42); // → async transformation → "val_42" at target's subscriber
 
 ## Pipeline Builders
 
-Builders provide a fluent API for assembling transfer chains with automatic linking via `linkTransfers`. A custom [LinkerInterface](#linkers) can be injected into `start()` to override linking behavior for the entire chain.
+Builders provide a fluent API for assembling transfer chains with automatic linking via `linkTransfers`. A custom [LinkStrategyInterface](#linking) can be injected into `start()` to override linking behavior for the entire chain.
 
 ### [CompositeTransferBuilder](https://smoren.github.io/transferum-ts/classes/CompositeTransferBuilder.html)
 `CompositeTransferBuilder` is the unified, type-safe builder that replaces `InputPipelineBuilder`, `OutputPipelineBuilder`, `DuplexPipelineBuilder`, and all async variants. A single builder covers all pipeline directions.
@@ -2780,10 +2769,10 @@ duplex.destroy(); // destroys owned resources
 - Output flags (`Pullable`, `Subscribable`, `AsyncPullable`) are extracted from the **finish** transfer.
 - Triggerable, AsyncTriggerable, and Gate are inferred from explicit options or auto-extracted from the chain.
 
-**`start(startTransfer, linker?)`:**
+**`start(startTransfer, linkStrategy?)`:**
 ```typescript
-CompositeTransferBuilder.start(startTransfer, linker?)
-// linker?: LinkerInterface — custom linker for all to()/finish() calls
+CompositeTransferBuilder.start(startTransfer, linkStrategy?)
+// linkStrategy?: LinkStrategyInterface — custom link strategy for all to()/finish() calls
 //          if omitted, falls back to linkTransfers()
 ```
 
@@ -2831,21 +2820,21 @@ pipeline.push(42);
 pipeline.subscribe((data) => console.log(data)); // → "42"
 ```
 
-**Custom linker:** Pass a `LinkStrategyInterface` to `start()` to override linking for the entire chain. See [Linkers](#linkers).
+**Custom link strategy:** Pass a `LinkStrategyInterface` to `start()` to override linking for the entire chain. See [Linking](#linking).
 
 ```typescript
 import {
   CompositeTransferBuilder,
-  DefaultLinker,
+  DefaultLinkStrategy,
   createPushStoredChannelTransfer,
   createBufferTransfer,
   createSinkTransfer,
 } from 'transferum';
 
-const linker = new DefaultLinker();
+const linkStrategy = new DefaultLinkStrategy();
 
 const pipeline = CompositeTransferBuilder
-  .start(createPushStoredChannelTransfer<number>(), linker)
+  .start(createPushStoredChannelTransfer<number>(), linkStrategy)
   .to(createBufferTransfer<number>())
   .finish(createSinkTransfer<number>({ callback: console.log }));
 
@@ -2935,7 +2924,7 @@ Full list of factories:
 | Sink / Flow                 | `createSinkTransfer`, `createWriteTransfer`, `createReadTransfer`                                                                                      |
 | Transformation              | `createConvertTransfer`, `createConditionTransfer`, `createDisplaceTransfer`                                                                           |
 | Bridges                     | `createPassBridge`, `createTransformBridge`, `createTransferBridge`, `createBridgeAggregator`, `createBridgeSelector`, `createBridgeMultiSelector`     |
-| Linkers                     | `createDefaultLinkStrategy`                                                                                                                                  |
+| Linking                     | `createDefaultLinkStrategy`                                                                                                                            |
 | Operators                   | `createTransparentOperator`, `createMapOperator`, `createFilterOperator`, `createReducerOperator`, `createGuardOperator`, `createPipelineOperator`     |
 | Storages                    | `createLatestStorage`, `createQueueStorage`, `createStackStorage`                                                                                      |
 | Async adapters              | `createAsyncSinkTransfer`, `createAsyncWriteTransfer`, `createAsyncReadTransfer`                                                                       |
@@ -3002,7 +2991,7 @@ Key types are defined in `types.ts`:
 | `GateInterface`                                            | Flow control: `active`, `activate()`, `deactivate()`, `toggle()`, `onStateChange()`                       |
 | `SubscriberInterface`                                      | Subscription management: `active`, `unsubscribe()`, `onUnsubscribe()`, `offUnsubscribe()`                 |
 | `DisposableInterface`                                      | Resource cleanup: `destroy()`                                                                             |
-| `LinkStrategyInterface`                                          | Facade for linking transfers and building pipelines: `link()`, `start()`                                  |
+| `LinkStrategyInterface`                                          | Facade for linking transfers: `link()`                                                                  |
 | `InputTransfer<T>`                                         | `PushableTransferInterface \| PollingProxyTransferInterface \| GateTransferInterface`                     |
 | `OutputTransfer<T>`                                        | `PullableTransferInterface \| SubscribableTransferInterface \| GateTransferInterface`                     |
 | `DuplexTransfer<TIn, TOut>`                                | `InputTransfer<TIn> & OutputTransfer<TOut>`                                                               |
@@ -3054,9 +3043,9 @@ Configs are defined in `configs.ts`. All configs are types (not classes), passed
 | `ConvertTransferConfig<TIn, TOut>`    | `ConvertTransfer`            | `operator`                                                          |
 | `ConditionTransferConfig<T>`          | `ConditionTransfer`          | — (predicates are optional), `onAcceptError?`, `onEmitError?`       |
 | `CompositeTransferConfig<TIn, TOut>`  | `UniversalCompositeTransfer` | `input`, `output`                                                   |
-| `PassBridgeConfig<T>`                 | `PassBridge`                 | `source`, `target`, `activated`, `linker?`                          |
-| `TransformBridgeConfig<TIn, TOut>`    | `TransformBridge`            | `source`, `target`, `operator`, `activated`, `linker?`              |
-| `TransferBridgeConfig<TIn, TOut>`     | `TransferBridge`             | `source`, `target`, `middle`, `middleOwned`, `activated`, `linker?` |
+| `PassBridgeConfig<T>`                 | `PassBridge`                 | `source`, `target`, `activated`, `linkStrategy?`                          |
+| `TransformBridgeConfig<TIn, TOut>`    | `TransformBridge`            | `source`, `target`, `operator`, `activated`, `linkStrategy?`              |
+| `TransferBridgeConfig<TIn, TOut>`     | `TransferBridge`             | `source`, `target`, `middle`, `middleOwned`, `activated`, `linkStrategy?` |
 | `BridgeAggregatorConfig`              | `BridgeAggregator`           | `bridges`, `activated`, `owned`                                     |
 | `BridgeSelectorConfig<TMap>`          | `BridgeSelector`             | `bridges`, `initialKey`, `activated`, `owned`, `syncWithChildren?`  |
 | `BridgeMultiSelectorConfig<TMap>`     | `BridgeMultiSelector`        | `bridges`, `initialKeys`, `activated`, `owned`, `syncWithChildren?` |
@@ -3075,7 +3064,7 @@ Configs are defined in `configs.ts`. All configs are types (not classes), passed
 | `AsyncConvertTransferConfig<TIn, TOut>` | `AsyncConvertTransfer`             | `operator` (AsyncOperatorInterface), `onError?`, `maxConcurrency?`, `bufferSize?`, `onBufferOverflow?`                              |
 | `AsyncConditionTransferConfig<T>`       | `AsyncConditionTransfer`           | — (predicates are optional, sync or async), `onAcceptError?`, `onEmitError?`, `maxConcurrency?`, `bufferSize?`, `onBufferOverflow?` |
 | `AsyncStoredChannelTransferConfig<T>`   | `AsyncStoredChannelTransfer`       | `setup`, `destroy`, `onError?`, `onDestroyError?`                                                                                   |
-| `AsyncTransformBridgeConfig<TIn, TOut>` | `AsyncTransformBridge`             | `source`, `target`, `operator`, `activated`, `onError?`, `linker?`                                                                  |
+| `AsyncTransformBridgeConfig<TIn, TOut>` | `AsyncTransformBridge`             | `source`, `target`, `operator`, `activated`, `onError?`, `linkStrategy?`                                                      |
 | `LinkConfig<TTargetTransfer>`           | `linkTransfers` (async strategies) | `onError?`                                                                                                                          |
 
 All polling transfers support an optional `tickerFactory?: TickerFactory` to replace the default ticker (`RAFTicker.factory`).
