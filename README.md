@@ -43,7 +43,7 @@ Type-safe primitives — **transfers** (nodes), **bridges** (edges), **builders*
   - [Capability Flags System](#capability-flags-system)
   - [Transfers](#transfers)
   - [Linking Transfers](#linking-transfers)
-  - [Linking](#linking)
+  - [Linking Strategies](#linking-strategies)
   - [Undefined Behavior in Data Flows](#undefined-behavior-in-data-flows)
   - [Error Handling](#error-handling)
 - [Transfers](#transfers-1)
@@ -133,9 +133,9 @@ Transferum provides **composable, type-safe building blocks** with a uniform cap
 
 ```
 Transfer ──── Bridge ──── Transfer
-    \                      │
-     \                     │
-      ──────── Bridge ──── Transfer
+    \                        │
+     \                       │
+      ─────── Bridge ──── Transfer
 ```
 
 This is a graph.
@@ -1288,7 +1288,7 @@ import { linkTransfers } from 'transferum';
 const link = linkTransfers(source, asyncTarget, { onError: (e) => console.error(e) });
 ```
 
-### Linking
+### Linking Strategies
 
 `LinkStrategyInterface` is a strategy for linking transfers:
 
