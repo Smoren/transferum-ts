@@ -169,7 +169,7 @@ import {
 
 // Poll an API every 5 seconds, transform the response, update subscribers
 const polling = createAsyncPollingSourceTransfer<ServerState>({
-  fetcher: async (): ServerState => await fetchApi('/api/state'),
+  fetcher: async (): Promise<ServerState> => await fetchApi('/api/state'),
   interval: 5000,
   activated: true,
 });
@@ -243,6 +243,7 @@ const router = createBridgeSelector({
   bridges: { fast: fastBridge, slow: slowBridge },
   initialKey: 'fast',
   activated: true,
+  owned: false,
 });
 
 // Switch route at runtime
@@ -357,6 +358,7 @@ const gameplayRouter = createBridgeSelector({
   },
   initialKey: 'driving', // The player starts inside a car by default
   activated: true,
+  owned: true,
 });
 
 // Pipe data from the raw source to the converter (proper subscription without loops)
@@ -487,9 +489,9 @@ const tempMonitor = createAsyncPollingSourceTransfer<number>({
 
 const alertPipeline = CompositeTransferBuilder
   .start(tempMonitor)
-  .to(createConditionTransfer({ shouldAccept: (temp) => temp > TEMPERATURE_THRESHOLD }))
-  .to(createThrottleTransfer({ interval: 5000 }))
-  .finish(createConvertTransfer({ operator: createMapOperator((temp): Alert => ({ type: 'HIGH_TEMP', value: temp })) }));
+  .to(createConditionTransfer<number>({ shouldAccept: (temp) => temp > TEMPERATURE_THRESHOLD }))
+  .to(createThrottleTransfer<number>({ interval: 5000 }))
+  .finish(createConvertTransfer<number, Alert>({ operator: createMapOperator((temp): Alert => ({ type: 'HIGH_TEMP', value: temp })) }));
 
 alertPipeline.subscribe((alert) => sendNotification(alert));
 ```
@@ -1297,13 +1299,7 @@ const link = linkTransfers(source, asyncTarget, { onError: (e) => console.error(
 `DefaultLinkStrategy` is the standard implementation: `link()` inspects capability flags on both transfers and dispatches to the matching sync or async strategy. It is the zero-config default — existing code works unchanged.
 
 ```typescript
-import {
-  DefaultLinkStrategy,
-  createPushChannelTransfer,
-  createSinkTransfer,
-  createPushStoredChannelTransfer,
-  createBufferTransfer,
-} from 'transferum';
+import { DefaultLinkStrategy } from 'transferum';
 
 const linkStrategy = new DefaultLinkStrategy();
 
@@ -1314,7 +1310,10 @@ const link = linkStrategy.link(source, target);
 For builder-based pipelines, pass a link strategy to `CompositeTransferBuilder.start()`:
 
 ```typescript
-import { CompositeTransferBuilder, DefaultLinkStrategy } from 'transferum';
+import {
+  CompositeTransferBuilder, DefaultLinkStrategy, createPushStoredChannelTransfer,
+  createConditionTransfer, createSinkTransfer,
+} from 'transferum';
 
 const linkStrategy = new DefaultLinkStrategy();
 const pipeline = CompositeTransferBuilder
@@ -1328,11 +1327,15 @@ pipeline.push(42); // → 42
 Implement `LinkStrategyInterface` to customize linking behavior — e.g., logging every link, validating combinations, serializing links across a network, or wrapping `linkTransfers()` with additional error handling. The builder calls `linkStrategy.link()` for every `to()` and `finish()`, so a single strategy instance controls the entire pipeline's wiring.
 
 ```typescript
-import type { LinkStrategyInterface } from 'transferum';
-import { linkTransfers, CompositeTransferBuilder } from 'transferum';
+import type { InputTransfer, LinkConfig, LinkStrategyInterface, OutputTransfer, SubscriberInterface } from 'transferum';
+import { linkTransfers } from 'transferum';
 
 class LoggingLinkStrategy implements LinkStrategyInterface {
-  link(lhs, rhs, options?) {
+  link<T, RTransfer extends InputTransfer<T>>(
+    lhs: OutputTransfer<T>,
+    rhs: RTransfer,
+    options?: LinkConfig<RTransfer>,
+  ): SubscriberInterface {
     console.log(`Linking ${lhs.constructor.name} → ${rhs.constructor.name}`);
     return linkTransfers(lhs, rhs, options);
   }
@@ -1348,7 +1351,7 @@ This behavior is intentional: `undefined` means "no data" in the library, not "e
 ```typescript
 import { createPushStoredChannelTransfer } from 'transferum';
 
-const channel = createPushStoredChannelTransfer<string | null>({ initialValue: null });
+const channel = createPushStoredChannelTransfer<string | null | undefined>({ initialValue: null });
 
 channel.subscribe((data) => console.log(data));
 
@@ -1734,6 +1737,8 @@ polling.deactivate(); // stop polling
 **Error handling:** If `fetcher()` throws in `trigger()`, `onError` is called. With `onError` — suppressed, polling continues. Without `onError` (or if `onError` itself throws) — exception rethrown, ticker stops. If `fetcher()` throws in `pull()` — same logic, but the ticker is not affected (error propagates to caller).
 
 ```typescript
+import { createPollingSourceTransfer } from 'transferum';
+
 const polling = createPollingSourceTransfer<number>({
   fetcher: () => { throw new Error('fail'); },
   interval: 1000,
@@ -1971,24 +1976,37 @@ displace.push('world'); // displaces previous inner, creates new one
 The `onDisplace` callback receives the previous inner transfer typed as the exact type returned by `factory`, so to abort an in-flight request you need a custom inner transfer that exposes an `abort()` method (a plain `AsyncConvertTransfer` doesn't have one).
 
 ```typescript
-import {
-  createDisplaceTransfer, createAsyncConvertTransfer, createAsyncMapOperator,
-  type Transfer,
-} from 'transferum';
+import { Transfer, AsyncPushable, Subscribable, BaseTransfer } from 'transferum';
+import { createDisplaceTransfer, createAsyncConvertTransfer, createAsyncMapOperator } from 'transferum';
 
 // Custom inner transfer: wraps AsyncConvertTransfer and exposes abort()
-class FetchTransfer implements Transfer<string, SearchResult, [AsyncPushable, Subscribable]> {
+class FetchTransfer extends BaseTransfer implements Transfer<string, SearchResult, [AsyncPushable, Subscribable]> {
+  public readonly isInput = true;
+  public readonly isOutput = true;
+  public readonly isDuplex = true;
+
+  public readonly isAsyncPushable = true;
+  public readonly isSubscribable = true;
+
   private readonly _controller = new AbortController();
   private readonly _inner = createAsyncConvertTransfer<string, SearchResult>({
     operator: createAsyncMapOperator(async (query) => {
-      return await fetch(`/api/search?q=${query}`, { signal: this._controller.signal });
+      return (await fetch(`/api/search?q=${query}`, { signal: this._controller.signal })).json();
     }),
   });
 
-  abort() { this._controller.abort(); }
-  asyncPush(data: string) { return this._inner.asyncPush(data); }
-  subscribe(handler: (data: SearchResult) => void) { return this._inner.subscribe(handler); }
-  destroy() { this._inner.destroy(); }
+  abort() {
+    this._controller.abort();
+  }
+  asyncPush(data: string) {
+    return this._inner.asyncPush(data);
+  }
+  subscribe(handler: (data: SearchResult) => void) {
+    return this._inner.subscribe(handler);
+  }
+  destroy() {
+    this._inner.destroy();
+  }
   // ...delegate remaining capability flags/methods
 }
 
@@ -2020,11 +2038,7 @@ Universal composite transfer — combines an input and an output transfer into a
 3. `config.output` (if it has the corresponding flag)
 
 ```typescript
-import {
-  createPushStoredChannelTransfer,
-  DuplexPipelineBuilder,
-  UniversalCompositeTransfer,
-} from 'transferum';
+import { createPushStoredChannelTransfer, UniversalCompositeTransfer } from 'transferum';
 
 const transfer = createPushStoredChannelTransfer<number>();
 
@@ -2178,6 +2192,8 @@ polling.subscribe((data) => console.log(data));
 **Error handling:** If `fetcher()` throws in `asyncTrigger()`, `onError` is called. With `onError` — suppressed, polling continues. Without `onError` (or if it throws) — rejection rethrown, ticker stops, resulting in an **unhandled promise rejection** (ticker calls `asyncTrigger()` fire-and-forget). `asyncPull()` rethrows to caller without affecting the ticker.
 
 ```typescript
+import { createAsyncPollingSourceTransfer } from 'transferum';
+
 const polling = createAsyncPollingSourceTransfer<number>({
   fetcher: async () => { throw new Error('fail'); },
   interval: 1000,
@@ -2460,7 +2476,8 @@ interface TickerInterface {
 **Usage example:**
 
 ```typescript
-import { RAFTicker, IntervalTicker, type TickerFactory } from 'transferum';
+import type { TickerFactory } from 'transferum';
+import { RAFTicker, IntervalTicker } from 'transferum';
 
 // Browser ticker (default)
 const rafTicker = new RAFTicker({ callback: () => console.log('tick'), interval: 1000 });
@@ -2513,7 +2530,12 @@ The value (usually the owning object itself) is set once in the constructor and 
 Used to implement `GateInterface.onStateChange()` in all gate transfers and bridges.
 
 ```typescript
-import { StateSubscriptionManager, type GateInterface } from 'transferum';
+import type { GateInterface } from 'transferum';
+import { StateSubscriptionManager, createGateTransfer } from 'transferum';
+
+const gate = createGateTransfer({
+  activated: true;
+})
 
 const manager = new StateSubscriptionManager<GateInterface>(gate);
 
@@ -2622,14 +2644,15 @@ bridge.destroy(); // breaks all links
 import { createBridgeSelector, createPassBridge } from 'transferum';
 
 const bridges = {
-  fast: createPassBridge({ source, target1, activated: false }),
-  slow: createPassBridge({ source, target2, activated: false }),
+  fast: createPassBridge({ source, target: target1, activated: false }),
+  slow: createPassBridge({ source, target: target2, activated: false }),
 };
 
 const selector = createBridgeSelector({
   bridges,
   initialKey: 'fast',
   activated: true,
+  owned: false,
 });
 
 selector.select('slow'); // switch to the second bridge
@@ -2644,11 +2667,14 @@ selector.select('slow'); // switch to the second bridge
 This enables **bidirectional gate synchronization**: the selector controls its children, and the children can control the selector. An internal `_syncing` guard prevents feedback loops — when the selector itself activates/deactivates/selects, child state-change notifications are suppressed.
 
 ```typescript
+import { createBridgeSelector } from 'transferum';
+
 const selector = createBridgeSelector({
   bridges,
   initialKey: 'fast',
   activated: true,
   syncWithChildren: true,
+  owned: false,
 });
 
 // External activation of 'slow' bridge → selector automatically switches to 'slow'
@@ -2664,6 +2690,7 @@ const selector = createBridgeMultiSelector({
   bridges,
   initialKeys: ['fast'],
   activated: true,
+  owned: false,
 });
 
 selector.check('slow');   // adds bridge to active
@@ -2679,11 +2706,14 @@ selector.uncheck('fast'); // removes bridge from active
 This enables **bidirectional gate synchronization**: the selector controls its children, and the children can control the selector. An internal `_syncing` guard prevents feedback loops — when the selector itself activates/deactivates/selects/checks/unchecks, child state-change notifications are suppressed.
 
 ```typescript
+import { createBridgeMultiSelector } from 'transferum';
+
 const selector = createBridgeMultiSelector({
   bridges,
   initialKeys: ['fast'],
   activated: true,
   syncWithChildren: true,
+  owned: false,
 });
 
 // External activation of 'slow' bridge → selector automatically adds it to selection
@@ -2810,12 +2840,8 @@ const pipeline = CompositeTransferBuilder
   .start(createPushStoredChannelTransfer<number>())
   .to(createAsyncConvertTransfer<number, string>({
     operator: createAsyncMapOperator(async (n) => n.toString()),
-    onLinkError: (e) => console.error(e),
-  }))
-  .finish(createPushStoredChannelTransfer<string>(), {
-    owned: true,
-    onLinkError: (e) => console.error(e),
-  });
+  }), { onLinkError: (e) => console.error(e) })
+  .finish(createPushStoredChannelTransfer<string>(), { owned: true, onLinkError: (e) => console.error(e) });
 
 pipeline.push(42);
 pipeline.subscribe((data) => console.log(data)); // → "42"
