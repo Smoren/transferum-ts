@@ -296,7 +296,7 @@ export class CompositeTransferBuilder<
    * If it is also an InputTransfer (duplex), its input flags become the composite's input flags.
    *
    * If a link strategy is provided, all subsequent `to()` and `finish()` calls will use it
-   * for linking. If omitted, linking falls back to `linkTransfers()` from `utils.ts`.
+   * for linking. If omitted, linking falls back to `DefaultLinkStrategy` (which delegates to `linkTransfers()`).
    *
    * @typeParam TStartTransfer — type of the initial transfer (must be OutputTransfer)
    * @param startTransfer — initial output transfer
