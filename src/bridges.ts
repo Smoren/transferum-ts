@@ -25,7 +25,7 @@ import type {
   AsyncTransformBridgeConfig,
 } from "./configs";
 import { ConvertTransfer, GateTransfer, AsyncConvertTransfer } from "./transfers";
-import { linkTransfers } from "./utils";
+import { DefaultLinker, linkTransfers } from "./linkers";
 import { StateSubscriptionManager } from "./helpers";
 
 /**
@@ -38,7 +38,7 @@ export class PassBridge<T> implements BridgeInterface {
   protected readonly _target: InputTransfer<T>;
   protected readonly _gate: GateTransferInterface<T>;
   protected readonly _gateState: StateSubscriptionManager<GateInterface>;
-  protected readonly _linker?: LinkerInterface;
+  protected readonly _linker: LinkerInterface;
   protected _subscribers: SubscriberInterface[];
 
   constructor(config: PassBridgeConfig<T>) {
@@ -46,11 +46,11 @@ export class PassBridge<T> implements BridgeInterface {
     this._target = config.target;
     this._gate = new GateTransfer<T>(config);
     this._gateState = new StateSubscriptionManager<GateInterface>(this);
-    this._linker = config.linker;
+    this._linker = config.linker ?? new DefaultLinker();
 
     this._subscribers = [
-      this._link(this._source, this._gate),
-      this._link(this._gate, this._target),
+      this._linker.link(this._source, this._gate),
+      this._linker.link(this._gate, this._target),
     ];
   }
 
@@ -84,16 +84,6 @@ export class PassBridge<T> implements BridgeInterface {
     this._gateState.destroy();
     this._gate.destroy();
   }
-
-  protected _link<TL, RTransfer extends InputTransfer<TL>>(
-    lhs: OutputTransfer<TL>,
-    rhs: RTransfer,
-  ): SubscriberInterface {
-    if (this._linker !== undefined) {
-      return this._linker.link(lhs, rhs);
-    }
-    return linkTransfers(lhs, rhs);
-  }
 }
 
 /**
@@ -107,7 +97,7 @@ export class TransformBridge<TInput, TOutput> implements BridgeInterface {
   protected readonly _converter: ConvertTransfer<TInput, TOutput>;
   protected readonly _gate: GateTransferInterface<TInput>;
   protected readonly _gateState: StateSubscriptionManager<GateInterface>;
-  protected readonly _linker?: LinkerInterface;
+  protected readonly _linker: LinkerInterface;
   protected _subscribers: SubscriberInterface[];
 
   constructor(config: TransformBridgeConfig<TInput, TOutput>) {
@@ -116,12 +106,12 @@ export class TransformBridge<TInput, TOutput> implements BridgeInterface {
     this._converter = new ConvertTransfer<TInput, TOutput>(config);
     this._gate = new GateTransfer<TInput>(config);
     this._gateState = new StateSubscriptionManager<GateInterface>(this);
-    this._linker = config.linker;
+    this._linker = config.linker ?? new DefaultLinker();
 
     this._subscribers = [
-      this._link(this._source, this._gate),
-      this._link(this._gate, this._converter),
-      this._link(this._converter, this._target),
+      this._linker.link(this._source, this._gate),
+      this._linker.link(this._gate, this._converter),
+      this._linker.link(this._converter, this._target),
     ];
   }
 
@@ -156,16 +146,6 @@ export class TransformBridge<TInput, TOutput> implements BridgeInterface {
     this._gateState.destroy();
     this._gate.destroy();
   }
-
-  protected _link<TL, RTransfer extends InputTransfer<TL>>(
-    lhs: OutputTransfer<TL>,
-    rhs: RTransfer,
-  ): SubscriberInterface {
-    if (this._linker !== undefined) {
-      return this._linker.link(lhs, rhs);
-    }
-    return linkTransfers(lhs, rhs);
-  }
 }
 
 /**
@@ -180,7 +160,7 @@ export class TransferBridge<TInput, TOutput> implements BridgeInterface {
   protected readonly _gate: GateTransferInterface<TInput>;
   protected readonly _gateState: StateSubscriptionManager<GateInterface>;
   protected readonly _middleOwned: boolean;
-  protected readonly _linker?: LinkerInterface;
+  protected readonly _linker: LinkerInterface;
   protected _subscribers: SubscriberInterface[];
 
   constructor(config: TransferBridgeConfig<TInput, TOutput>) {
@@ -190,12 +170,12 @@ export class TransferBridge<TInput, TOutput> implements BridgeInterface {
     this._middleOwned = config.middleOwned;
     this._gate = new GateTransfer(config);
     this._gateState = new StateSubscriptionManager<GateInterface>(this);
-    this._linker = config.linker;
+    this._linker = config.linker ?? new DefaultLinker();
 
     this._subscribers = [
-      this._link(this._source, this._gate),
-      this._link(this._gate, this._middle),
-      this._link(this._middle, this._target),
+      this._linker.link(this._source, this._gate),
+      this._linker.link(this._gate, this._middle),
+      this._linker.link(this._middle, this._target),
     ];
   }
 
@@ -233,16 +213,6 @@ export class TransferBridge<TInput, TOutput> implements BridgeInterface {
     this._gateState.destroy();
     this._gate.destroy();
   }
-
-  protected _link<TL, RTransfer extends InputTransfer<TL>>(
-    lhs: OutputTransfer<TL>,
-    rhs: RTransfer,
-  ): SubscriberInterface {
-    if (this._linker !== undefined) {
-      return this._linker.link(lhs, rhs);
-    }
-    return linkTransfers(lhs, rhs);
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -273,7 +243,7 @@ export class AsyncTransformBridge<TInput, TOutput> implements BridgeInterface {
   protected readonly _converter: AsyncConvertTransfer<TInput, TOutput>;
   protected readonly _gate: GateTransferInterface<TInput>;
   protected readonly _gateState: StateSubscriptionManager<GateInterface>;
-  protected readonly _linker?: LinkerInterface;
+  protected readonly _linker: LinkerInterface;
   protected _subscribers: SubscriberInterface[];
 
   constructor(config: AsyncTransformBridgeConfig<TInput, TOutput>) {
@@ -282,23 +252,13 @@ export class AsyncTransformBridge<TInput, TOutput> implements BridgeInterface {
     this._converter = new AsyncConvertTransfer<TInput, TOutput>(config);
     this._gate = new GateTransfer<TInput>(config);
     this._gateState = new StateSubscriptionManager<GateInterface>(this);
-    this._linker = config.linker;
+    this._linker = config.linker ?? new DefaultLinker();
 
     this._subscribers = [
-      this._link(this._source, this._gate),
-      this._link(this._gate, this._converter),
-      this._link(this._converter, this._target),
+      this._linker.link(this._source, this._gate),
+      this._linker.link(this._gate, this._converter),
+      this._linker.link(this._converter, this._target),
     ];
-  }
-
-  protected _link<TL, RTransfer extends InputTransfer<TL>>(
-    lhs: OutputTransfer<TL>,
-    rhs: RTransfer,
-  ): SubscriberInterface {
-    if (this._linker !== undefined) {
-      return this._linker.link(lhs, rhs);
-    }
-    return linkTransfers(lhs, rhs);
   }
 
   public get active(): boolean {

@@ -9,7 +9,6 @@ import type {
   AsyncTriggerableInterface,
   AsyncOperatorInterface,
   LinkerInterface,
-  SubscriberInterface,
   InputPipelineBuilderInterface,
   OutputPipelineBuilderInterface,
   DuplexPipelineBuilderInterface,
@@ -35,7 +34,7 @@ import type { LinkConfig } from "./configs";
 import { PipelineOperator, AsyncPipelineOperator } from "./operators";
 import { DisposableSubscriberAdapter } from "./helpers";
 import { UniversalCompositeTransfer } from "./transfers";
-import { linkTransfers } from "./utils";
+import { DefaultLinker, linkTransfers } from "./linkers";
 
 // ═══════════════════════════════════════════════════════════════
 // OperatorPipelineBuilder
@@ -277,7 +276,7 @@ export class CompositeTransferBuilder<
   private readonly _startTransfer: TStartTransfer;
   private readonly _currentTransfer: DuplexTransfer<unknown, TCurrent>;
   private readonly _ownedResources: DisposableInterface[];
-  private readonly _linker?: LinkerInterface;
+  private readonly _linker: LinkerInterface;
 
   private constructor(
     startTransfer: TStartTransfer,
@@ -288,7 +287,7 @@ export class CompositeTransferBuilder<
     this._startTransfer = startTransfer;
     this._currentTransfer = currentTransfer;
     this._ownedResources = ownedResources;
-    this._linker = linker;
+    this._linker = linker ?? new DefaultLinker();
   }
 
   /**
@@ -346,7 +345,7 @@ export class CompositeTransferBuilder<
       ? { onError: options.onLinkError }
       : undefined;
 
-    const subscriber = this._link(this._currentTransfer, nextTransfer, linkConfig);
+    const subscriber = this._linker.link(this._currentTransfer, nextTransfer, linkConfig);
     const nextOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
 
     if (options?.owned) {
@@ -411,7 +410,7 @@ export class CompositeTransferBuilder<
       ? { onError: options.onLinkError }
       : undefined;
 
-    const subscriber = this._link(this._currentTransfer, lastTransfer, linkConfig);
+    const subscriber = this._linker.link(this._currentTransfer, lastTransfer, linkConfig);
     const finalOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
 
     if (options?.owned) {
@@ -439,28 +438,6 @@ export class CompositeTransferBuilder<
       TAsyncTriggerable,
       TGate
     >;
-  }
-
-  /**
-   * Links two transfers using the injected linker, or falls back to
-   * `linkTransfers()` when no linker was provided to `start()`.
-   *
-   * @typeParam T — data type flowing through the link
-   * @typeParam RTransfer — type of the input transfer (RHS)
-   * @param lhs — output transfer (source)
-   * @param rhs — input transfer (sink)
-   * @param options — optional link config
-   * @returns SubscriberInterface for breaking the link
-   */
-  private _link<T, RTransfer extends InputTransfer<T>>(
-    lhs: OutputTransfer<T>,
-    rhs: RTransfer,
-    options?: LinkConfig<RTransfer>,
-  ): SubscriberInterface {
-    if (this._linker !== undefined) {
-      return this._linker.link(lhs, rhs, options);
-    }
-    return linkTransfers(lhs, rhs, options);
   }
 }
 

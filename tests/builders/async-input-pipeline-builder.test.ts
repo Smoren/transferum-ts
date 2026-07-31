@@ -1,8 +1,8 @@
 import {
-  AsyncInputPipelineBuilder,
   PushStoredChannelTransfer,
   GateTransfer,
   AsyncPollingSourceTransfer,
+  AsyncInputPipelineBuilder,
 } from '../../src';
 import { describe, expect, it, jest } from '@jest/globals';
 
