@@ -1,6 +1,5 @@
 import type {
-  CompositeTransferBuilderInterface,
-  LinkerInterface,
+  LinkStrategyInterface,
   SubscriberInterface,
 } from "./interfaces";
 import type {
@@ -12,36 +11,26 @@ import type {
   Pushable,
   Subscribable,
 } from "./types";
-import type { ErrorHandler, InputTransfer, OutputTransfer, OutputTransferDataType } from "./types";
+import type { ErrorHandler, InputTransfer, OutputTransfer } from "./types";
 import type { LinkConfig } from "./configs";
-import { CompositeTransferBuilder } from "./builders";
 import { Subscriber } from "./helpers";
 import { handleError } from "./utils";
 
 /**
- * Default implementation of {@link LinkerInterface}.
+ * Default implementation of {@link LinkStrategyInterface}.
  *
  * Provides the standard linking behavior:
  * - `link()` delegates to {@link linkTransfers} from `utils.ts`
- * - `start()` creates a {@link CompositeTransferBuilder} with `this` injected as the linker
  *
  * @example
  * ```typescript
- * const linker = new DefaultLinker();
- *
- * // Direct linking
- * const subscriber = linker.link(source, target);
- *
- * // Builder-based linking
- * const pipeline = linker
- *   .start(source)
- *   .to(intermediate)
- *   .finish(sink);
+ * const linkStrategy = new DefaultLinkStrategy();
+ * const subscriber = linkStrategy.link(source, target);
  * ```
  *
- * @category Linkers
+ * @category Linking
  */
-export class DefaultLinker implements LinkerInterface {
+export class DefaultLinkStrategy implements LinkStrategyInterface {
   /**
    * Links an output transfer to an input transfer via {@link linkTransfers}.
    *
@@ -57,20 +46,7 @@ export class DefaultLinker implements LinkerInterface {
     rhs: RTransfer,
     options?: LinkConfig<RTransfer>,
   ): SubscriberInterface {
-    // TODO implement abstract BaseLinker with protected methods, use here.
     return linkTransfers(lhs, rhs, options);
-  }
-
-  /**
-   * Creates a {@link CompositeTransferBuilder} with this linker injected,
-   * so that every `to()` and `finish()` call uses this linker's `link()` method.
-   *
-   * @typeParam TStartTransfer — type of the initial transfer (must be OutputTransfer)
-   * @param startTransfer — initial output transfer
-   * @returns A new CompositeTransferBuilder instance with this linker injected
-   */
-  public start<TStartTransfer extends OutputTransfer<unknown>>(startTransfer: TStartTransfer): CompositeTransferBuilderInterface<OutputTransferDataType<TStartTransfer>, TStartTransfer> {
-    return CompositeTransferBuilder.start(startTransfer, this);
   }
 }
 
@@ -123,7 +99,7 @@ export class DefaultLinker implements LinkerInterface {
  * @see {@link linkPullableToAsyncPollingProxy} — Case 6
  * @see {@link linkSubscribableToAsyncPollingProxy} — Case 7
  *
- * @category Utilities
+ * @category Linking
  */
 export function linkTransfers<T, RTransfer extends InputTransfer<T>>(
   lhs: OutputTransfer<T>,

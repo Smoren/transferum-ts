@@ -8,7 +8,7 @@ import type {
   SubscribableTransferInterface,
   DisposableInterface,
   GateInterface,
-  LinkerInterface,
+  LinkStrategyInterface,
   AsyncInputFlowInterface,
   AsyncOutputFlowInterface,
   AsyncOperatorInterface,
@@ -392,7 +392,7 @@ export type PassBridgeConfig<T> = {
   readonly source: OutputTransfer<T>;
   readonly target: InputTransfer<T>;
   readonly activated: boolean;
-  readonly linker?: LinkerInterface;
+  readonly linkStrategy?: LinkStrategyInterface;
 }
 
 /**
@@ -404,7 +404,7 @@ export type TransformBridgeConfig<TInput, TOutput> = {
   readonly target: InputTransfer<TOutput>;
   readonly operator: OperatorInterface<TInput, TOutput>;
   readonly activated: boolean;
-  readonly linker?: LinkerInterface;
+  readonly linkStrategy?: LinkStrategyInterface;
 }
 
 /**
@@ -417,7 +417,7 @@ export type TransferBridgeConfig<TInput, TOutput> = {
   readonly middle: DuplexTransfer<TInput, TOutput>;
   readonly middleOwned: boolean;
   readonly activated: boolean;
-  readonly linker?: LinkerInterface;
+  readonly linkStrategy?: LinkStrategyInterface;
 }
 
 /**
@@ -463,7 +463,7 @@ export type AsyncTransformBridgeConfig<TInput, TOutput> = ErrorHandlingConfig<As
   readonly target: InputTransfer<TOutput>;
   readonly operator: AsyncOperatorInterface<TInput, TOutput | undefined>;
   readonly activated: boolean;
-  readonly linker?: LinkerInterface;
+  readonly linkStrategy?: LinkStrategyInterface;
 }
 
 /**

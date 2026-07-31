@@ -4,7 +4,7 @@ export * from './transfers';
 export * from './operators';
 export * from './storages';
 export * from './builders';
-export * from './linkers';
+export * from './linking';
 export * from './tickers';
 export * from './helpers';
 export * from './utils';

@@ -8,7 +8,7 @@ import type {
   AsyncOperatorPipelineBuilderInterface,
   AsyncTriggerableInterface,
   AsyncOperatorInterface,
-  LinkerInterface,
+  LinkStrategyInterface,
   InputPipelineBuilderInterface,
   OutputPipelineBuilderInterface,
   DuplexPipelineBuilderInterface,
@@ -34,7 +34,7 @@ import type { LinkConfig } from "./configs";
 import { PipelineOperator, AsyncPipelineOperator } from "./operators";
 import { DisposableSubscriberAdapter } from "./helpers";
 import { UniversalCompositeTransfer } from "./transfers";
-import { DefaultLinker, linkTransfers } from "./linkers";
+import { DefaultLinkStrategy, linkTransfers } from "./linking";
 
 // ═══════════════════════════════════════════════════════════════
 // OperatorPipelineBuilder
@@ -240,8 +240,8 @@ export class AsyncOperatorPipelineBuilder<TFlow extends readonly unknown[]> impl
  * Sync and async are unified: `onLinkError` in finish() options enables async error
  * handling when the chain contains async transfers.
  *
- * Linking is performed via a {@link LinkerInterface} (defaults to `linkTransfers()`
- * when no linker is provided). Pass a custom linker to `start()` to override
+ * Linking is performed via a {@link LinkStrategyInterface} (defaults to `linkTransfers()`
+ * when no link strategy is provided). Pass a custom link strategy to `start()` to override
  * linking behavior for the entire chain.
  *
  * @example
@@ -256,11 +256,10 @@ export class AsyncOperatorPipelineBuilder<TFlow extends readonly unknown[]> impl
  * composite.destroy();
  * ```
  *
- * @example Using a custom linker
  * ```typescript
- * const linker = new DefaultLinker();
- * const composite = linker
- *   .start(new PushStoredChannelTransfer<number>())
+ * const linkStrategy = new DefaultLinkStrategy();
+ * const composite = CompositeTransferBuilder
+ *   .start(new PushStoredChannelTransfer<number>(), linkStrategy)
  *   .to(new BufferTransfer<number>())
  *   .finish(new SinkTransfer<number>({ callback: console.log }));
  * ```
@@ -276,18 +275,18 @@ export class CompositeTransferBuilder<
   private readonly _startTransfer: TStartTransfer;
   private readonly _currentTransfer: DuplexTransfer<unknown, TCurrent>;
   private readonly _ownedResources: DisposableInterface[];
-  private readonly _linker: LinkerInterface;
+  private readonly _linkStrategy: LinkStrategyInterface;
 
   private constructor(
     startTransfer: TStartTransfer,
     currentTransfer: DuplexTransfer<unknown, TCurrent>,
     ownedResources: DisposableInterface[] = [],
-    linker?: LinkerInterface,
+    linkStrategy?: LinkStrategyInterface,
   ) {
     this._startTransfer = startTransfer;
     this._currentTransfer = currentTransfer;
     this._ownedResources = ownedResources;
-    this._linker = linker ?? new DefaultLinker();
+    this._linkStrategy = linkStrategy ?? new DefaultLinkStrategy();
   }
 
   /**
@@ -296,32 +295,31 @@ export class CompositeTransferBuilder<
    * The start transfer provides the output capabilities that feed data into the chain.
    * If it is also an InputTransfer (duplex), its input flags become the composite's input flags.
    *
-   * If a linker is provided, all subsequent `to()` and `finish()` calls will use it
+   * If a link strategy is provided, all subsequent `to()` and `finish()` calls will use it
    * for linking. If omitted, linking falls back to `linkTransfers()` from `utils.ts`.
    *
    * @typeParam TStartTransfer — type of the initial transfer (must be OutputTransfer)
    * @param startTransfer — initial output transfer
-   * @param linker — optional linker for custom linking behavior
+   * @param linkStrategy — optional link strategy for custom linking behavior
    * @returns A new CompositeTransferBuilder instance
    */
   public static start<TStartTransfer extends OutputTransfer<unknown>>(
     startTransfer: TStartTransfer,
-    linker?: LinkerInterface,
+    linkStrategy?: LinkStrategyInterface,
   ): CompositeTransferBuilderInterface<OutputTransferDataType<TStartTransfer>, TStartTransfer> {
     return new CompositeTransferBuilder<OutputTransferDataType<TStartTransfer>, TStartTransfer>(
       startTransfer,
       startTransfer as DuplexTransfer<unknown, any>,
       [],
-      linker,
+      linkStrategy,
     );
   }
 
   /**
    * Adds an intermediate duplex transfer to the chain.
    *
-   * Links the current transfer to nextTransfer via the linker (or `linkTransfers()`
-   * if no linker was provided to `start()`), then returns a new builder with the
-   * next transfer's output data type as the current type.
+   * Links the current transfer to nextTransfer via the link strategy,
+   * then returns a new builder with the next transfer's output data type as the current type.
    *
    * Options:
    * - owned — if true, nextTransfer will be destroyed on composite destroy()
@@ -345,7 +343,7 @@ export class CompositeTransferBuilder<
       ? { onError: options.onLinkError }
       : undefined;
 
-    const subscriber = this._linker.link(this._currentTransfer, nextTransfer, linkConfig);
+    const subscriber = this._linkStrategy.link(this._currentTransfer, nextTransfer, linkConfig);
     const nextOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
 
     if (options?.owned) {
@@ -356,15 +354,14 @@ export class CompositeTransferBuilder<
       this._startTransfer,
       nextTransfer as DuplexTransfer<unknown, OutputTransferDataType<TNextTransfer>>,
       nextOwnedResources,
-      this._linker,
+      this._linkStrategy,
     );
   }
 
   /**
    * Completes the chain construction and creates a composite transfer.
    *
-   * Links the current transfer to lastTransfer via the linker (or `linkTransfers()`
-   * if no linker was provided to `start()`), creates a UniversalCompositeTransfer
+   * Links the current transfer to lastTransfer via the link strategy, creates a UniversalCompositeTransfer
    * with input = startTransfer, output = lastTransfer, and returns it typed as
    * CompositeTransfer with flags computed from start and finish transfers.
    *
@@ -410,7 +407,7 @@ export class CompositeTransferBuilder<
       ? { onError: options.onLinkError }
       : undefined;
 
-    const subscriber = this._linker.link(this._currentTransfer, lastTransfer, linkConfig);
+    const subscriber = this._linkStrategy.link(this._currentTransfer, lastTransfer, linkConfig);
     const finalOwnedResources = [new DisposableSubscriberAdapter(subscriber), ...this._ownedResources];
 
     if (options?.owned) {
