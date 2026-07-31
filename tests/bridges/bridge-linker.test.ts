@@ -2,7 +2,7 @@ import type {
   OutputTransfer,
   OutputTransferDataType,
   CompositeTransferBuilderInterface,
-  LinkerInterface,
+  LinkStrategyInterface,
   SubscriberInterface,
 } from '../../src';
 import {
@@ -21,7 +21,7 @@ import { describe, expect, it } from '@jest/globals';
  * Custom linker that wraps linkTransfers and records every call.
  * Used to verify that bridges delegate to the injected linker.
  */
-class TrackingLinker implements LinkerInterface {
+class TrackingLinker implements LinkStrategyInterface {
   public calls: Array<{ lhs: string; rhs: string }> = [];
 
   link<T, RTransfer extends { constructor: { name: string } }>(
@@ -57,7 +57,7 @@ describe('PassBridge with custom linker', () => {
       source,
       target,
       activated: true,
-      linker,
+      linkStrategy: linker,
     });
 
     // PassBridge wires: source → gate, gate → target
@@ -107,7 +107,7 @@ describe('TransformBridge with custom linker', () => {
       target,
       operator: new MapOperator<number, string>((n) => n.toString()),
       activated: true,
-      linker,
+      linkStrategy: linker,
     });
 
     // TransformBridge wires: source → gate, gate → converter, converter → target
@@ -140,7 +140,7 @@ describe('TransferBridge with custom linker', () => {
       middle,
       middleOwned: false,
       activated: true,
-      linker,
+      linkStrategy: linker,
     });
 
     // TransferBridge wires: source → gate, gate → middle, middle → target
@@ -171,7 +171,7 @@ describe('AsyncTransformBridge with custom linker', () => {
       target,
       operator: new AsyncMapOperator<number, string>(async (n) => n.toString()),
       activated: true,
-      linker,
+      linkStrategy: linker,
     });
 
     // AsyncTransformBridge wires: source → gate, gate → converter, converter → target

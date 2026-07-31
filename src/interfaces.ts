@@ -537,32 +537,21 @@ export interface BridgeMultiSelectorInterface<TMap extends Record<BaseSelectorKe
 /**
  * Facade for linking transfers and building composite pipelines.
  *
- * A linker provides two complementary forms of linking:
+ * A link strategy two complementary forms of linking:
  * - `link()` — directly connects an output transfer to an input transfer
- * - `start()` — creates a {@link CompositeTransferBuilderInterface} with this linker
- *   injected, so that every subsequent `to()` and `finish()` call uses the same
- *   linking strategy automatically
  *
  * Implementations can override either method to customize linking behavior
  * (e.g., logging, serialization, custom error handling for unsupported combinations).
  *
  * @example
  * ```typescript
- * const linker = new DefaultLinker();
- *
- * // Direct linking
- * linker.link(source, target);
- *
- * // Builder-based linking — linker is injected automatically
- * const pipeline = linker
- *   .start(source)
- *   .to(intermediate)
- *   .finish(sink);
+ * const linkStrategy = new DefaultLinker();
+ * linkStrategy.link(source, target);
  * ```
  *
  * @category Interfaces
  */
-export interface LinkerInterface {
+export interface LinkStrategyInterface {
   /**
    * Links an output transfer (LHS) to an input transfer (RHS).
    *
@@ -581,21 +570,6 @@ export interface LinkerInterface {
     rhs: RTransfer,
     options?: LinkConfig<RTransfer>,
   ): SubscriberInterface;
-
-  /**
-   * Creates a {@link CompositeTransferBuilderInterface} with this linker injected.
-   *
-   * Every `to()` and `finish()` call on the resulting builder will use this
-   * linker's `link()` method, ensuring consistent linking behavior throughout
-   * the pipeline.
-   *
-   * @typeParam TStartTransfer — type of the initial transfer (must be OutputTransfer)
-   * @param startTransfer — initial output transfer
-   * @returns A new CompositeTransferBuilder instance with this linker injected
-   */
-  start<TStartTransfer extends OutputTransfer<unknown>>(
-    startTransfer: TStartTransfer,
-  ): CompositeTransferBuilderInterface<OutputTransferDataType<TStartTransfer>, TStartTransfer>;
 }
 
 // ═══════════════════════════════════════════════════════════════
