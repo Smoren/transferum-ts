@@ -255,7 +255,7 @@ export interface UniversalDuplexInterface<TInput, TOutput> extends
  * Contract of capability flags — boolean properties that determine which interfaces and methods a transfer supports.
  * @category Interfaces
  */
-interface CommunicationContractInterface {
+export interface CommunicationContractInterface {
   // Direction and nature of the flow
   readonly isInput: boolean;        // can act as an input
   readonly isOutput: boolean;       // can act as an output
@@ -535,17 +535,17 @@ export interface BridgeMultiSelectorInterface<TMap extends Record<BaseSelectorKe
 }
 
 /**
- * Facade for linking transfers and building composite pipelines.
+ * Strategy interface for linking transfers.
  *
- * A link strategy two complementary forms of linking:
- * - `link()` — directly connects an output transfer to an input transfer
+ * A link strategy provides a single method:
+ * - `link()` — connects an output transfer to an input transfer based on their capability flags
  *
- * Implementations can override either method to customize linking behavior
+ * Implementations can override the method to customize linking behavior
  * (e.g., logging, serialization, custom error handling for unsupported combinations).
  *
  * @example
  * ```typescript
- * const linkStrategy = new DefaultLinker();
+ * const linkStrategy = new DefaultLinkStrategy();
  * linkStrategy.link(source, target);
  * ```
  *

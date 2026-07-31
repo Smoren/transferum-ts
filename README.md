@@ -1243,7 +1243,7 @@ UniversalCompositeTransfer (separate hierarchy, composition of input + output)
 
 ### Linking Transfers
 
-The `linkTransfers(lhs, rhs)` function connects an output transfer (LHS) to an input transfer (RHS), selecting a strategy based on flags:
+The `linkTransfers(lhs, rhs)` function connects an output transfer (LHS) to an input transfer (RHS). It delegates to `DefaultLinkStrategy.link()`, selecting a strategy based on flags:
 
 | LHS                              | RHS                              | Strategy                                                           |
 |----------------------------------|----------------------------------|--------------------------------------------------------------------|
@@ -1290,11 +1290,11 @@ const link = linkTransfers(source, asyncTarget, { onError: (e) => console.error(
 
 ### Linking
 
-`LinkStrategyInterface` is a lightweight facade for linking transfers:
+`LinkStrategyInterface` is a strategy for linking transfers:
 
 - **`link(lhs, rhs, options?)`** — directly connects an output transfer to an input transfer (same as `linkTransfers()`)
 
-`DefaultLinkStrategy` is the standard implementation: `link()` delegates to `linkTransfers()`. It is the zero-config default — existing code works unchanged.
+`DefaultLinkStrategy` is the standard implementation: `link()` inspects capability flags on both transfers and dispatches to the matching sync or async strategy. It is the zero-config default — existing code works unchanged.
 
 ```typescript
 import {

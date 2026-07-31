@@ -240,9 +240,9 @@ export class AsyncOperatorPipelineBuilder<TFlow extends readonly unknown[]> impl
  * Sync and async are unified: `onLinkError` in finish() options enables async error
  * handling when the chain contains async transfers.
  *
- * Linking is performed via a {@link LinkStrategyInterface} (defaults to `linkTransfers()`
- * when no link strategy is provided). Pass a custom link strategy to `start()` to override
- * linking behavior for the entire chain.
+ * Linking is performed via a {@link LinkStrategyInterface} (defaults to
+ * {@link DefaultLinkStrategy} when no link strategy is provided). Pass a custom
+ * link strategy to `start()` to override linking behavior for the entire chain.
  *
  * @example
  * ```typescript
