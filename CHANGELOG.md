@@ -46,7 +46,7 @@
 * **New test suite `tests/linkers/default-linker.test.ts`** (549 lines) — covers all 7 linking strategies (Subscribable → Pushable, Pullable → PollingProxy, Subscribable → PollingProxy, Subscribable → AsyncPushable, AsyncPullable → AsyncPollingProxy, Pullable → AsyncPollingProxy, Subscribable → AsyncPollingProxy), error cases (AsyncPullable → sync PollingProxy, Pullable → Pushable, unsupported combinations), lifecycle (active/inactive, unsubscribe stops data flow), and multiple independent links.
 * **New test suite `tests/bridges/bridge-linker.test.ts`** (190 lines) — covers custom link strategy injection in all 4 bridge types: `PassBridge`, `TransformBridge`, `TransferBridge`, `AsyncTransformBridge`. Each test verifies that the bridge delegates internal wiring to the injected strategy via call tracking, and that backward compatibility (no `linkStrategy` config) works correctly.
 * **New test suite `tests/factories/linker-factories.test.ts`** (89 lines) — covers `createDefaultLinkStrategy()`: returns `DefaultLinkStrategy` instance, provides `link()` method, returns new instance each call, connects Subscribable → Pushable, and supports unsubscribe.
-* **Coverage:** Maintained **100% test coverage** (statements, branches, functions, lines) across all 12 source files. Total tests: **2,174**.
+* **Coverage:** Maintained **100% test coverage** (statements, branches, functions, lines) across all 12 source files. Total tests: **2,176**.
 
 ## v1.5.1 - 2026-07-26
 
