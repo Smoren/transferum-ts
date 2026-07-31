@@ -1319,7 +1319,7 @@ import { CompositeTransferBuilder, DefaultLinkStrategy } from 'transferum';
 const linkStrategy = new DefaultLinkStrategy();
 const pipeline = CompositeTransferBuilder
   .start(createPushStoredChannelTransfer<number>(), linkStrategy)
-  .to(createBufferTransfer<number>())
+  .to(createConditionTransfer<number>({ shouldAccept: x => x > 0 }))
   .finish(createSinkTransfer<number>({ callback: console.log }));
 
 pipeline.push(42); // → 42
@@ -2827,7 +2827,7 @@ import {
   CompositeTransferBuilder,
   DefaultLinkStrategy,
   createPushStoredChannelTransfer,
-  createBufferTransfer,
+  createConditionTransfer,
   createSinkTransfer,
 } from 'transferum';
 
@@ -2835,7 +2835,7 @@ const linkStrategy = new DefaultLinkStrategy();
 
 const pipeline = CompositeTransferBuilder
   .start(createPushStoredChannelTransfer<number>(), linkStrategy)
-  .to(createBufferTransfer<number>())
+  .to(createConditionTransfer<number>({ shouldAccept: x => x > 0 }))
   .finish(createSinkTransfer<number>({ callback: console.log }));
 
 pipeline.push(42); // → 42
@@ -2991,7 +2991,7 @@ Key types are defined in `types.ts`:
 | `GateInterface`                                            | Flow control: `active`, `activate()`, `deactivate()`, `toggle()`, `onStateChange()`                       |
 | `SubscriberInterface`                                      | Subscription management: `active`, `unsubscribe()`, `onUnsubscribe()`, `offUnsubscribe()`                 |
 | `DisposableInterface`                                      | Resource cleanup: `destroy()`                                                                             |
-| `LinkStrategyInterface`                                          | Facade for linking transfers: `link()`                                                                  |
+| `LinkStrategyInterface`                                    | Facade for linking transfers: `link()`                                                                    |
 | `InputTransfer<T>`                                         | `PushableTransferInterface \| PollingProxyTransferInterface \| GateTransferInterface`                     |
 | `OutputTransfer<T>`                                        | `PullableTransferInterface \| SubscribableTransferInterface \| GateTransferInterface`                     |
 | `DuplexTransfer<TIn, TOut>`                                | `InputTransfer<TIn> & OutputTransfer<TOut>`                                                               |
@@ -3023,32 +3023,32 @@ Key types are defined in `types.ts`:
 
 Configs are defined in `configs.ts`. All configs are types (not classes), passed to transfer and bridge constructors.
 
-| Config                                | For                          | Required fields                                                     |
-|---------------------------------------|------------------------------|---------------------------------------------------------------------|
-| `GateTransferConfig`                  | `GateTransfer`               | `activated`                                                         |
-| `DelayedPushChannelTransferConfig<T>` | `DelayedPushChannelTransfer` | `delay`                                                             |
-| `DebounceTransferConfig`              | `DebounceTransfer`           | `delay`                                                             |
-| `ThrottleTransferConfig`              | `ThrottleTransfer`           | `interval`                                                          |
-| `MergeTransferConfig<T>`              | `MergeTransfer`              | `sources`                                                           |
-| `SplitTransferConfig<T>`              | `SplitTransfer`              | `targets`                                                           |
-| `PollingSourceTransferConfig<T>`      | `PollingSourceTransfer`      | `fetcher`, `interval`, `activated`                                  |
-| `PollingProxyTransferConfig`          | `PollingProxyTransfer`       | `interval`, `activated`                                             |
-| `PollingFlowTransferConfig<T>`        | `PollingFlowTransfer`        | `flow`, `interval`, `activated`                                     |
-| `IdlePollingTransferConfig<T>`        | `IdlePollingTransfer`        | `fetcher`, `timeout`, `interval`, `activated`                       |
-| `ChannelTransferConfig<T>`            | `ChannelTransfer`            | `setup`, `destroy`, `onError?`, `onDestroyError?`                   |
-| `StoredChannelTransferConfig<T>`      | `StoredChannelTransfer`      | `setup`, `destroy`, `onError?`, `onDestroyError?`                   |
-| `SinkTransferConfig<T>`               | `SinkTransfer`               | `callback`, `onError?`                                              |
-| `WriteTransferConfig<T>`              | `WriteTransfer`              | `flow`                                                              |
-| `ReadTransferConfig<T>`               | `ReadTransfer`               | `flow`                                                              |
-| `ConvertTransferConfig<TIn, TOut>`    | `ConvertTransfer`            | `operator`                                                          |
-| `ConditionTransferConfig<T>`          | `ConditionTransfer`          | — (predicates are optional), `onAcceptError?`, `onEmitError?`       |
-| `CompositeTransferConfig<TIn, TOut>`  | `UniversalCompositeTransfer` | `input`, `output`                                                   |
+| Config                                | For                          | Required fields                                                           |
+|---------------------------------------|------------------------------|---------------------------------------------------------------------------|
+| `GateTransferConfig`                  | `GateTransfer`               | `activated`                                                               |
+| `DelayedPushChannelTransferConfig<T>` | `DelayedPushChannelTransfer` | `delay`                                                                   |
+| `DebounceTransferConfig`              | `DebounceTransfer`           | `delay`                                                                   |
+| `ThrottleTransferConfig`              | `ThrottleTransfer`           | `interval`                                                                |
+| `MergeTransferConfig<T>`              | `MergeTransfer`              | `sources`                                                                 |
+| `SplitTransferConfig<T>`              | `SplitTransfer`              | `targets`                                                                 |
+| `PollingSourceTransferConfig<T>`      | `PollingSourceTransfer`      | `fetcher`, `interval`, `activated`                                        |
+| `PollingProxyTransferConfig`          | `PollingProxyTransfer`       | `interval`, `activated`                                                   |
+| `PollingFlowTransferConfig<T>`        | `PollingFlowTransfer`        | `flow`, `interval`, `activated`                                           |
+| `IdlePollingTransferConfig<T>`        | `IdlePollingTransfer`        | `fetcher`, `timeout`, `interval`, `activated`                             |
+| `ChannelTransferConfig<T>`            | `ChannelTransfer`            | `setup`, `destroy`, `onError?`, `onDestroyError?`                         |
+| `StoredChannelTransferConfig<T>`      | `StoredChannelTransfer`      | `setup`, `destroy`, `onError?`, `onDestroyError?`                         |
+| `SinkTransferConfig<T>`               | `SinkTransfer`               | `callback`, `onError?`                                                    |
+| `WriteTransferConfig<T>`              | `WriteTransfer`              | `flow`                                                                    |
+| `ReadTransferConfig<T>`               | `ReadTransfer`               | `flow`                                                                    |
+| `ConvertTransferConfig<TIn, TOut>`    | `ConvertTransfer`            | `operator`                                                                |
+| `ConditionTransferConfig<T>`          | `ConditionTransfer`          | — (predicates are optional), `onAcceptError?`, `onEmitError?`             |
+| `CompositeTransferConfig<TIn, TOut>`  | `UniversalCompositeTransfer` | `input`, `output`                                                         |
 | `PassBridgeConfig<T>`                 | `PassBridge`                 | `source`, `target`, `activated`, `linkStrategy?`                          |
 | `TransformBridgeConfig<TIn, TOut>`    | `TransformBridge`            | `source`, `target`, `operator`, `activated`, `linkStrategy?`              |
 | `TransferBridgeConfig<TIn, TOut>`     | `TransferBridge`             | `source`, `target`, `middle`, `middleOwned`, `activated`, `linkStrategy?` |
-| `BridgeAggregatorConfig`              | `BridgeAggregator`           | `bridges`, `activated`, `owned`                                     |
-| `BridgeSelectorConfig<TMap>`          | `BridgeSelector`             | `bridges`, `initialKey`, `activated`, `owned`, `syncWithChildren?`  |
-| `BridgeMultiSelectorConfig<TMap>`     | `BridgeMultiSelector`        | `bridges`, `initialKeys`, `activated`, `owned`, `syncWithChildren?` |
+| `BridgeAggregatorConfig`              | `BridgeAggregator`           | `bridges`, `activated`, `owned`                                           |
+| `BridgeSelectorConfig<TMap>`          | `BridgeSelector`             | `bridges`, `initialKey`, `activated`, `owned`, `syncWithChildren?`        |
+| `BridgeMultiSelectorConfig<TMap>`     | `BridgeMultiSelector`        | `bridges`, `initialKeys`, `activated`, `owned`, `syncWithChildren?`       |
 
 **Async configs:**
 
@@ -3064,7 +3064,7 @@ Configs are defined in `configs.ts`. All configs are types (not classes), passed
 | `AsyncConvertTransferConfig<TIn, TOut>` | `AsyncConvertTransfer`             | `operator` (AsyncOperatorInterface), `onError?`, `maxConcurrency?`, `bufferSize?`, `onBufferOverflow?`                              |
 | `AsyncConditionTransferConfig<T>`       | `AsyncConditionTransfer`           | — (predicates are optional, sync or async), `onAcceptError?`, `onEmitError?`, `maxConcurrency?`, `bufferSize?`, `onBufferOverflow?` |
 | `AsyncStoredChannelTransferConfig<T>`   | `AsyncStoredChannelTransfer`       | `setup`, `destroy`, `onError?`, `onDestroyError?`                                                                                   |
-| `AsyncTransformBridgeConfig<TIn, TOut>` | `AsyncTransformBridge`             | `source`, `target`, `operator`, `activated`, `onError?`, `linkStrategy?`                                                      |
+| `AsyncTransformBridgeConfig<TIn, TOut>` | `AsyncTransformBridge`             | `source`, `target`, `operator`, `activated`, `onError?`, `linkStrategy?`                                                            |
 | `LinkConfig<TTargetTransfer>`           | `linkTransfers` (async strategies) | `onError?`                                                                                                                          |
 
 All polling transfers support an optional `tickerFactory?: TickerFactory` to replace the default ticker (`RAFTicker.factory`).

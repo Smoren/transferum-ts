@@ -1,5 +1,53 @@
 # Transferum Change Log
 
+## v1.6.0 - 2026-07-31
+
+### Pluggable Link Strategies — new public API for custom linking
+
+* **`LinkStrategyInterface`** (`src/interfaces.ts`) — new public interface for custom linking strategies. Implement `link(lhs, rhs, options?)` to override how transfers are wired together.
+* **`DefaultLinkStrategy`** (`src/linking.ts`) — default implementation that inspects capability flags on both transfers and dispatches to the matching sync or async strategy (Subscribable → Pushable, Pullable → PollingProxy, Subscribable → PollingProxy, Subscribable → AsyncPushable, AsyncPullable → AsyncPollingProxy, Pullable → AsyncPollingProxy, Subscribable → AsyncPollingProxy). Sync strategies have priority over async.
+* **`BaseLinkingStrategy`** (`src/linking.ts`) — abstract base class with protected helper methods for each of the 7 linking strategies and error pattern. Custom strategies can extend this class and override only the strategies they need to customize.
+* **`createDefaultLinkStrategy()`** (`src/factories.ts`) — factory function that returns a new `DefaultLinkStrategy` instance.
+
+### Pluggable linking in CompositeTransferBuilder
+
+* `CompositeTransferBuilder.start(transfer, linkStrategy?)` now accepts an optional `LinkStrategyInterface`. When provided, all subsequent `to()` and `finish()` calls use the injected strategy's `link()` method instead of `linkTransfers()`.
+* Example:
+  ```typescript
+  const linkStrategy = createDefaultLinkStrategy();
+  const composite = CompositeTransferBuilder
+    .start(createPushStoredChannelTransfer<number>(), linkStrategy)
+    .to(createConditionTransfer<number>({ shouldAccept: x => x > 0 }))
+    .finish(createSinkTransfer<number>({ callback: console.log }));
+  ```
+
+### Pluggable linking in Bridges
+
+* `PassBridge`, `TransformBridge`, `TransferBridge`, and `AsyncTransformBridge` now accept an optional `linkStrategy?: LinkStrategyInterface` in their config.
+* When provided, all internal links (source → gate → converter → target) are created via `linkStrategy.link()` instead of `linkTransfers()`.
+* Default: `new DefaultLinkStrategy()` (zero-config, backward-compatible).
+
+### Code organization
+
+* **New module `src/linking.ts`** — contains `BaseLinkingStrategy`, `DefaultLinkStrategy`, and `linkTransfers()` function. The `linkTransfers()` function now delegates to `DefaultLinkStrategy.link()`.
+* **`src/utils.ts` simplified** — `linkTransfers()` has been moved to `linking.ts`. `utils.ts` now only contains `handleError()`.
+* **`src/interfaces.ts`** — `CommunicationContractInterface` is now `export` (was package-private), enabling typed access to capability flags for custom strategies and bridges.
+* **`src/index.ts`** — exports `./linking` module.
+
+### Backward compatibility
+
+* `linkTransfers()` is still exported from `'transferum'` (now from `linking.ts` instead of `utils.ts`). All existing imports from `'transferum'` work unchanged.
+* All bridge constructors continue to work without a `linkStrategy` config — defaults to `DefaultLinkStrategy`.
+* `CompositeTransferBuilder.start()` continues to work without a `linkStrategy` argument — defaults to `DefaultLinkStrategy`.
+* No breaking API changes. All deprecated builders from v1.5.0 remain deprecated.
+
+### Tests
+
+* **New test suite `tests/linkers/default-linker.test.ts`** (549 lines) — covers all 7 linking strategies (Subscribable → Pushable, Pullable → PollingProxy, Subscribable → PollingProxy, Subscribable → AsyncPushable, AsyncPullable → AsyncPollingProxy, Pullable → AsyncPollingProxy, Subscribable → AsyncPollingProxy), error cases (AsyncPullable → sync PollingProxy, Pullable → Pushable, unsupported combinations), lifecycle (active/inactive, unsubscribe stops data flow), and multiple independent links.
+* **New test suite `tests/bridges/bridge-linker.test.ts`** (190 lines) — covers custom link strategy injection in all 4 bridge types: `PassBridge`, `TransformBridge`, `TransferBridge`, `AsyncTransformBridge`. Each test verifies that the bridge delegates internal wiring to the injected strategy via call tracking, and that backward compatibility (no `linkStrategy` config) works correctly.
+* **New test suite `tests/factories/linker-factories.test.ts`** (89 lines) — covers `createDefaultLinkStrategy()`: returns `DefaultLinkStrategy` instance, provides `link()` method, returns new instance each call, connects Subscribable → Pushable, and supports unsubscribe.
+* **Coverage:** Maintained **100% test coverage** (statements, branches, functions, lines) across all 12 source files. Total tests: **2,174**.
+
 ## v1.5.1 - 2026-07-26
 
 ### Documentation
