@@ -11,14 +11,14 @@
 
 ### Pluggable linking in CompositeTransferBuilder
 
-* `CompositeTransferBuilder.start(transfer, linkStrategy?)` now accepts an optional `LinkStrategyInterface`. When provided, all subsequent `to()` and `finish()` calls use the injected strategy's `link()` method instead of `linkTransfers()`.
+* `CompositeTransferBuilder.start(transfer, options?)` now accepts an optional config object `{ linkStrategy?: LinkStrategyInterface }`. When provided, all subsequent `to()` and `finish()` calls use the injected strategy's `link()` method instead of `linkTransfers()`.
 * Example:
   ```typescript
-  const linkStrategy = createDefaultLinkStrategy();
+  const linkStrategy = new DefaultLinkStrategy();
   const composite = CompositeTransferBuilder
-    .start(createPushStoredChannelTransfer<number>(), linkStrategy)
-    .to(createConditionTransfer<number>({ shouldAccept: x => x > 0 }))
-    .finish(createSinkTransfer<number>({ callback: console.log }));
+    .start(new PushStoredChannelTransfer<number>(), { linkStrategy })
+    .to(new ConditionTransfer<number>({ shouldAccept: x => x > 0 }))
+    .finish(new SinkTransfer<number>({ callback: console.log }));
   ```
 
 ### Pluggable linking in Bridges
@@ -38,7 +38,7 @@
 
 * `linkTransfers()` is still exported from `'transferum'` (now from `linking.ts` instead of `utils.ts`). All existing imports from `'transferum'` work unchanged.
 * All bridge constructors continue to work without a `linkStrategy` config — defaults to `DefaultLinkStrategy`.
-* `CompositeTransferBuilder.start()` continues to work without a `linkStrategy` argument — defaults to `DefaultLinkStrategy`.
+* `CompositeTransferBuilder.start()` continues to work without `options` — defaults to `DefaultLinkStrategy`.
 * No breaking API changes. All deprecated builders from v1.5.0 remain deprecated.
 
 ### Tests

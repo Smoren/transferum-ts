@@ -259,8 +259,8 @@ export class AsyncOperatorPipelineBuilder<TFlow extends readonly unknown[]> impl
  * ```typescript
  * const linkStrategy = new DefaultLinkStrategy();
  * const composite = CompositeTransferBuilder
- *   .start(new PushStoredChannelTransfer<number>(), linkStrategy)
- *   .to(new BufferTransfer<number>())
+ *   .start(new PushStoredChannelTransfer<number>(), { linkStrategy })
+ *   .to(new ConditionTransfer<number>({ shouldAccept: x => x > 0 }))
  *   .finish(new SinkTransfer<number>({ callback: console.log }));
  * ```
  *
@@ -295,23 +295,24 @@ export class CompositeTransferBuilder<
    * The start transfer provides the output capabilities that feed data into the chain.
    * If it is also an InputTransfer (duplex), its input flags become the composite's input flags.
    *
-   * If a link strategy is provided, all subsequent `to()` and `finish()` calls will use it
-   * for linking. If omitted, linking falls back to `DefaultLinkStrategy` (which delegates to `linkTransfers()`).
+   * Options:
+   * - linkStrategy — custom link strategy for all subsequent `to()` and `finish()` calls.
+   *   If omitted, defaults to `DefaultLinkStrategy`.
    *
    * @typeParam TStartTransfer — type of the initial transfer (must be OutputTransfer)
    * @param startTransfer — initial output transfer
-   * @param linkStrategy — optional link strategy for custom linking behavior
+   * @param options — optional start configuration
    * @returns A new CompositeTransferBuilder instance
    */
   public static start<TStartTransfer extends OutputTransfer<unknown>>(
     startTransfer: TStartTransfer,
-    linkStrategy?: LinkStrategyInterface,
+    options?: { linkStrategy?: LinkStrategyInterface },
   ): CompositeTransferBuilderInterface<OutputTransferDataType<TStartTransfer>, TStartTransfer> {
     return new CompositeTransferBuilder<OutputTransferDataType<TStartTransfer>, TStartTransfer>(
       startTransfer,
       startTransfer as DuplexTransfer<unknown, any>,
       [],
-      linkStrategy,
+      options?.linkStrategy,
     );
   }
 
