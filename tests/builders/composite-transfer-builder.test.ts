@@ -7,6 +7,7 @@ import {
   ConditionTransfer,
   SinkTransfer,
   AsyncPollingSourceTransfer,
+  DefaultLinkStrategy,
 } from '../../src';
 import { describe, expect, it, jest } from '@jest/globals';
 
@@ -36,6 +37,41 @@ describe(
       const builder = CompositeTransferBuilder.start(startTransfer);
 
       expect(builder).toBeDefined();
+    });
+  },
+);
+
+describe(
+  'CompositeTransferBuilder.start() accepts linkStrategy via options test',
+  () => {
+    it('', () => {
+      const startTransfer = new PushStoredChannelTransfer<number>();
+      const linkStrategy = new DefaultLinkStrategy();
+
+      const builder = CompositeTransferBuilder.start(startTransfer, { linkStrategy });
+
+      expect(builder).toBeDefined();
+    });
+  },
+);
+
+describe(
+  'CompositeTransferBuilder.start() with linkStrategy uses it for linking test',
+  () => {
+    it('', () => {
+      const startTransfer = new PushStoredChannelTransfer<number>();
+      const received: number[] = [];
+      const finishWithCallback = new SinkTransfer<number>({ callback: (v) => received.push(v) });
+
+      const composite = CompositeTransferBuilder
+        .start(startTransfer, { linkStrategy: new DefaultLinkStrategy() })
+        .finish(finishWithCallback);
+
+      startTransfer.push(42);
+
+      expect(received).toEqual([42]);
+
+      composite.destroy();
     });
   },
 );
