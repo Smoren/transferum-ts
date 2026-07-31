@@ -1,5 +1,11 @@
 # Transferum Change Log
 
+## v1.6.1 - 2026-07-31
+
+### README: documentation fixes
+
+* Multiple corrections in code examples across the README: missing type parameters, incomplete imports, omitted `owned` config fields in bridge examples, syntax errors, and incorrect return types. No source code or API changes — documentation-only release.
+
 ## v1.6.0 - 2026-07-31
 
 ### Pluggable Link Strategies — new public API for custom linking
