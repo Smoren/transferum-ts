@@ -18,13 +18,13 @@ import type {
 import type { LinkConfig } from "./configs";
 import { Subscriber } from "./helpers";
 import {
-  isAsyncPollingProxy,
-  isAsyncPullable,
-  isAsyncPushable,
-  isPollingProxy,
-  isPullable,
   isPushable,
+  isPullable,
   isSubscribable,
+  isPollingProxy,
+  isAsyncPushable,
+  isAsyncPullable,
+  isAsyncPollingProxy,
 } from "./guards";
 import { handleError } from "./utils";
 
@@ -225,12 +225,12 @@ export class DefaultLinkStrategy extends BaseLinkingStrategy {
 
     // CASE 8: asyncPullable → sync-pollingProxy — impossible
     // Sync poller calls fetcher() synchronously and cannot await.
-    if (lhs.isAsyncPullable && rhs.isPollingProxy) {
+    if (isAsyncPullable(lhs) && isPollingProxy(rhs)) {
       this._throwLinkAsyncPullableToPollingProxyError();
     }
 
     // CASE 9: pullable/asyncPullable → pushable/asyncPushable — needs a trigger
-    if ((lhs.isPullable || lhs.isAsyncPullable) && (rhs.isPushable || rhs.isAsyncPushable)) {
+    if ((isPullable(lhs) || isAsyncPullable(lhs)) && (isPushable(rhs) || isAsyncPushable(rhs))) {
       this._throwLinkPullableToPushableError();
     }
 

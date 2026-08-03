@@ -106,6 +106,7 @@ Type-safe primitives — **transfers** (nodes), **bridges** (edges), **builders*
   - [Deprecated Builders](#deprecated-builders)
 - [Factories](#factories)
 - [Utilities](#utilities)
+- [Guards](#guards)
 - [Types](#types)
 - [Configurations](#configurations)
 - [Running Tests](#running-tests)
@@ -1073,6 +1074,18 @@ import {
   linkPullableToAsyncPollingProxy,
   linkSubscribableToAsyncPollingProxy,
   handleError,
+
+  // Guards
+  isPushable,
+  isPullable,
+  isSubscribable,
+  isPollingProxy,
+  isTriggerable,
+  isGate,
+  isAsyncPushable,
+  isAsyncPullable,
+  isAsyncPollingProxy,
+  isAsyncTriggerable,
 } from 'transferum';
 ```
 
@@ -3005,6 +3018,40 @@ Universal error handler:
 - If `onError` is provided — invokes it with `(error, source)` and suppresses the exception.
 - If `onError` is not provided — rethrows the exception.
 - Non-`Error` values are converted to `Error` (via `String(error)`).
+
+---
+
+## Guards
+
+Type guards for narrowing `CommunicationContractInterface` to a specific branded capability type. Each guard checks a boolean capability flag and, when `true`, narrows the TypeScript type so that the corresponding methods are available without casts.
+
+| Guard                    | Checks flag           | Narrows to             | Methods unlocked                                            |
+|--------------------------|-----------------------|------------------------|-------------------------------------------------------------|
+| `isPushable<T>`          | `isPushable`          | `Pushable<T>`          | `push(data: T)`                                             |
+| `isPullable<T>`          | `isPullable`          | `Pullable<T>`          | `pull(): T \| undefined`                                    |
+| `isSubscribable<T>`      | `isSubscribable`      | `Subscribable<T>`      | `subscribe(handler): SubscriberInterface`                   |
+| `isPollingProxy<T>`      | `isPollingProxy`      | `PollingProxy<T>`      | `setFetcher()`, `clearFetcher()`                            |
+| `isTriggerable`          | `isTriggerable`       | `Triggerable`          | `trigger()`                                                 |
+| `isGate`                 | `isGate`              | `Gate`                 | `activate()`, `deactivate()`, `toggle()`, `onStateChange()` |
+| `isAsyncPushable<T>`     | `isAsyncPushable`     | `AsyncPushable<T>`     | `asyncPush(data: T): Promise<void>`                         |
+| `isAsyncPullable<T>`     | `isAsyncPullable`     | `AsyncPullable<T>`     | `asyncPull(): Promise<T \| undefined>`                      |
+| `isAsyncPollingProxy<T>` | `isAsyncPollingProxy` | `AsyncPollingProxy<T>` | `setAsyncFetcher()`, `clearAsyncFetcher()`                  |
+| `isAsyncTriggerable`     | `isAsyncTriggerable`  | `AsyncTriggerable`     | `asyncTrigger(): Promise<void>`                             |
+
+```typescript
+import type { CommunicationContractInterface } from "transferum";
+import { isPushable, isSubscribable, createPushChannelTransfer } from 'transferum';
+
+const transfer: CommunicationContractInterface = createPushChannelTransfer<number>();
+
+if (isSubscribable(transfer) && isPushable(transfer)) {
+  // TypeScript knows: transfer.subscribe() and transfer.push() exist
+  transfer.subscribe((data) => console.log(data));
+  transfer.push(42);
+}
+```
+
+Internally, `DefaultLinkStrategy.link()` uses these guards instead of `as`-casts to narrow transfer types before dispatching to each linking strategy — making the linking code type-safe without runtime overhead.
 
 ---
 
