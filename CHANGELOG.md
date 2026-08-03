@@ -1,5 +1,30 @@
 # Transferum Change Log
 
+## v1.7.0 - 2026-08-03
+
+### Type Guards for capability flags
+
+* **New module `src/guards.ts`** — 10 type guards that narrow `CommunicationContractInterface` to a specific branded capability type by checking boolean flags. Each guard is a `contract is` predicate, enabling TypeScript narrowing without `as`-casts:
+  * `isPushable<T>`, `isPullable<T>`, `isSubscribable<T>`, `isPollingProxy<T>`, `isTriggerable`, `isGate` (sync)
+  * `isAsyncPushable<T>`, `isAsyncPullable<T>`, `isAsyncPollingProxy<T>`, `isAsyncTriggerable` (async)
+* **`src/index.ts`** — exports `./guards` module.
+
+### Type-safe linking — `as`-casts eliminated
+
+* **`src/linking.ts`** — `DefaultLinkStrategy.link()` now uses type guards instead of direct flag checks and `as`-casts in all 10 cases (7 linking strategies + 3 error cases). The linking code is fully type-safe with zero runtime overhead.
+* **`src/transfers.ts`** — `UniversalCompositeTransfer._extractTriggerable()`, `_extractGate()`, `_extractAsyncTriggerable()` use `isTriggerable`, `isGate`, `isAsyncTriggerable` guards instead of direct flag checks + `as`-casts. Four redundant `as`-casts in async delegation methods (`asyncPush`, `asyncPull`, `setAsyncFetcher`, `clearAsyncFetcher`) removed — `UniversalInputInterface` / `UniversalOutputInterface` already include the required async interfaces.
+
+### Documentation
+
+* **README — Guards section:** New section with a table of all 10 guards (flag checked, narrowed type, methods unlocked), a usage example, and a note about internal usage in `DefaultLinkStrategy.link()`.
+* **README — Table of Contents:** Added `Guards` entry.
+* **README — Installation & Import:** Added all 10 guard functions to the import list.
+
+### Tests
+
+* **New test suite `tests/guards/guards.test.ts`** (21 tests) — verifies `true`/`false` responses for each guard across various transfer classes.
+* **Coverage:** Maintained **100% test coverage** (statements, branches, functions, lines) across all 12 source files. Total tests: **2,197**.
+
 ## v1.6.1 - 2026-07-31
 
 ### README: documentation fixes
