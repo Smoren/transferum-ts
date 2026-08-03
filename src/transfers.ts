@@ -18,10 +18,7 @@ import type {
   UniversalOutputInterface,
   TriggerableInterface,
   TickerInterface,
-  AsyncPushableInterface,
-  AsyncPullableInterface,
   AsyncTriggerableInterface,
-  AsyncPollingProxyInterface,
   AsyncPushableTransferInterface,
   AsyncPullableTransferInterface,
   AsyncPollingProxyTransferInterface,
@@ -75,6 +72,7 @@ import type {
 import { ProxyReference, SubscriptionManager, StateSubscriptionManager } from "./helpers";
 import { RAFTicker } from "./tickers";
 import { handleError } from "./utils";
+import { isAsyncTriggerable, isGate, isTriggerable } from "./guards";
 import { PendingResultQueue, OrderedExecutor } from "./helpers";
 
 // ═══════════════════════════════════════════════════════════════
@@ -3691,7 +3689,7 @@ export class UniversalCompositeTransfer<TInput, TOutput> implements UniversalDup
     if (!this.isAsyncPushable) {
       throw new Error("Cannot asyncPush to non-async-pushable transfer");
     }
-    await (this._input as AsyncPushableInterface<TInput>).asyncPush(data);
+    await this._input.asyncPush(data);
   }
 
   /**
@@ -3702,7 +3700,7 @@ export class UniversalCompositeTransfer<TInput, TOutput> implements UniversalDup
     if (!this.isAsyncPullable) {
       throw new Error("Cannot asyncPull from non-async-pullable transfer");
     }
-    return (this._output as AsyncPullableInterface<TOutput>).asyncPull();
+    return this._output.asyncPull();
   }
 
   /**
@@ -3724,7 +3722,7 @@ export class UniversalCompositeTransfer<TInput, TOutput> implements UniversalDup
     if (!this.isAsyncPollingProxy) {
       throw new Error("Cannot setAsyncFetcher to non-async-pollable transfer");
     }
-    (this._input as AsyncPollingProxyInterface<TInput>).setAsyncFetcher(fetcher);
+    this._input.setAsyncFetcher(fetcher);
   }
 
   /**
@@ -3735,7 +3733,7 @@ export class UniversalCompositeTransfer<TInput, TOutput> implements UniversalDup
     if (!this.isAsyncPollingProxy) {
       throw new Error("Cannot clearAsyncFetcher of non-async-pollable transfer");
     }
-    (this._input as AsyncPollingProxyInterface<TInput>).clearAsyncFetcher();
+    this._input.clearAsyncFetcher();
   }
 
   /**
@@ -3917,11 +3915,11 @@ export class UniversalCompositeTransfer<TInput, TOutput> implements UniversalDup
     if (config.triggerable !== undefined) {
       return config.triggerable;
     }
-    if (config.input.isTriggerable) {
-      return config.input as UniversalInputInterface<TInput>;
+    if (isTriggerable(config.input)) {
+      return config.input;
     }
-    if (config.output.isTriggerable) {
-      return config.output as UniversalOutputInterface<TInput>;
+    if (isTriggerable(config.output)) {
+      return config.output;
     }
     return undefined;
   }
@@ -3938,11 +3936,11 @@ export class UniversalCompositeTransfer<TInput, TOutput> implements UniversalDup
     if (config.gate !== undefined) {
       return config.gate;
     }
-    if (config.input.isGate) {
-      return config.input as UniversalInputInterface<TInput>;
+    if (isGate(config.input)) {
+      return config.input;
     }
-    if (config.output.isGate) {
-      return config.output as UniversalOutputInterface<TInput>;
+    if (isGate(config.output)) {
+      return config.output;
     }
     return undefined;
   }
@@ -3959,11 +3957,11 @@ export class UniversalCompositeTransfer<TInput, TOutput> implements UniversalDup
     if (config.asyncTriggerable !== undefined) {
       return config.asyncTriggerable;
     }
-    if (config.input.isAsyncTriggerable) {
-      return config.input as UniversalInputInterface<TInput>;
+    if (isAsyncTriggerable(config.input)) {
+      return config.input;
     }
-    if (config.output.isAsyncTriggerable) {
-      return config.output as UniversalOutputInterface<TInput>;
+    if (isAsyncTriggerable(config.output)) {
+      return config.output;
     }
     return undefined;
   }
