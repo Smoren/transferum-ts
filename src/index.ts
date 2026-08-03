@@ -7,6 +7,7 @@ export * from './builders';
 export * from './linking';
 export * from './tickers';
 export * from './helpers';
+export * from './guards';
 export * from './utils';
 export type * from './interfaces';
 export type * from './types';
