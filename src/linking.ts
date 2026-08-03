@@ -17,6 +17,15 @@ import type {
 } from "./types";
 import type { LinkConfig } from "./configs";
 import { Subscriber } from "./helpers";
+import {
+  isAsyncPollingProxy,
+  isAsyncPullable,
+  isAsyncPushable,
+  isPollingProxy,
+  isPullable,
+  isPushable,
+  isSubscribable,
+} from "./guards";
 import { handleError } from "./utils";
 
 /**
@@ -162,18 +171,18 @@ export class DefaultLinkStrategy extends BaseLinkingStrategy {
     // ═══════════════════════════════════════════════════════════════
 
     // CASE 1: Reactive Push (LHS streams data -> RHS accepts data)
-    if (lhs.isSubscribable && rhs.isPushable) {
-      return this._linkSubscribableToPushable(lhs as Subscribable<T>, rhs as Pushable<T>);
+    if (isSubscribable(lhs) && isPushable(rhs)) {
+      return this._linkSubscribableToPushable(lhs, rhs);
     }
 
     // CASE 2: Active Polling on the input side (RHS pulls data itself)
-    if (lhs.isPullable && rhs.isPollingProxy) {
-      return this._linkPullableToPollingProxy(lhs as Pullable<T>, rhs as PollingProxy<T>);
+    if (isPullable(lhs) && isPollingProxy(rhs)) {
+      return this._linkPullableToPollingProxy(lhs, rhs);
     }
 
     // CASE 3: Subscription + last-value buffer for the poller
-    if (lhs.isSubscribable && rhs.isPollingProxy) {
-      return this._linkSubscribableToPollingProxy(lhs as Subscribable<T>, rhs as PollingProxy<T>);
+    if (isSubscribable(lhs) && isPollingProxy(rhs)) {
+      return this._linkSubscribableToPollingProxy(lhs, rhs);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -184,30 +193,30 @@ export class DefaultLinkStrategy extends BaseLinkingStrategy {
     // Reactive subscription + async-push with rejection handling.
     // No ordering guarantees: fast sync notifications can overtake
     // pending asyncPush calls.
-    if (lhs.isSubscribable && rhs.isAsyncPushable) {
+    if (isSubscribable(lhs) && isAsyncPushable(rhs)) {
       return this._linkSubscribableToAsyncPushable(
-        lhs as Subscribable<T>,
-        rhs as AsyncPushable<T>,
+        lhs,
+        rhs,
         options?.onError as ErrorHandler<AsyncPushable<T>>,
       );
     }
 
     // CASE 5: asyncPullable → asyncPollingProxy
     // Active polling: RHS pulls data via asyncPull.
-    if (lhs.isAsyncPullable && rhs.isAsyncPollingProxy) {
-      return this._linkAsyncPullableToAsyncPollingProxy(lhs as AsyncPullable<T>, rhs as AsyncPollingProxy<T>);
+    if (isAsyncPullable(lhs) && isAsyncPollingProxy(rhs)) {
+      return this._linkAsyncPullableToAsyncPollingProxy(lhs, rhs);
     }
 
     // CASE 6: pullable → asyncPollingProxy
     // Sync-pull wrapped in an async fetcher for the async poller.
-    if (lhs.isPullable && rhs.isAsyncPollingProxy) {
-      return this._linkPullableToAsyncPollingProxy(lhs as Pullable<T>, rhs as AsyncPollingProxy<T>);
+    if (isPullable(lhs) && isAsyncPollingProxy(rhs)) {
+      return this._linkPullableToAsyncPollingProxy(lhs, rhs);
     }
 
     // CASE 7: subscribable → asyncPollingProxy
     // Subscription + last-value buffer for the async poller.
-    if (lhs.isSubscribable && rhs.isAsyncPollingProxy) {
-      return this._linkSubscribableToAsyncPollingProxy(lhs as Subscribable<T>, rhs as AsyncPollingProxy<T>);
+    if (isSubscribable(lhs) && isAsyncPollingProxy(rhs)) {
+      return this._linkSubscribableToAsyncPollingProxy(lhs, rhs);
     }
 
     // ═══════════════════════════════════════════════════════════════
