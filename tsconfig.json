@@ -17,5 +17,6 @@
     "declarationMap": true,
     "isolatedModules": true
   },
+  "include": ["src"],
   "exclude": ["tests"]
 }
