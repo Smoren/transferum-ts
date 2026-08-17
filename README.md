@@ -2982,7 +2982,7 @@ function linkTransfers<T, RTransfer extends InputTransfer<T>>(
 
 Links an output transfer (LHS) to an input transfer (RHS). Returns `SubscriberInterface` for breaking the link. The strategy is determined by capability flags (see [Linking Transfers](#linking-transfers)). `options.onError` is used to intercept rejections in the async `subscribable → asyncPushable` strategy — invoked as `onError(error, target)` via `handleError()`. Without `onError`, rejections are rethrown by `handleError()` (unhandled promise rejection); the source's subscription remains active.
 
-Internally, `linkTransfers` delegates to `DefaultLinkStrategy.link()`, which inspects capability flags on both transfers and dispatches to one of seven protected strategy methods on `BaseLinkingStrategy`. Sync strategies take priority over async. These methods are not exported as standalone functions — to customize a strategy, extend `BaseLinkingStrategy` and override the relevant method, then inject the subclass into `CompositeTransferBuilder.start()` or a bridge config via `linkStrategy`.
+Internally, `linkTransfers` delegates to `DefaultLinkStrategy.link()`, which inspects capability flags on both transfers and dispatches to one of seven protected strategy methods on `BaseLinkStrategy`. Sync strategies take priority over async. These methods are not exported as standalone functions — to customize a strategy, extend `BaseLinkStrategy` and override the relevant method, then inject the subclass into `CompositeTransferBuilder.start()` or a bridge config via `linkStrategy`.
 
 | Strategy (protected method)              | LHS             | RHS                 | Behavior                                                 |
 |------------------------------------------|-----------------|---------------------|----------------------------------------------------------|
@@ -2994,7 +2994,7 @@ Internally, `linkTransfers` delegates to `DefaultLinkStrategy.link()`, which ins
 | `_linkPullableToAsyncPollingProxy`       | `Pullable`      | `AsyncPollingProxy` | Sync-pull wrapped in an async fetcher                    |
 | `_linkSubscribableToAsyncPollingProxy`   | `Subscribable`  | `AsyncPollingProxy` | Subscription + buffer + async fetcher                    |
 
-Error helpers for unsupported combinations (protected methods on `BaseLinkingStrategy`):
+Error helpers for unsupported combinations (protected methods on `BaseLinkStrategy`):
 
 | Method                                      | When                                                                                            |
 |---------------------------------------------|-------------------------------------------------------------------------------------------------|

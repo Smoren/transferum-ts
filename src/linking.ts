@@ -39,7 +39,7 @@ import { handleError } from "./utils";
  *
  * @category Linking
  */
-abstract class BaseLinkingStrategy implements LinkStrategyInterface {
+export abstract class BaseLinkStrategy implements LinkStrategyInterface {
   public abstract link<T, RTransfer extends InputTransfer<T>>(
     lhs: OutputTransfer<T>,
     rhs: RTransfer,
@@ -134,7 +134,7 @@ abstract class BaseLinkingStrategy implements LinkStrategyInterface {
 /**
  * Default implementation of {@link LinkStrategyInterface}.
  *
- * Extends {@link BaseLinkingStrategy} and implements {@link link} with
+ * Extends {@link BaseLinkStrategy} and implements {@link link} with
  * standard capability-based dispatch: inspects flags on both transfers
  * and selects the matching sync or async linking strategy.
  *
@@ -146,7 +146,7 @@ abstract class BaseLinkingStrategy implements LinkStrategyInterface {
  *
  * @category Linking
  */
-export class DefaultLinkStrategy extends BaseLinkingStrategy {
+export class DefaultLinkStrategy extends BaseLinkStrategy {
   /**
    * Links an output transfer to an input transfer.
    *
