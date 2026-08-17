@@ -3159,8 +3159,21 @@ Many configs include optional error handlers (`onError`, `onAcceptError`, `onEmi
 
 ```bash
 npm i
-npm run test
+npm run lint   # formatting & type check
+npm run test   # 2,197 tests, 100% coverage
 ```
+
+## Contributing
+
+Please read our [Contributing Guide](CONTRIBUTING.md) before submitting pull requests.
+
+## Code of Conduct
+
+This project adheres to the [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
+
+## Security
+
+Please report security vulnerabilities responsibly. See our [Security Policy](SECURITY.md).
 
 ## License
 
