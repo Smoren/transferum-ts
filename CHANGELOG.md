@@ -1,5 +1,30 @@
 # Transferum Change Log
 
+## v1.7.1 - 2026-08-17
+
+### New linting system
+
+* Replaced `ts-scripts lint` (which was broken — `lint` command listed in help but not implemented) with **ESLint v9** using flat config (`eslint.config.mts`).
+* **`eslint.config.mts`** — new flat config with `@typescript-eslint` recommended rules.
+* `package.json` — `"lint"` script now runs `eslint src/`. Removed unused `"format"` script.
+* Added devDependencies: `@eslint/js`, `eslint`, `globals`, `jiti`, `typescript-eslint`.
+
+### CI improvements
+
+* **`.github/workflows/test.yml`** — renamed to "Build and test", added `npm run lint` step between `build` and `test`.
+
+### Documentation
+
+* **`CODE_OF_CONDUCT.md`** — new code of conduct.
+* **`CONTRIBUTING.md`** — new contributor guidelines.
+* **`SECURITY.md`** — new security policy.
+
+### Internal
+
+* **`tsconfig.json`** — added `include: ["src"]` to prevent non-source files (like `eslint.config.mts`) from being included in compilation (`rootDir` error).
+* **`tests/linkers/` → `tests/linking/`** — renamed test directory for consistency.
+* **`CHANGELOG.md`** — fixed typo: `linkers` → `linking`.
+
 ## v1.7.0 - 2026-08-03
 
 ### Type Guards for capability flags
