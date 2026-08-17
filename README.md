@@ -1066,13 +1066,6 @@ import {
 
   // Utilities
   linkTransfers,
-  linkSubscribableToPushable,
-  linkPullableToPollingProxy,
-  linkSubscribableToPollingProxy,
-  linkSubscribableToAsyncPushable,
-  linkAsyncPullableToAsyncPollingProxy,
-  linkPullableToAsyncPollingProxy,
-  linkSubscribableToAsyncPollingProxy,
   handleError,
 
   // Guards
@@ -2989,25 +2982,25 @@ function linkTransfers<T, RTransfer extends InputTransfer<T>>(
 
 Links an output transfer (LHS) to an input transfer (RHS). Returns `SubscriberInterface` for breaking the link. The strategy is determined by capability flags (see [Linking Transfers](#linking-transfers)). `options.onError` is used to intercept rejections in the async `subscribable → asyncPushable` strategy — invoked as `onError(error, target)` via `handleError()`. Without `onError`, rejections are rethrown by `handleError()` (unhandled promise rejection); the source's subscription remains active.
 
-Internally, `linkTransfers` dispatches to one of seven exported strategy functions based on capability flags. You can call these directly for the same result:
+Internally, `linkTransfers` delegates to `DefaultLinkStrategy.link()`, which inspects capability flags on both transfers and dispatches to one of seven protected strategy methods on `BaseLinkingStrategy`. Sync strategies take priority over async. These methods are not exported as standalone functions — to customize a strategy, extend `BaseLinkingStrategy` and override the relevant method, then inject the subclass into `CompositeTransferBuilder.start()` or a bridge config via `linkStrategy`.
 
-| Strategy                               | LHS             | RHS                 | Behavior                                                 |
-|----------------------------------------|-----------------|---------------------|----------------------------------------------------------|
-| `linkSubscribableToPushable`           | `Subscribable`  | `Pushable`          | Reactive subscription: LHS notifies → RHS accepts        |
-| `linkPullableToPollingProxy`           | `Pullable`      | `PollingProxy`      | Active polling: RHS pulls via `setFetcher`               |
-| `linkSubscribableToPollingProxy`       | `Subscribable`  | `PollingProxy`      | Subscription + last-value buffering for the poller       |
-| `linkSubscribableToAsyncPushable`      | `Subscribable`  | `AsyncPushable`     | Subscription + `asyncPush` with `.catch()` (no ordering) |
-| `linkAsyncPullableToAsyncPollingProxy` | `AsyncPullable` | `AsyncPollingProxy` | Active async polling: RHS pulls via `setAsyncFetcher`    |
-| `linkPullableToAsyncPollingProxy`      | `Pullable`      | `AsyncPollingProxy` | Sync-pull wrapped in an async fetcher                    |
-| `linkSubscribableToAsyncPollingProxy`  | `Subscribable`  | `AsyncPollingProxy` | Subscription + buffer + async fetcher                    |
+| Strategy (protected method)              | LHS             | RHS                 | Behavior                                                 |
+|------------------------------------------|-----------------|---------------------|----------------------------------------------------------|
+| `_linkSubscribableToPushable`            | `Subscribable`  | `Pushable`          | Reactive subscription: LHS notifies → RHS accepts        |
+| `_linkPullableToPollingProxy`            | `Pullable`      | `PollingProxy`      | Active polling: RHS pulls via `setFetcher`               |
+| `_linkSubscribableToPollingProxy`        | `Subscribable`  | `PollingProxy`      | Subscription + last-value buffering for the poller       |
+| `_linkSubscribableToAsyncPushable`       | `Subscribable`  | `AsyncPushable`     | Subscription + `asyncPush` with `.catch()` (no ordering) |
+| `_linkAsyncPullableToAsyncPollingProxy`  | `AsyncPullable` | `AsyncPollingProxy` | Active async polling: RHS pulls via `setAsyncFetcher`    |
+| `_linkPullableToAsyncPollingProxy`       | `Pullable`      | `AsyncPollingProxy` | Sync-pull wrapped in an async fetcher                    |
+| `_linkSubscribableToAsyncPollingProxy`   | `Subscribable`  | `AsyncPollingProxy` | Subscription + buffer + async fetcher                    |
 
-Error helpers for unsupported combinations:
+Error helpers for unsupported combinations (protected methods on `BaseLinkingStrategy`):
 
-| Function                                    | When                                                                                            |
+| Method                                      | When                                                                                            |
 |---------------------------------------------|-------------------------------------------------------------------------------------------------|
-| `throwLinkAsyncPullableToPollingProxyError` | `AsyncPullable` → sync `PollingProxy` (cannot await)                                            |
-| `throwLinkPullableToPushableError`          | `Pullable`/`AsyncPullable` → `Pushable`/`AsyncPushable` (needs a Bridge or Triggerable adapter) |
-| `throwLinkUnsupportedError`                 | Any other incompatible combination                                                              |
+| `_throwLinkAsyncPullableToPollingProxyError` | `AsyncPullable` → sync `PollingProxy` (cannot await)                                            |
+| `_throwLinkPullableToPushableError`          | `Pullable`/`AsyncPullable` → `Pushable`/`AsyncPushable` (needs a Bridge or Triggerable adapter) |
+| `_throwLinkUnsupportedError`                 | Any other incompatible combination                                                              |
 
 ### [handleError](https://smoren.github.io/transferum-ts/functions/handleError.html)
 ```typescript
