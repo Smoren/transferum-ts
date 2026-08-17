@@ -20,11 +20,12 @@
   "module": "./es/index.js",
   "scripts": {
     "build": "npm run build:commonjs && npm run build:es",
-    "build:commonjs": "rimraf lib && tsc --target es6 --outDir lib --module commonjs --declaration",
-    "build:es": "rimraf es && tsc --target es6 --outDir es --module es6 --moduleResolution node10",
+    "build:commonjs": "rimraf lib && tsc --target es6 --outDir lib --module commonjs --declaration --rootDir src",
+    "build:es": "rimraf es && tsc --target es6 --outDir es --module es6 --moduleResolution node10 --rootDir src",
     "test": "jest --coverage",
     "jest": "jest",
     "lint": "eslint src/",
+    "lint-tests": "eslint tests/",
     "prepublishOnly": "npm run build",
     "docs": "typedoc src/index.ts --navigation.includeCategories --out docs/api"
   },

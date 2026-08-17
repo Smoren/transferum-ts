@@ -27,7 +27,6 @@ import type {
   TechnicalIndicator,
   TradingSignal,
   SearchResult,
-  // @ts-ignore
 } from './fixtures';
 import { describe, expect, it } from '@jest/globals';
 import { wait } from './fixtures';
