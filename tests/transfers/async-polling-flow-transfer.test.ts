@@ -1,5 +1,5 @@
 import type { TickerFactory } from '../../src';
-import { AsyncPollingFlowTransfer, RAFTicker } from '../../src';
+import { AsyncPollingFlowTransfer } from '../../src';
 import { describe, expect, it, jest } from '@jest/globals';
 
 // ═══════════════════════════════════════════════════════════════

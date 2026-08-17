@@ -51,24 +51,6 @@ describe(
   },
 );
 
-/**
- * Data provider for testing pull().
- * [StorageClass, value, expected]
- */
-function dataProviderForReadPull(): Array<unknown> {
-  return [
-    [LatestStorage, 42, 42],
-    [LatestStorage, 0, 0],
-    [LatestStorage, undefined, undefined],
-    [QueueStorage, 42, 42],
-    [QueueStorage, 0, 0],
-    [QueueStorage, undefined, undefined],
-    [StackStorage, 42, 42],
-    [StackStorage, 0, 0],
-    [StackStorage, undefined, undefined],
-  ];
-}
-
 describe(
   'ReadTransfer pull from QueueStorage shifts value test',
   () => {
@@ -108,18 +90,6 @@ describe(
     });
   },
 );
-
-/**
- * Data provider for testing owned destroy.
- * [StorageClass, value]
- */
-function dataProviderForReadOwned(): Array<unknown> {
-  return [
-    [LatestStorage, 42],
-    [QueueStorage, 42],
-    [StackStorage, 42],
-  ];
-}
 
 describe(
   'ReadTransfer not owned destroy does not clear storage test',

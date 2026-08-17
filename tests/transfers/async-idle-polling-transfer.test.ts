@@ -1,5 +1,4 @@
-import type { TickerFactory } from '../../src';
-import { AsyncIdlePollingTransfer, RAFTicker } from '../../src';
+import { AsyncIdlePollingTransfer } from '../../src';
 import { describe, expect, it, jest } from '@jest/globals';
 
 // ═══════════════════════════════════════════════════════════════

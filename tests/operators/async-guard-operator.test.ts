@@ -185,7 +185,7 @@ describe(
   'AsyncGuardOperator handles null value test',
   () => {
     it('', async () => {
-      const operator = new AsyncGuardOperator<null>((n) => true);
+      const operator = new AsyncGuardOperator<null>(() => true);
       const result = await operator.apply(null);
       expect(result).toEqual(null);
     });
@@ -196,7 +196,7 @@ describe(
   'AsyncGuardOperator handles undefined value test',
   () => {
     it('', async () => {
-      const operator = new AsyncGuardOperator<undefined>((n) => false);
+      const operator = new AsyncGuardOperator<undefined>(() => false);
       const result = await operator.apply(undefined);
       expect(result).toBeUndefined();
     });
@@ -218,7 +218,7 @@ describe(
   'AsyncGuardOperator sync validator still returns Promise test',
   () => {
     it('', () => {
-      const operator = new AsyncGuardOperator<number>((n) => true);
+      const operator = new AsyncGuardOperator<number>(() => true);
       const result = operator.apply(42);
       expect(result).toBeInstanceOf(Promise);
     });

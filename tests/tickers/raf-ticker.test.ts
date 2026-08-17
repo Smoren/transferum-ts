@@ -416,13 +416,13 @@ describe('Ticker uses native requestAnimationFrame when available test', () => {
     const origRAF = (globalThis as any).requestAnimationFrame;
     const origCAF = (globalThis as any).cancelAnimationFrame;
 
-    const rafMock = jest.fn((cb: FrameRequestCallback) => 1);
-    const cafMock = jest.fn((handle: number) => {});
+    const rafMock = jest.fn(() => 1);
+    const cafMock = jest.fn(() => {});
     (globalThis as any).requestAnimationFrame = rafMock;
     (globalThis as any).cancelAnimationFrame = cafMock;
 
     jest.isolateModules(() => {
-      // @ts-ignore
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const mod = require('../../src');
       const callback = jest.fn();
       const ticker = new mod.RAFTicker({ callback, interval: 16 });
@@ -469,6 +469,7 @@ describe('Ticker fallback uses Date.now when performance.now unavailable test', 
 describe('Ticker callback calling stop() prevents re-scheduling test', () => {
   it('', () => {
     jest.useFakeTimers();
+    // eslint-disable-next-line prefer-const
     let ticker: RAFTicker;
     const callback = jest.fn(function() {
       // Call stop() synchronously inside callback

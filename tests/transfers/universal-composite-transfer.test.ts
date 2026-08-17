@@ -658,7 +658,7 @@ describe.each([
   ...dataProviderForDestroyOwned(),
 ] as Array<[number]>)(
   'UniversalCompositeTransfer destroy cleans up owned resources test',
-  (value: number) => {
+  () => {
     it('', () => {
       const transfer = new PushStoredChannelTransfer<number>();
       const destroySpy = jest.fn();

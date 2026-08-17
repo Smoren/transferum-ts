@@ -171,7 +171,7 @@ describe(
       let callCount = 0;
       const onError = jest.fn();
       const transfer = new SinkTransfer<number>({
-        callback: (n) => {
+        callback: () => {
           callCount++;
           if (callCount === 1) { throw new Error('first error'); }
         },

@@ -542,7 +542,6 @@ describe(
     it('', () => {
       const startTransfer = new PushStoredChannelTransfer<number>();
       const intermediate1 = new PushStoredChannelTransfer<number>();
-      const intermediate2 = new PushStoredChannelTransfer<number>();
 
       const builder1 = DuplexPipelineBuilder.start(startTransfer);
       const builder2 = builder1.to(intermediate1);

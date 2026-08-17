@@ -1,7 +1,4 @@
 import type {
-  OutputTransfer,
-  OutputTransferDataType,
-  CompositeTransferBuilderInterface,
   LinkStrategyInterface,
   SubscriberInterface,
 } from '../../src';
@@ -24,7 +21,7 @@ import { describe, expect, it } from '@jest/globals';
 class TrackingLinker implements LinkStrategyInterface {
   public calls: Array<{ lhs: string; rhs: string }> = [];
 
-  link<T, RTransfer extends { constructor: { name: string } }>(
+  link<RTransfer extends { constructor: { name: string } }>(
     lhs: { constructor: { name: string } },
     rhs: RTransfer,
   ): SubscriberInterface {
@@ -33,13 +30,6 @@ class TrackingLinker implements LinkStrategyInterface {
       lhs as Parameters<typeof linkTransfers>[0],
       rhs as unknown as Parameters<typeof linkTransfers>[1],
     );
-  }
-
-  start<TStartTransfer extends OutputTransfer<unknown>>(
-    startTransfer: TStartTransfer,
-  ): CompositeTransferBuilderInterface<OutputTransferDataType<TStartTransfer>, TStartTransfer> {
-    // Not used in bridge tests — bridges only call link()
-    throw new Error('Not implemented');
   }
 }
 

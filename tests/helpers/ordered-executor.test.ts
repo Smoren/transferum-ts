@@ -147,7 +147,7 @@ describe(
   'OrderedExecutor handles empty submit gracefully test',
   () => {
     it('', async () => {
-      const executor = new OrderedExecutor();
+      new OrderedExecutor();
 
       // No tasks — should not throw
       await new Promise((resolve) => setTimeout(resolve, 10));

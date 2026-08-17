@@ -1136,14 +1136,13 @@ describe(
 
         get callIdx() { return this._callIdx; }
 
-        async asyncPush(_data: number): Promise<void> {}
+        async asyncPush(): Promise<void> {}
 
         subscribe(handler: DataHandler<string>): SubscriberInterface {
           return this._subscription.subscribe(handler);
         }
 
         abort() { this._aborted = true; }
-        get aborted() { return this._aborted; }
 
         override destroy() {
           this._subscription.destroy();

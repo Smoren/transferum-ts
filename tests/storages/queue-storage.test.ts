@@ -1,4 +1,4 @@
-import { QueueStorage, StackStorage } from '../../src';
+import { QueueStorage } from '../../src';
 import { describe, expect, it } from '@jest/globals';
 
 // ═══════════════════════════════════════════════════════════════

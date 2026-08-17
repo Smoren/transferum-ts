@@ -514,9 +514,10 @@ describe(
       const intermediate1 = new PushStoredChannelTransfer<number>();
       const intermediate2 = new PushStoredChannelTransfer<number>();
 
+      expect(intermediate2).toBeDefined();
+
       const builder1 = OutputPipelineBuilder.start(startTransfer);
       const builder2 = builder1.to(intermediate1);
-      const builder3 = builder2.to(intermediate2);
 
       // builder1 should not change after to()
       const lastTransfer1 = new PushStoredChannelTransfer<number>();
