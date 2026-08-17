@@ -6,19 +6,16 @@ import {
   SinkTransfer,
   PollingProxyTransfer,
   ReadTransfer,
-  GateTransfer,
   LatestStorage,
   AsyncSinkTransfer,
   AsyncReadTransfer,
   AsyncPollingProxyTransfer,
-  CompositeTransferBuilder,
 } from '../../src';
-import type { LinkStrategyInterface, SubscriberInterface, OutputTransfer } from '../../src';
 
 // ═══════════════════════════════════════════════════════════════
-// DefaultLinker.link()
+// DefaultLinkStrategy.link()
 // ═══════════════════════════════════════════════════════════════
-// Tests that DefaultLinker.link() correctly delegates to the underlying
+// Tests that DefaultLinkStrategy.link() correctly delegates to the underlying
 // link strategy for all 7 valid cases.
 
 // ═══════════════════════════════════════════════════════════════
@@ -29,7 +26,7 @@ describe.each([
   [1],
   [42],
 ] as Array<[number]>)(
-  'DefaultLinker.link connects Subscribable source to Pushable target test',
+  'DefaultLinkStrategy.link connects Subscribable source to Pushable target test',
   (value: number) => {
     it('', () => {
       const linker = new DefaultLinkStrategy();
@@ -54,7 +51,7 @@ describe.each([
   [1, 2, 3],
   [10, 20, 30],
 ] as Array<[number, number, number]>)(
-  'DefaultLinker.link forwards multiple values from Subscribable to Pushable test',
+  'DefaultLinkStrategy.link forwards multiple values from Subscribable to Pushable test',
   (v1: number, v2: number, v3: number) => {
     it('', () => {
       const linker = new DefaultLinkStrategy();
@@ -84,7 +81,7 @@ describe.each([
   [1],
   [99],
 ] as Array<[number]>)(
-  'DefaultLinker.link connects Pullable source to PollingProxy target test',
+  'DefaultLinkStrategy.link connects Pullable source to PollingProxy target test',
   (value: number) => {
     it('', async () => {
       const linker = new DefaultLinkStrategy();
@@ -118,7 +115,7 @@ describe.each([
 );
 
 describe(
-  'DefaultLinker.link Pullable to PollingProxy unsubscribe stops polling test',
+  'DefaultLinkStrategy.link Pullable to PollingProxy unsubscribe stops polling test',
   () => {
     it('', async () => {
       const linker = new DefaultLinkStrategy();
@@ -159,7 +156,7 @@ describe.each([
   [100],
   [200],
 ] as Array<[number]>)(
-  'DefaultLinker.link connects Subscribable source to PollingProxy target test',
+  'DefaultLinkStrategy.link connects Subscribable source to PollingProxy target test',
   (value: number) => {
     it('', async () => {
       const linker = new DefaultLinkStrategy();
@@ -199,7 +196,7 @@ describe.each([
   [42],
   [-7],
 ] as Array<[number]>)(
-  'DefaultLinker.link connects Subscribable source to AsyncPushable target test',
+  'DefaultLinkStrategy.link connects Subscribable source to AsyncPushable target test',
   (value: number) => {
     it('', async () => {
       const linker = new DefaultLinkStrategy();
@@ -227,7 +224,7 @@ describe.each([
 );
 
 describe(
-  'DefaultLinker.link Subscribable to AsyncPushable with onError handles rejection test',
+  'DefaultLinkStrategy.link Subscribable to AsyncPushable with onError handles rejection test',
   () => {
     it('', async () => {
       const linker = new DefaultLinkStrategy();
@@ -254,7 +251,7 @@ describe(
 );
 
 describe(
-  'DefaultLinker.link Subscribable to AsyncPushable unsubscribe stops data flow test',
+  'DefaultLinkStrategy.link Subscribable to AsyncPushable unsubscribe stops data flow test',
   () => {
     it('', async () => {
       const linker = new DefaultLinkStrategy();
@@ -290,7 +287,7 @@ describe.each([
   [42],
   [-7],
 ] as Array<[number]>)(
-  'DefaultLinker.link connects AsyncPullable source to AsyncPollingProxy target test',
+  'DefaultLinkStrategy.link connects AsyncPullable source to AsyncPollingProxy target test',
   (value: number) => {
     it('', async () => {
       const linker = new DefaultLinkStrategy();
@@ -328,7 +325,7 @@ describe.each([
   [42],
   [-7],
 ] as Array<[number]>)(
-  'DefaultLinker.link connects Pullable source to AsyncPollingProxy target test',
+  'DefaultLinkStrategy.link connects Pullable source to AsyncPollingProxy target test',
   (value: number) => {
     it('', async () => {
       const linker = new DefaultLinkStrategy();
@@ -368,7 +365,7 @@ describe.each([
   [42],
   [-7],
 ] as Array<[number]>)(
-  'DefaultLinker.link connects Subscribable source to AsyncPollingProxy target test',
+  'DefaultLinkStrategy.link connects Subscribable source to AsyncPollingProxy target test',
   (value: number) => {
     it('', async () => {
       const linker = new DefaultLinkStrategy();
@@ -403,7 +400,7 @@ describe.each([
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'DefaultLinker.link throws error for AsyncPullable to sync PollingProxy test',
+  'DefaultLinkStrategy.link throws error for AsyncPullable to sync PollingProxy test',
   () => {
     it('', () => {
       const linker = new DefaultLinkStrategy();
@@ -425,7 +422,7 @@ describe(
 );
 
 describe(
-  'DefaultLinker.link throws error for Pullable to Pushable test',
+  'DefaultLinkStrategy.link throws error for Pullable to Pushable test',
   () => {
     it('', () => {
       const linker = new DefaultLinkStrategy();
@@ -444,7 +441,7 @@ describe(
 );
 
 describe(
-  'DefaultLinker.link throws error for unsupported combination test',
+  'DefaultLinkStrategy.link throws error for unsupported combination test',
   () => {
     it('', () => {
       const linker = new DefaultLinkStrategy();
@@ -452,7 +449,7 @@ describe(
       const source = new ReadTransfer<number>({ flow: storage });
       const target = new ReadTransfer<number>({ flow: new LatestStorage<number>() });
 
-      // @ts-expect-error
+      // @ts-expect-error: target has unacceptable type
       expect(() => linker.link(source, target)).toThrow(
         'Unsupported transfer link combination',
       );
@@ -464,11 +461,11 @@ describe(
 );
 
 // ═══════════════════════════════════════════════════════════════
-// DefaultLinker.link — lifecycle
+// DefaultLinkStrategy.link — lifecycle
 // ═══════════════════════════════════════════════════════════════
 
 describe(
-  'DefaultLinker.link subscriber is active after link and inactive after unsubscribe test',
+  'DefaultLinkStrategy.link subscriber is active after link and inactive after unsubscribe test',
   () => {
     it('', () => {
       const linker = new DefaultLinkStrategy();
@@ -488,7 +485,7 @@ describe(
 );
 
 describe(
-  'DefaultLinker.link returns unique subscriber each call test',
+  'DefaultLinkStrategy.link returns unique subscriber each call test',
   () => {
     it('', () => {
       const linker = new DefaultLinkStrategy();
@@ -516,7 +513,7 @@ describe(
 );
 
 describe(
-  'DefaultLinker.link multiple link calls accumulate and stop independently test',
+  'DefaultLinkStrategy.link multiple link calls accumulate and stop independently test',
   () => {
     it('', () => {
       const linker = new DefaultLinkStrategy();

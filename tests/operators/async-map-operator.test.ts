@@ -188,7 +188,7 @@ describe(
   'AsyncMapOperator handles null value test',
   () => {
     it('', async () => {
-      const operator = new AsyncMapOperator<null, string>((n) => 'is_null');
+      const operator = new AsyncMapOperator<null, string>(() => 'is_null');
       const result = await operator.apply(null);
       expect(result).toEqual('is_null');
     });
@@ -199,7 +199,7 @@ describe(
   'AsyncMapOperator handles undefined value test',
   () => {
     it('', async () => {
-      const operator = new AsyncMapOperator<undefined, string>((n) => 'is_undefined');
+      const operator = new AsyncMapOperator<undefined, string>(() => 'is_undefined');
       const result = await operator.apply(undefined);
       expect(result).toEqual('is_undefined');
     });

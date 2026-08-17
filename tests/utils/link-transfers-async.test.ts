@@ -226,7 +226,7 @@ describe(
         isAsyncPullable: false,
         isAsyncTriggerable: false,
         isAsyncPollingProxy: false,
-        asyncPush: async (_data: number) => { throw 'raw string error'; },
+        asyncPush: async () => { throw 'raw string error'; },
         destroy: () => {},
       } as any;
 

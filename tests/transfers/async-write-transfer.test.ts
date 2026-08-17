@@ -48,7 +48,9 @@ describe.each([
   'AsyncWriteTransfer asyncPush calls flow.write test',
   (value: number) => {
     it('', async () => {
-      const write = jest.fn(async (_) => {});
+      const write = jest.fn(async (_) => {
+        return _;
+      });
       const transfer = new AsyncWriteTransfer<number>({ flow: { write } });
 
       await transfer.asyncPush(value);
@@ -704,7 +706,7 @@ describe(
       const promiseWrite = new Promise<void>((resolve) => { resolveWrite = resolve; });
 
       const flow = {
-        write: async (_n: number) => {
+        write: async () => {
           await promiseWrite;
           writeDone = true;
         },

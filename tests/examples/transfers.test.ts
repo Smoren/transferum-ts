@@ -349,6 +349,8 @@ describe('README Transfers: ChannelTransfer', () => {
       onError: (e) => console.error(e),
     });
 
+    expect(emit).toBeDefined();
+
     const received: number[] = [];
     channel.subscribe((data) => received.push(data));
 

@@ -1,4 +1,4 @@
-import { WriteTransfer, LatestStorage, QueueStorage, StackStorage } from '../../src';
+import { WriteTransfer, LatestStorage, QueueStorage } from '../../src';
 import { describe, expect, it, jest } from '@jest/globals';
 
 // ═══════════════════════════════════════════════════════════════
@@ -51,21 +51,6 @@ describe(
   },
 );
 
-/**
- * Data provider for testing push().
- * [StorageClass, value, expectedSize]
- */
-function dataProviderForWritePush(): Array<unknown> {
-  return [
-    [LatestStorage, 42, 1],
-    [LatestStorage, 0, 1],
-    [QueueStorage, 42, 1],
-    [QueueStorage, 0, 1],
-    [StackStorage, 42, 1],
-    [StackStorage, 0, 1],
-  ];
-}
-
 describe(
   'WriteTransfer push overwrites LatestStorage test',
   () => {
@@ -101,18 +86,6 @@ describe(
     });
   },
 );
-
-/**
- * Data provider for testing owned destroy.
- * [StorageClass, value]
- */
-function dataProviderForWriteOwned(): Array<unknown> {
-  return [
-    [LatestStorage, 42],
-    [QueueStorage, 42],
-    [StackStorage, 42],
-  ];
-}
 
 describe(
   'WriteTransfer not owned destroy does not clear storage test',

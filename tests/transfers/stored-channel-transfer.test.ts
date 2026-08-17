@@ -54,6 +54,7 @@ describe.each([
       });
 
       expect(transfer.pull()).toBe(value);
+      expect(emit).toBeDefined();
 
       transfer.destroy();
     });
@@ -114,6 +115,7 @@ describe.each([
 
       expect(handler).toHaveBeenCalledTimes(1);
       expect(handler).toHaveBeenCalledWith(value);
+      expect(emit).toBeDefined();
 
       transfer.destroy();
     });

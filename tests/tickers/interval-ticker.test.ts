@@ -445,7 +445,7 @@ describe('IntervalTicker with zero interval starts setInterval immediately test'
 describe('IntervalTicker with zero interval executes callback via setInterval test', () => {
   it('', () => {
     const callback = jest.fn();
-    // @ts-ignore
+    // @ts-expect-error: fn has bad type
     const setIntervalSpy = jest.spyOn(globalThis, 'setInterval').mockImplementation((fn: (...args: any[]) => void) => {
       fn();
       return 123 as any;

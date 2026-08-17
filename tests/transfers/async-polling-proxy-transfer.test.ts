@@ -1,5 +1,5 @@
-import type { TickerFactory, AsyncDataFetcher } from '../../src';
-import { AsyncPollingProxyTransfer, IntervalTicker } from '../../src';
+import type { TickerFactory } from '../../src';
+import { AsyncPollingProxyTransfer } from '../../src';
 import { describe, expect, it, jest } from '@jest/globals';
 
 // ═══════════════════════════════════════════════════════════════

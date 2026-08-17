@@ -84,7 +84,7 @@ describe.each([
   'AsyncSinkTransfer asyncPush with async callback test',
   (value: number) => {
     it('', async () => {
-      const callback = jest.fn(async (v: number) => { await Promise.resolve(); });
+      const callback = jest.fn(async (v: number) => await Promise.resolve(v));
       const transfer = new AsyncSinkTransfer<number>({ callback });
 
       await transfer.asyncPush(value);
@@ -756,7 +756,7 @@ describe(
       const promiseCb = new Promise<void>((resolve) => { resolveCb = resolve; });
 
       const transfer = new AsyncSinkTransfer<number>({
-        callback: async (n: number) => {
+        callback: async () => {
           await promiseCb;
           callbackDone = true;
         },

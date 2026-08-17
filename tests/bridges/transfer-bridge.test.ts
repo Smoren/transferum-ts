@@ -80,12 +80,12 @@ describe.each([
 // ═══════════════════════════════════════════════════════════════
 
 describe.each([
-  [5, 10],
-  [20, 40],
-  [100, 200],
-] as Array<[number, number]>)(
+  [5],
+  [20],
+  [100],
+] as Array<[number]>)(
   'TransferBridge activate from inactive state test',
-  (inputValue: number, expectedOutput: number) => {
+  (inputValue: number) => {
     it('', () => {
       const source = new PushStoredChannelTransfer<number>();
       const target = new PushStoredChannelTransfer<number>();
@@ -372,10 +372,9 @@ describe.each([
 
 describe.each([
   [1],
-  [42],
 ] as Array<[number]>)(
   'TransferBridge destroy with middleOwned=true destroys middle transfer test',
-  (testValue: number) => {
+  () => {
     it('', () => {
       const source = new PushStoredChannelTransfer<number>();
       const target = new PushStoredChannelTransfer<number>();
@@ -400,10 +399,9 @@ describe.each([
 
 describe.each([
   [1],
-  [42],
 ] as Array<[number]>)(
   'TransferBridge destroy with middleOwned=false does not destroy middle transfer test',
-  (testValue: number) => {
+  () => {
     it('', () => {
       const source = new PushStoredChannelTransfer<number>();
       const target = new PushStoredChannelTransfer<number>();
@@ -463,10 +461,9 @@ describe.each([
 
 describe.each([
   [1],
-  [42],
 ] as Array<[number]>)(
   'TransferBridge multiple destroy calls are safe test',
-  (testValue: number) => {
+  () => {
     it('', () => {
       const source = new PushStoredChannelTransfer<number>();
       const target = new PushStoredChannelTransfer<number>();

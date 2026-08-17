@@ -45,6 +45,7 @@ describe(
       // Submit 0 and 2, but not 1 — gap at seq 1
       queue.submit(seq0, 0);
       queue.submit(seq2, 2);
+      expect(seq1).toBe(1);
 
       queue.drain((value) => emitted.push(value));
 

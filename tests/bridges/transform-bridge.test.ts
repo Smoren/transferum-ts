@@ -424,10 +424,9 @@ describe.each([
 
 describe.each([
   [1],
-  [42],
 ] as Array<[number]>)(
   'TransformBridge multiple destroy calls are safe test',
-  (testValue: number) => {
+  () => {
     it('', () => {
       const source = new PushStoredChannelTransfer<number>();
       const target = new PushStoredChannelTransfer<string>();

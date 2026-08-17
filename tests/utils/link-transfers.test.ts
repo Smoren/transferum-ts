@@ -512,7 +512,7 @@ describe.each([
       const source = new ReadTransfer<number>({ flow: storage });
       const target = new ReadTransfer<number>({ flow: new LatestStorage<number>() });
 
-      // @ts-expect-error
+      // @ts-expect-error: target is unacceptable here
       expect(() => linkTransfers(source, target)).toThrow(
         'Unsupported transfer link combination'
       );
