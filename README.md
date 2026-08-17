@@ -3159,7 +3159,7 @@ Many configs include optional error handlers (`onError`, `onAcceptError`, `onEmi
 
 ```bash
 npm i
-npm run lint   # formatting & type check
+npm run lint   # lint source files
 npm run test   # 2,197 tests, 100% coverage
 ```
 
