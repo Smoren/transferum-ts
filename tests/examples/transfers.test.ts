@@ -34,7 +34,6 @@ import {
   UniversalCompositeTransfer,
 } from '../../src';
 import { describe, expect, it } from '@jest/globals';
-// @ts-ignore
 import { wait } from './fixtures';
 
 // ═══════════════════════════════════════════════════════════════

@@ -3,7 +3,7 @@
     "target": "ES6",
     "module": "Node16",
     "lib": ["es2017", "dom"],
-    "rootDir": "./src",
+    "rootDir": ".",
     "allowJs": false,
     "outDir": "./dist",
     "esModuleInterop": true,

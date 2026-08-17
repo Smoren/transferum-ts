@@ -35,7 +35,6 @@ import type {
   Telemetry,
   LogEntry,
   SearchResult,
-  // @ts-ignore
 } from './fixtures';
 import {
   wait,
