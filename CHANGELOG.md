@@ -1,5 +1,23 @@
 # Transferum Change Log
 
+## v1.8.0 - 2026-08-18
+
+### New: `BaseLinkStrategy` exported
+
+* **`src/linking.ts`** — internal `BaseLinkingStrategy` renamed to `BaseLinkStrategy` and now **exported**. Custom link strategies can extend this abstract class (or extend `DefaultLinkStrategy`) and override individual protected `_link*` methods while reusing the rest. No breaking change: the previous class was not part of the public API.
+* **Tests:** new suite `tests/linking/base-link-strategy.test.ts` (8 tests) — custom subclasses extend `BaseLinkStrategy`/`DefaultLinkStrategy`, override protected `_link*` methods, and are injected into `CompositeTransferBuilder` and `PassBridge`.
+
+### Documentation
+
+* **README — Installation & Import:** removed seven non-existent standalone exports (`linkSubscribableToPushable`, `linkPullableToPollingProxy`, etc.).
+* **README — `linkTransfers` section:** updated to describe delegation to `DefaultLinkStrategy.link()` and the seven protected `_link*` strategy methods on `BaseLinkStrategy`.
+
+### Internal
+
+* **`tsconfig.json`** — `rootDir` set to `.` (fixes TS6059 in IDEs that include tests in the TS program); added `"types": ["node"]` (fixes TS2591 for `require()` in tests).
+* **`package.json`** — build scripts now pass `--rootDir src` explicitly (keeps `lib/`/`es/` output layout stable); added `lint-tests` script.
+* **Tests:** fixed lint errors in example tests (removed unused `@ts-ignore` comments); renamed `tests/linking/default-linker.test.ts` → `tests/linking/default-link-strategy.test.ts`.
+
 ## v1.7.1 - 2026-08-17
 
 ### New linting system
