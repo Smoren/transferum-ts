@@ -2994,7 +2994,7 @@ Internally, `linkTransfers` delegates to `DefaultLinkStrategy.link()`, which ins
 | `_linkPullableToAsyncPollingProxy`       | `Pullable`      | `AsyncPollingProxy` | Sync-pull wrapped in an async fetcher                    |
 | `_linkSubscribableToAsyncPollingProxy`   | `Subscribable`  | `AsyncPollingProxy` | Subscription + buffer + async fetcher                    |
 
-Error helpers for unsupported combinations (protected methods on `BaseLinkStrategy`):
+Error helpers for unsupported combinations (protected methods on `BaseLinkStrategy` or `DefaultLinkStrategy` as noted below):
 
 | Method                                      | When                                                                                            |
 |---------------------------------------------|-------------------------------------------------------------------------------------------------|
